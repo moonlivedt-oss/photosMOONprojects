@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Промпты для картинок</title>
+<style>
+:root{--bg:#15151c;--card:#1f1f29;--card2:#272734;--fg:#e8e6f0;--dim:#9a98a8;--acc:#9d8cff;--line:#2f2f3d;--ok:#5fd39a}
+@media (prefers-color-scheme:light){:root{--bg:#f4f3f8;--card:#fff;--card2:#f0eef7;--fg:#1d1c24;--dim:#6b6978;--acc:#6a55e0;--line:#e2e0ea;--ok:#1f9d63}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,"Segoe UI",sans-serif}
+header{position:sticky;top:0;z-index:3;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 16px}
+h1{font-size:18px;margin:0 0 4px}
+.hint{color:var(--dim);font-size:13px;margin:0 0 10px}
+.pals{display:flex;flex-wrap:wrap;gap:6px}
+.pal{display:flex;align-items:center;gap:6px;padding:4px 9px 4px 5px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;font-size:12px}
+.pal.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.sw{display:flex;border-radius:10px;overflow:hidden;height:16px}.sw i{width:8px;display:block}
+nav{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:10px}nav a{color:var(--acc);text-decoration:none;font-size:13px}
+main{padding:4px 16px 40px;max-width:1300px}
+h2{font-size:17px;margin:26px 0 2px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.c b{font-size:14px}
+.meta{color:var(--dim);font-size:12px}
+.p{background:var(--card2);border-radius:7px;padding:7px 9px;font:12px/1.45 Consolas,monospace;white-space:pre-wrap;word-break:break-word;max-height:9.5em;overflow:auto;cursor:pointer}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.lab{color:var(--dim);font-size:12px;margin:8px 0 4px}
+.tools{display:flex;gap:8px;margin-top:10px}.tools input{flex:1;min-width:160px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.tools button{padding:6px 14px;border-radius:8px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
+.c.flash{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+.c.done{opacity:.55}.c.done b:after{content:"  - готово";color:var(--ok);font-weight:400}
+.tools button.alt{background:var(--card);color:var(--fg);border-color:var(--line)}
+button.b{flex:1;padding:6px;border-radius:7px;border:1px solid var(--line);background:var(--card2);color:var(--fg);cursor:pointer;font-size:12px}
+button.b.main{background:var(--acc);border-color:var(--acc);color:#fff}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ok);color:#fff;padding:8px 16px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;font-size:13px}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>Промпты для картинок</h1>
+  <p class="hint">Выберите цвета, затем нажмите «Копировать всё»: в буфер попадут промпт и негатив одним текстом (для умной модели запреты идут второй строкой «Avoid: ...», для SDXL - «Negative prompt: ...»). «Имена» копирует английские имена файлов: для листа - 12 через запятую, их вставляют в поле «Имена» окна библиотеки. В режиме «Умная модель» наклейки, значки и частицы просятся сразу на прозрачном фоне. «Промпт» и «Negative» копируют их по отдельности. «Как задумано» - у каждого промпта своя подходящая палитра. Манера рисунка меняет наклейки, значки, маскота и медали; на фоны не влияет. «Случайный» сам выбирает промпт, цвета и манеру. Лица есть только у живых существ: у предметов их нет.</p>
+  <div class="lab">Генератор</div>
+  <div class="pals" id="gens"></div>
+  <div class="lab">Цвета</div>
+  <div class="pals" id="pals"></div>
+  <div class="lab">Манера рисунка</div>
+  <div class="pals" id="stys"></div>
+  <div class="tools"><input id="q" placeholder="Поиск по промптам..."><button id="rnd">Случайный</button><button id="done" class="alt"></button></div>
+  <nav id="nav"></nav>
+</header>
+<main id="main"></main>
+<div id="toast"></div>
+<!-- Список того, что уже лежит в библиотеке; пересоздаётся вместе с галереей. -->
+<script src="_инструменты/готово.js"></script>
+<script>
+// ---------------- палитры ----------------
+var PAL = [
+  ["auto","Как задумано","",[]],
+  ["default","Фиолетовая ночь","lavender and periwinkle colors, soft violet, indigo shadows, white highlights",["#2b2550","#7c6cf0","#a99cff"]],
+  ["dracula","Dracula","dark purple-grey base, hot pink, soft purple and cyan accents",["#282a36","#ff79c6","#bd93f9","#8be9fd"]],
+  ["nord","Nord","cold arctic blue-grey, frosty light blue, snow white, muted teal",["#2e3440","#88c0d0","#eceff4"]],
+  ["gruvbox","Gruvbox","warm dark brown base, mustard yellow, burnt orange, olive green",["#282828","#fabd2f","#fe8019","#98971a"]],
+  ["mocha","Mocha","dark blue-black base, soft mauve, peach and sky blue pastels",["#1e1e2e","#cba6f7","#fab387","#89dceb"]],
+  ["onedark","One Dark","charcoal grey base, soft blue, coral red and fresh green accents",["#282c34","#61afef","#e06c75","#98c379"]],
+  ["rosepine","Rose Pine","very dark violet base, dusty rose, muted gold, pine teal",["#191724","#ebbcba","#f6c177","#31748f"]],
+  ["tokyo","Tokyo Night","deep navy base, electric blue, magenta and teal glow",["#1a1b26","#7aa2f7","#bb9af7","#73daca"]],
+  ["forest","Лес","deep forest green, moss green, sage, warm amber highlights",["#1b2b22","#6a8f4e","#a3b18a","#e0a458"]],
+  ["sunset","Закат","peach, coral, magenta dusk sky, deep plum shadows",["#3d1e4a","#c850c0","#ff6f61","#ffb38a"]],
+  ["latte","Latte (светлая)","creamy off-white base, lavender, soft pink and peach pastels, light and airy",["#eff1f5","#7287fd","#ea76cb","#fe640b"]],
+  ["solar","Solar (светлая)","warm beige base, teal, calm blue, small orange accents, light",["#fdf6e3","#2aa198","#268bd2","#cb4b16"]],
+  ["paper","Бумага","off-white parchment, warm brown ink lines, faded red accents, vintage",["#f4ecd8","#5b4636","#a33b2f"]],
+  ["mint","Мята","clean white, mint green, soft aqua, pale lemon accents",["#ffffff","#98f5c8","#7fdbda","#fff3a0"]],
+  ["sakura","Сакура","pale pink, white blossoms, soft leaf green, warm cream",["#ffd1dc","#ffffff","#a8d5a2","#fff4e0"]],
+  ["mono","Ч/б","monochrome black, white and greys, single bright red accent",["#000000","#8a8a8a","#ffffff","#e5484d"]],
+  ["contrast","Контраст","pure black background, vivid yellow, pure white and cyan, high contrast",["#000000","#ffd400","#ffffff","#00e5ff"]],
+  ["synthwave","Synthwave","dark purple night, hot pink and cyan neon, orange-to-pink sun gradient",["#1a0b2e","#ff2e97","#00e5ff","#ff8a00"]],
+  ["ocean","Океан","abyss navy, turquoise, bioluminescent cyan glow",["#061a2b","#1fb5a8","#5ff5ff"]],
+  ["autumn","Осень","burnt orange, crimson, golden yellow, dark brown",["#4a2c1a","#a93226","#d35400","#f1c40f"]]
+];
+
+// ---------------- манера рисунка ----------------
+// [ключ, название, текст, что убрать из негативного промпта]
+var STY = [
+  ["sticker","Наклейка","(thick clean white outline:1.3), soft cel shading, glossy highlights",[]],
+  ["flat","Плоский вектор","flat vector illustration, bold simple shapes, two-tone shading, (thick white sticker border:1.2)",[]],
+  ["pixel","Пиксель-арт","pixel art, 32-bit game item sprite, crisp square pixels, limited palette, dark one pixel outline",["thin outline"]],
+  ["clay","Пластилин","claymation style, soft clay 3d render, rounded forms, matte material, subtle fingerprint texture, soft studio light",["3d render"]],
+  ["paper","Бумажная аппликация","layered paper cut craft, visible paper grain, soft shadow between layers, white paper border",["drop shadow"]],
+  ["water","Акварель","watercolor painting, loose wet edges, fine ink linework, paper texture, white border",["thin outline"]],
+  ["neon","Неон","glowing neon line art, thin luminous tubes, soft bloom, dark glass body",["thin outline"]],
+  ["iso","Изометрия","isometric 3d icon, smooth plastic material, soft gradients, subtle ambient occlusion",["3d render"]],
+  ["ink","Тушь","hand drawn ink sketch, crosshatching, slightly uneven lines, flat color fills",["thin outline","multiple outlines"]],
+  ["glass","Стекло","glossy translucent glass material, frosted surface, soft refraction, bright rim light",["3d render"]]
+];
+// Неожиданная деталь для фонов: кнопка «С изюминкой» дописывает одну случайную.
+var TW = ["a single paper lantern drifting away in the distance", "a constellation shaped like a fox in the sky", "a tiny red umbrella left on the ground",
+  "one window glowing in a different color than all the others", "a paper boat floating by", "a thin trail of glowing footprints leading away",
+  "a small door where no door should be", "a kite caught in the wires", "an old bicycle leaning against a wall", "a flock of paper cranes flying past",
+  "a comet crossing the sky", "a cat silhouette on a far rooftop", "a forgotten telescope pointed at the sky", "a staircase that leads nowhere"];
+
+// ---------------- куски промптов ----------------
+var ST = "{S}, {P}, solid flat mid grey background, masterpiece, best quality";
+// Предметы рисуются предметами: слово kawaii убрано, потому что оно приделывает лица всему подряд.
+var OBJ = "plain inanimate objects with clean simple surfaces";
+var MASCOT = "cute round blob mascot, soft periwinkle-lavender body shaped like a chubby teardrop, small messy tuft of fluffy hair on top, huge glossy dark eyes with star-shaped sparkle highlights, pink blush cheeks, tiny open smile, short stubby arms, tiny round feet";
+function sheet(x){ return "sticker sheet, 12 different object stickers arranged in a neat 4x3 grid, evenly spaced with wide gaps, each sticker separate and not touching, same size, same style, " + OBJ + ": " + x + ", " + ST; }
+// Лист живых существ: здесь лица на месте.
+function zoo(x){ return "sticker sheet, 12 different cute creature stickers arranged in a neat 4x3 grid, evenly spaced with wide gaps, each sticker separate and not touching, same size, same style, friendly expressive faces: " + x + ", " + ST; }
+function icon(x){ return "single app ui icon of " + x + ", chunky rounded object illustration, plain surfaces, slight 3/4 view, centered with margin, " + ST; }
+function mascot(x){ return "character sticker, " + MASCOT + ", " + x + ", full body, centered, small colorful confetti lines around, " + ST; }
+function dark(x){ return x + ", anime background art, cinematic wide shot, dramatic volumetric lighting, glowing light sources, rich painterly detail in the lower third, calm darker upper area, depth haze, no people, {P}, highly detailed, masterpiece, best quality"; }
+function light(x){ return x + ", flat vector landscape illustration, minimalist, layered silhouettes, atmospheric perspective, (high key, pale, washed out:1.2), soft morning light, large empty sky, no people, {P}, calm, clean shapes, masterpiece"; }
+function pat(x){ return "(seamless tileable pattern:1.3), " + x + ", flat top-down view, evenly distributed, no focal point, subtle low contrast, {P}, clean repeating texture"; }
+function grad(x){ return x + ", abstract background, smooth, no objects, subtle grain, {P}, modern ui wallpaper, masterpiece"; }
+function empty(x){ return "empty state illustration for an app, " + x + ", small scene on a soft round ground shape, chunky rounded sticker illustration, " + OBJ + ", gentle calm mood, " + ST; }
+function medal(m, x){ return "round achievement medal badge, polished " + m + " rim with small engraved dots, " + x + " emblem in the center, short folded ribbon below, chunky sticker illustration, front view, " + ST; }
+function avatar(x){ return "round profile avatar, cute " + x + " face and shoulders, looking at viewer, happy expression, kawaii sticker style, inside a solid colored circle, " + ST; }
+function fx(x){ return "sprite sheet of 16 different " + x + " arranged in a 4x4 grid, each separate with wide gaps, soft glow, varied sizes and rotations, {P}, (pure black background:1.3), no other objects, masterpiece"; }
+function frame(x){ return x + ", game ui asset, front view, flat, symmetrical, clean edges, {P}, solid flat mid grey background, masterpiece"; }
+function logo(x){ return "app icon, rounded square tile with soft inner glow, " + x + ", one clear central symbol, bold simple shapes, readable at small size, soft cel shading, glossy highlight, {P}, centered, masterpiece, best quality"; }
+function cover(x){ return "wide banner illustration, " + x + " on the right third, (large calm empty area on the left for a title:1.3), flat vector style with soft gradients, soft light, {P}, masterpiece"; }
+function vn(x, t){ return "visual novel background, " + x + ", " + t + ", eye-level view, anime style, detailed, clean lines, (no characters:1.3), {P}, masterpiece"; }
+
+// ---------------- английские имена файлов ----------------
+// Кнопка «Имена» копирует готовые имена: для листа - 12 штук через запятую (вставить в поле «Имена» окна библиотеки),
+// для одиночной картинки - одно имя. Имена собираются из английского текста промпта.
+var SRC = {}, STOP = " a an the of with and in on at to for from by under over near into its is no very that ";
+function slug(s, n) {
+  var w = s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(function (x) { return x && STOP.indexOf(" " + x + " ") < 0; });
+  return w.slice(0, n || 3).join("-");
+}
+function wrap(f, pre) {
+  return function () { var a = arguments, r = f.apply(null, a); SRC[r] = pre + (a.length > 1 ? slug(a[0], 2) + "-" + slug(a[1], 2) : slug(a[0], 3)); return r; };
+}
+icon = wrap(icon, "icon-"); mascot = wrap(mascot, "mascot-"); dark = wrap(dark, "bg-"); light = wrap(light, "bg-"); pat = wrap(pat, "pattern-");
+grad = wrap(grad, "gradient-"); empty = wrap(empty, "empty-"); medal = wrap(medal, "medal-"); avatar = wrap(avatar, "avatar-"); fx = wrap(fx, "fx-");
+frame = wrap(frame, "frame-"); logo = wrap(logo, "logo-"); cover = wrap(cover, "cover-"); vn = wrap(vn, "vn-");
+function names(it) {
+  var m = /(?:simple surfaces|expressive faces): (.*), \{S\}/.exec(it[1]);
+  if (m) {
+    var l = m[1].slice(m[1].lastIndexOf(": ") + 1).split(", ").map(function (x) { return slug(x, 3); });
+    if (l.length === 12) return l.join(", ");
+  }
+  if (SRC[it[1]]) return /^[\x20-\x7e]+$/.test(it[0]) ? SRC[it[1]].split("-")[0] + "-" + slug(it[0], 3) : SRC[it[1]];
+  return slug(it[1].replace(MASCOT, "mascot"), 4);
+}
+
+var NB = "text, letters, words, watermark, signature, logo, blurry, jpeg artifacts, lowres, noise, deformed, cropped, cut off";
+var N = {
+  st: NB + ", face, eyes, mouth, smile, blush cheeks, anthropomorphic, character, mascot, shadow on the ground, drop shadow, background scenery, gradient background, photo, realistic, 3d render, thin outline, multiple outlines",
+  liv: NB + ", scary, extra eyes, human, shadow on the ground, drop shadow, background scenery, gradient background, photo, realistic, 3d render, thin outline, multiple outlines",
+  ch: NB + ", shadow on the ground, gradient background, photo, realistic, 3d render, extra limbs, extra eyes, missing arms, teeth, scary, human",
+  bg: NB + ", people, characters, faces, animals in foreground, ui elements, frame, border, vignette, oversaturated",
+  grad: NB + ", people, characters, faces, objects, ui elements, frame, border, vignette, oversaturated",
+  pat: NB + ", seams, visible tile edges, vignette, single central object, perspective, lighting gradient",
+  fx: NB + ", background scenery, gradient background, grey background, frame"
+};
+
+// ---------------- разделы ----------------
+// [название, пояснение, негатив, палитра по умолчанию, [[имя, промпт, размер, палитра?, негатив?], ...]]
+var S = [
+ ["Листы наклеек 4x3", "12 картинок за одну генерацию. Готовый лист положить в 00 Входящие и открыть «Библиотека.cmd»: заготовка «Наклейки» или «Иконки». Предметы без лиц; листы с живыми существами - с лицами.", "st", "default", [
+  ["Интерфейс: основное", sheet("folder, gear, magnifying glass, trash bin, cloud, padlock, key, bell, calendar, wifi signal, rocket, beetle seen from above"), "1024x1024"],
+  ["Интерфейс: действия", sheet("download arrow, upload arrow, circular sync arrows, eye, camera, clipboard, terminal window, puzzle piece, paint brush, color palette, wrench, battery"), "1024x1024"],
+  ["Интерфейс: знаки", sheet("house, user silhouette, plus in circle, check mark in circle, cross in circle, question mark bubble, speech bubble, heart, star, bookmark, pin, lightning bolt"), "1024x1024"],
+  ["Файлы", sheet("document, image file, music file, video file, zip archive, code file with brackets, spreadsheet, pdf file, folder with star, folder with lock, notebook, sticky note"), "1024x1024"],
+  ["Сеть (NetworkDoctor)", sheet("globe, wifi router with antennas, ethernet cable, broken chain link, shield with check mark, satellite dish, server rack, signal bars, plug and socket, magnet, tunnel entrance, first aid kit"), "1024x1024", "nord"],
+  ["Время и конкурсы (ContestReminder)", sheet("alarm clock, hourglass, stopwatch, calendar with red circle, ringing bell, trophy cup, medal, finish flag, rocket, checklist, target with arrow, envelope"), "1024x1024", "sunset"],
+  ["Язык (AutoTranslator)", sheet("two speech bubbles, open dictionary, globe with arrows, keyboard, microphone, headphones, magnifier over text lines, scissors, clipboard with lines, eye, loudspeaker, quill pen"), "1024x1024", "tokyo"],
+  ["Реакции", sheet("thumbs up, clapping hands, party popper, fire, sparkles, zzz sleep symbol, sweat drop, exclamation mark, question mark, broken heart, crown, rainbow"), "1024x1024"],
+  ["Погода", sheet("sun, cloud, rain cloud, thunderstorm, snowflake, rainbow, moon with stars, wind swirl, umbrella, thermometer, tornado, sunrise"), "1024x1024", "mint"],
+  ["Еда и уют", sheet("coffee cup, tea mug, donut, cookie, cake slice, pizza slice, onigiri, ramen bowl, milk box, apple, candy, ice cream"), "1024x1024", "latte"],
+  ["RPG-лут", sheet("short sword, round wooden shield, red health potion, blue mana potion, treasure chest, stack of gold coins, rolled map with a wax seal, magic ring, bow with an arrow, leather boots, spell book with a clasp, cut crystal gem"), "1024x1024", "gruvbox"],
+  ["Алхимия и магия", sheet("round flask with bubbling liquid, mortar and pestle, crystal ball on a stand, wand with a star tip, carved rune stone, dripping candle, sealed scroll, iron cauldron, bundle of dried herbs, hourglass, amulet on a chain, quill in an inkwell"), "1024x1024", "dracula"],
+  ["Космос", sheet("rocket, ringed planet, flying saucer, satellite with solar panels, space helmet with a mirrored visor, telescope, comet, cratered moon, space station module, meteor, star map, moon rover"), "1024x1024", "tokyo"],
+  ["Ретро-техника", sheet("floppy disk, cassette tape, crt monitor, game cartridge, joystick, vinyl record, pager, film camera, boombox, rotary phone, instant photo, portable cassette player"), "1024x1024", "synthwave"],
+  ["Стол программиста", sheet("mechanical keyboard, coffee mug with steam, energy drink can, stack of sticky notes, laptop with code lines, headphones, usb stick, monitor with a terminal, branching diagram sign, small desk plant, tangled cable, pizza box"), "1024x1024", "onedark"],
+  ["Растения в горшках", sheet("monstera, round cactus, succulent rosette, bonsai tree, fern, snake plant, flowering orchid, hanging ivy, bamboo in a glass, venus flytrap, lavender pot, sprout in a cup"), "1024x1024", "forest"],
+  ["Мастерская", sheet("hammer, screwdriver, pliers, tape measure, paint roller, glue gun, soldering iron, toolbox, hand saw, spirit level, roll of tape, jar of screws"), "1024x1024", "autumn"],
+  ["Лесные звери (с лицами)", zoo("fox, owl, hedgehog, squirrel, fawn, raccoon, rabbit, bear cub, frog, badger, mouse, bat"), "1024x1024", "forest", "liv"],
+  ["Морские жители (с лицами)", zoo("octopus, crab, whale, jellyfish, seahorse, sea turtle, pufferfish, baby shark, otter, seal, clownfish, axolotl"), "1024x1024", "ocean", "liv"],
+  ["Сказочные существа (с лицами)", zoo("baby dragon, little ghost, slime, tiny golem, forest spirit, phoenix chick, unicorn foal, kitsune, mushroom sprite, griffin cub, sea serpent, moth fairy"), "1024x1024", "rosepine", "liv"]
+ ]],
+ ["Маскот", "Тот же колобок, что в 03 Маскоты. Лучше генерировать с референсом (IP-Adapter 0.6-0.7 или img2img по Привет.webp, denoise 0.55). Сохранять в 03 Маскоты.", "ch", "default", [
+  ["Грусть (ошибка)", mascot("sad face with a single big tear, drooping hair tuft"), "1024x1024"],
+  ["Удивление", mascot("surprised with wide eyes and round open mouth, hair tuft standing up"), "1024x1024"],
+  ["Ждёт (загрузка)", mascot("waiting patiently, holding a tiny alarm clock, tapping one foot"), "1024x1024"],
+  ["Чинит", mascot("holding a big wrench, fixing something, small sparks around"), "1024x1024"],
+  ["Празднует", mascot("jumping with joy, arms raised, confetti falling"), "1024x1024"],
+  ["Читает", mascot("reading an open book, small round glasses on the nose"), "1024x1024"],
+  ["Пьёт чай", mascot("drinking tea from a big mug, relaxed, steam curls"), "1024x1024"],
+  ["Машет на прощание", mascot("waving goodbye with one arm, happy closed eyes"), "1024x1024"],
+  ["Показывает влево", mascot("pointing to the left with the whole arm, looking at the viewer"), "1024x1024"],
+  ["Показывает вправо", mascot("pointing to the right with the whole arm, looking at the viewer"), "1024x1024"],
+  ["Сидит на краю", mascot("sitting on an edge with legs dangling down"), "1024x1024"],
+  ["Держит табличку", mascot("holding a large blank sign board with both arms"), "1024x1024"],
+  ["В наушниках", mascot("wearing big headphones, eyes closed, music notes floating"), "1024x1024"],
+  ["С глобусом (сеть)", mascot("hugging a small globe with glowing network lines"), "1024x1024"],
+  ["С календарём", mascot("hugging a calendar page with a red circle"), "1024x1024"],
+  ["Сонный в пледе", mascot("wrapped in a blanket, sleepy, zzz above head"), "1024x1024"],
+  ["Выглядывает", mascot("peeking out from behind a wall, only half of the body visible"), "1024x1024"],
+  ["Лист 12 поз", "character sticker sheet, 12 poses of the same character arranged in a neat 4x3 grid, evenly spaced with wide gaps, each separate and not touching, same size, " + MASCOT + ", poses: sad with tear, surprised, waiting with clock, fixing with wrench, celebrating, reading book, drinking tea, waving, pointing left, pointing right, holding blank sign, sleeping, " + ST, "1024x1024"]
+ ]],
+ ["Фоны тёмные", "Для VS Code и тёмных тем. Сохранять в 01 Фоны/Ночные сцены. Для боковой панели генерировать 640x1536, для нижней 1536x640.", "bg", "tokyo", [
+  ["Лофи-комната", dark("cozy lofi study room at night, wooden desk with a glowing monitor and desk lamp, rain streaks on a large window, potted plants, a sleeping cat on the windowsill, blurred city lights outside"), "1344x768", "mocha"],
+  ["Подводные руины", dark("sunken ancient ruins under water, god rays from the surface, glowing jellyfish, schools of tiny fish, coral and seaweed silhouettes"), "1344x768", "ocean"],
+  ["Космос", dark("deep space with a colorful nebula, a small ringed planet in the lower right, distant galaxies, thin bands of star dust, tiny spaceship silhouette"), "1344x768", "dracula"],
+  ["Киберпанк-переулок", dark("rainy cyberpunk back alley, wet asphalt with neon reflections, hanging signs with abstract symbols, steam from vents, cables overhead, vending machine glow"), "1344x768", "synthwave"],
+  ["Горный храм", dark("japanese mountain shrine at night, red torii gates, glowing stone lanterns, gentle snowfall, pine trees, stairs going up into fog"), "1344x768", "rosepine"],
+  ["Волшебная библиотека", dark("endless magical library, tall bookshelves disappearing into darkness, floating candles, spiral staircase, open books with glowing pages"), "1344x768", "gruvbox"],
+  ["Ночная станция", dark("empty old train station at night, single platform, warm street lamps, light fog, rails vanishing into the distance, a lone bench"), "1344x768", "onedark"],
+  ["Светящееся дерево", dark("giant ancient tree with glowing blue leaves in a dark valley, swirling fireflies, a small river reflecting the light"), "1344x768", "forest"],
+  ["Хижина и сияние", dark("cozy wooden cabin in a snowy forest at night, warm window light, smoke from the chimney, aurora in the sky"), "1344x768", "nord"],
+  ["Маяк", dark("lighthouse on a cliff at night, rotating light beam cutting through sea mist, waves crashing below, starry sky"), "1344x768", "ocean"],
+  ["Летающие острова", dark("floating islands above clouds at twilight, waterfalls falling into the void, small glowing houses"), "1344x768", "sunset"],
+  ["Сад на крыше", dark("quiet rooftop garden above a night city, string lights, a telescope, potted plants, skyline bokeh"), "1344x768", "tokyo"],
+  ["Боковая панель (вертикаль)", dark("tall vertical composition, main subject at the bottom, empty dark sky in the upper two thirds, a small glowing lantern on a hill with a lone tree"), "640x1536"],
+  ["Поезд среди звёзд", dark("an old steam train crossing a bridge of light between clouds in a starry sky, glowing windows, long trail of sparkling steam"), "1344x768", "dracula"],
+  ["Оранжерея на орбите", dark("glass greenhouse dome on a space station, lush plants and hanging vines inside, a blue planet glowing through the glass, soft grow lights"), "1344x768", "forest"],
+  ["Рынок фонарей", dark("night lantern market along a canal, hundreds of paper lanterns, empty wooden boats, reflections on still water, stalls with glowing jars"), "1344x768", "sunset"],
+  ["Затопленное метро", dark("abandoned flooded subway station, clear shallow water over the rails, glowing moss and mushrooms on the walls, a shaft of moonlight from a broken ceiling"), "1344x768", "ocean"],
+  ["Город на спине кита", dark("tiny lantern-lit town built on the back of a giant whale swimming through a sea of clouds at night, far away and small in the frame"), "1344x768", "tokyo"],
+  ["Обсерватория", dark("old observatory on a mountain peak, open dome with a brass telescope, milky way overhead, warm light from the doorway"), "1344x768", "nord"],
+  ["Грибной лес", dark("giant bioluminescent mushroom forest, glowing spores drifting, narrow wooden walkway, small round doors in the stems"), "1344x768", "rosepine"],
+  ["Мастерская часовщика", dark("clockmaker workshop at night, hundreds of clocks and brass gears on the walls, desk lamp glow, moonlight through a round window"), "1344x768", "gruvbox"],
+  ["Нижняя панель (панорама)", dark("ultra wide panorama, horizon line in the middle, low detail on the left side, distant mountain range under a starry sky with a thin moon"), "1536x640"]
+ ]],
+ ["Фоны светлые", "Для светлых тем: бледно, мало контраста, тёмный текст поверх читается. Сохранять в 01 Фоны/Светлые.", "bg", "latte", [
+  ["Холмы", light("soft rolling green hills with a few round trees and small white clouds"), "1344x768", "mint"],
+  ["Город у моря", light("white seaside town with blue domes stacked on a hillside, calm sea"), "1344x768", "solar"],
+  ["Берёзовый лес", light("misty birch forest at early morning, thin white trunks, light fog"), "1344x768", "paper"],
+  ["Светлое кафе", light("bright cozy cafe interior, huge window, hanging plants, wooden tables, sunlight patches"), "1344x768", "latte"],
+  ["Бумажные горы", light("paper cut layered mountains with a pastel sky and a pale sun"), "1344x768", "sakura"],
+  ["Лавандовое поле", light("lavender fields with a small windmill, soft haze"), "1344x768", "latte"],
+  ["Утреннее озеро", light("wide calm lake with reeds and floating lily pads, morning mist"), "1344x768", "mint"],
+  ["Сад камней", light("japanese zen garden with raked sand patterns and one maple tree"), "1344x768", "paper"],
+  ["Над облаками", light("cloudscape from above, soft pastel cumulus clouds, a tiny paper plane"), "1344x768", "sakura"],
+  ["Воздушные шары", light("a few hot air balloons drifting over a pale valley with a winding river"), "1344x768", "solar"],
+  ["Стеклянная оранжерея", light("bright glass conservatory with tall palms, white iron arches, sunlight through the roof"), "1344x768", "mint"],
+  ["Ветряки на побережье", light("white wind turbines on a grassy coast, long soft shadows, calm pale sea"), "1344x768", "latte"]
+ ]],
+ ["Паттерны и текстуры", "Бесшовные, для фона карточек и панелей. Сохранять в 07 Паттерны и текстуры.", "pat", "default", [
+  ["Звёзды и луны", pat("tiny stars, dots and small crescent moons scattered"), "1024x1024"],
+  ["Зерно", pat("fine film grain noise, uniform"), "1024x1024", "mono"],
+  ["Акварельная бумага", pat("watercolor paper texture with soft fibers"), "1024x1024", "paper"],
+  ["Изометрическая сетка", pat("thin isometric grid lines, blueprint style"), "1024x1024", "nord"],
+  ["Символы кода", pat("faint code symbols: curly braces, brackets, semicolons, slashes"), "1024x1024", "onedark"],
+  ["Волны", pat("soft wavy lines, calm flowing"), "1024x1024", "ocean"],
+  ["Терраццо", pat("terrazzo stone with pastel speckles"), "1024x1024", "latte"],
+  ["Сэйгайха", pat("japanese seigaiha overlapping wave arcs, thin lines"), "1024x1024", "rosepine"],
+  ["Мемфис", pat("small plus signs, circles and squiggles, memphis style"), "1024x1024", "sunset"],
+  ["Соты", pat("hexagon honeycomb outlines"), "1024x1024", "gruvbox"],
+  ["Лапки", pat("tiny cute paw prints"), "1024x1024", "sakura"],
+  ["Листья и цветы", pat("leaves and small flowers, flat botanical"), "1024x1024", "forest"],
+  ["Плата", pat("circuit board traces with small nodes"), "1024x1024", "tokyo"],
+  ["Горошек", pat("polka dots of two sizes"), "1024x1024", "mint"]
+ ]],
+ ["Градиенты", "Шапки окон, заставки, подложки под кнопки. Сохранять в 08 Градиенты.", "grad", "default", [
+  ["Меш-градиент", grad("mesh gradient with large soft blurred color blobs"), "1344x768"],
+  ["Северное сияние", grad("aurora borealis ribbons of light flowing across a dark sky"), "1344x768", "nord"],
+  ["Матовое стекло", grad("frosted glass panels overlapping, blurred colors behind glass, glassmorphism"), "1344x768", "mocha"],
+  ["Свечение в центре", grad("soft radial glow in the center fading to dark edges"), "1344x768", "dracula"],
+  ["Жидкий хром", grad("liquid chrome waves, iridescent, smooth"), "1344x768", "synthwave"],
+  ["Шёлк", grad("silk fabric folds with soft light"), "1344x768", "rosepine"],
+  ["Боке", grad("soft bokeh lights of different sizes, out of focus"), "1344x768", "tokyo"],
+  ["Лучи в дымке", grad("diagonal light rays through haze"), "1344x768", "sunset"]
+ ]],
+ ["Экраны ошибок и пустоты", "Картинка по центру пустого экрана. Сохранять в 13 Экраны ошибок и пустоты.", "st", "default", [
+  ["Пусто", empty("empty inbox tray with a tiny cobweb in the corner"), "1024x1024"],
+  ["Нет интернета", empty("unplugged power cable lying next to a wall socket, small grey rain cloud above"), "1024x1024"],
+  ["Плохая сеть", empty("broken wifi signal bars with a bandage"), "1024x1024"],
+  ["Ничего не найдено", empty("magnifying glass over an empty dotted rectangle, small question mark"), "1024x1024"],
+  ["Нет доступа", empty("closed door with a big padlock and a small key lying far away"), "1024x1024"],
+  ["404", empty("torn paper map with a dotted path that runs off the edge, a small flag planted on a tiny planet"), "1024x1024"],
+  ["Загрузка", empty("two gears turning with small sparks and motion lines"), "1024x1024"],
+  ["Успех", empty("big check mark with confetti bursting"), "1024x1024"],
+  ["Ошибка", empty("warning triangle with a loose bolt and small sparks"), "1024x1024"],
+  ["Нет планов", empty("empty calendar page with a zzz sleep symbol above it"), "1024x1024"],
+  ["Есть обновление", empty("tiny rocket on a launchpad with countdown lights"), "1024x1024"],
+  ["Нет файлов", empty("open cardboard box with bubble wrap, nothing inside"), "1024x1024"],
+  ["Ночной режим", empty("crescent moon resting on a small cloud, nightcap hanging on its tip, zzz symbol"), "1024x1024"]
+ ]],
+ ["Онбординг и заставки", "Приветствие и шаги первого запуска. Сохранять в 06 Иллюстрации/Онбординг.", "ch", "default", [
+  ["Приветствие", "onboarding illustration, " + MASCOT + ", opening a big door with warm light pouring out, small scene, kawaii sticker style, friendly, " + ST, "1024x1024"],
+  ["Шаг 1: выбор", "onboarding illustration, " + MASCOT + ", choosing colorful blocks from a shelf, small scene, kawaii sticker style, friendly, " + ST, "1024x1024"],
+  ["Шаг 2: настройка", "onboarding illustration, " + MASCOT + ", stacking blocks into a small tower, small scene, kawaii sticker style, friendly, " + ST, "1024x1024"],
+  ["Шаг 3: запуск", "onboarding illustration, " + MASCOT + ", riding a small rocket taking off from a laptop, small scene, kawaii sticker style, friendly, " + ST, "1024x1024"],
+  ["Готово", "onboarding illustration, " + MASCOT + ", giving a thumbs up next to a big check mark, small scene, kawaii sticker style, friendly, " + ST, "1024x1024"],
+  ["Экран запуска", "splash screen background, soft glowing crescent moon above calm layered clouds, (large empty space in the center for a logo:1.3), gentle light rays, {P}, flat vector style, smooth gradients, minimal, masterpiece", "1344x768"]
+ ]],
+ ["Медали и достижения", "Сохранять в 12 Медали и достижения.", "st", "default", [
+  ["Серия дней (бронза)", medal("bronze", "flame"), "1024x1024", "autumn"],
+  ["Прочитано (серебро)", medal("silver", "open book"), "1024x1024", "nord"],
+  ["Первая победа (золото)", medal("gold", "star"), "1024x1024", "gruvbox"],
+  ["Скорость", medal("gold", "lightning bolt"), "1024x1024", "tokyo"],
+  ["Без ошибок", medal("silver", "shield"), "1024x1024", "mint"],
+  ["Мастер", medal("rainbow crystal", "crown"), "1024x1024", "dracula"],
+  ["Неделя подряд", medal("gold", "calendar with number 7"), "1024x1024", "sunset"],
+  ["Первый запуск", medal("bronze", "rocket"), "1024x1024", "onedark"],
+  ["Ночная работа", medal("dark obsidian with glowing cracks", "crescent moon"), "1024x1024", "default"],
+  ["Лист медалей", sheet("12 round achievement medals with ribbons in bronze, silver and gold, emblems: flame, book, star, lightning, shield, crown, calendar, rocket, heart, gear, moon, coffee cup"), "1024x1024"],
+  ["Лист званий", sheet("12 hexagon rank badges, from one to five chevron stripes, then bronze, silver, gold, crystal and obsidian versions, then a star badge and a crown badge"), "1024x1024"]
+ ]],
+ ["Аватары", "Живые существа, поэтому с лицами. Сохранять в 11 Аватары.", "liv", "default", [
+  ["Кот", avatar("cat"), "1024x1024", "default"],
+  ["Лиса", avatar("fox"), "1024x1024", "autumn"],
+  ["Сова", avatar("owl"), "1024x1024", "forest"],
+  ["Пингвин", avatar("penguin"), "1024x1024", "nord"],
+  ["Аксолотль", avatar("axolotl"), "1024x1024", "sakura"],
+  ["Дракончик", avatar("baby dragon"), "1024x1024", "dracula"],
+  ["Лист 12 зверей", zoo("12 round profile avatars of cute animal faces inside colored circles: cat, fox, owl, bear, rabbit, penguin, frog, axolotl, raccoon, panda, baby dragon, little ghost"), "1024x1024"],
+  ["Заглушка", "round default avatar, abstract head and shoulders silhouette, flat, single color, inside a circle, {P}, solid flat mid grey background, clean, minimal", "1024x1024", "mono", "st"]
+ ]],
+ ["Эффекты и частицы", "На чёрном фоне: в приложении режим наложения Screen, и чёрный исчезнет. В «Библиотека.cmd» заготовка «Частицы на чёрном фоне». Сохранять в 09 Эффекты и частицы.", "fx", "default", [
+  ["Искорки", fx("four-point sparkles"), "1024x1024"],
+  ["Боке", fx("round bokeh dots"), "1024x1024", "tokyo"],
+  ["Светлячки", fx("fireflies"), "1024x1024", "forest"],
+  ["Снежинки", fx("snowflakes"), "1024x1024", "nord"],
+  ["Лепестки сакуры", fx("cherry blossom petals"), "1024x1024", "sakura"],
+  ["Кленовые листья", fx("autumn maple leaves"), "1024x1024", "autumn"],
+  ["Капли дождя", fx("raindrop streaks"), "1024x1024", "ocean"],
+  ["Падающие звёзды", fx("shooting star trails"), "1024x1024", "dracula"],
+  ["Волшебная пыль", fx("magic dust swirls"), "1024x1024", "default"],
+  ["Искры", fx("ember sparks"), "1024x1024", "gruvbox"],
+  ["Пузыри", fx("soap bubbles"), "1024x1024", "mint"],
+  ["Ноты", fx("musical notes"), "1024x1024", "synthwave"]
+ ]],
+ ["Рамки и орнаменты", "Сохранять в 10 Рамки и орнаменты.", "st", "default", [
+  ["Фэнтези-рамка", frame("ornate rectangular frame border with fantasy gold filigree, completely empty center"), "1024x1024", "gruvbox"],
+  ["Разделитель с луной", frame("horizontal decorative divider line with a small crescent moon in the middle"), "1536x640"],
+  ["Угловой орнамент", frame("corner ornament with art nouveau vines, top left corner"), "1024x1024", "forest"],
+  ["Панель (9-slice)", frame("rounded ui panel with thin glowing edge, empty center, 9-slice friendly, even border width"), "1024x1024", "tokyo"],
+  ["Лента под заголовок", frame("ribbon banner for a title, empty, folded ends"), "1536x640", "sunset"],
+  ["Облачко реплики", frame("cute speech bubble frame, empty"), "1024x1024", "latte"],
+  ["Подсказка", frame("tooltip box with a small arrow pointing down, empty"), "1024x1024", "mocha"],
+  ["Полоса прогресса", frame("progress bar frame, empty, rounded"), "1536x640", "mint"]
+ ]],
+ ["Логотипы проектов", "В «Библиотека.cmd» заготовка «Логотип в ICO». Буквы модели часто рисуют криво - поправить в редакторе. Сохранять в 05 Логотипы.", "st", "default", [
+  ["NetworkDoctor", logo("a stethoscope wrapped around a glowing wifi signal"), "1024x1024", "nord"],
+  ["AutoTranslator", logo("two overlapping speech bubbles, one with letter A and one with letter Я"), "1024x1024", "tokyo"],
+  ["ContestReminder", logo("calendar page with a small trophy and a ringing bell"), "1024x1024", "sunset"],
+  ["Moon Bundle", logo("gift box with a crescent moon on the lid, ribbon"), "1024x1024", "default"],
+  ["Moon Core", logo("crescent moon with a glowing gear inside it"), "1024x1024", "dracula"],
+  ["GraphicsGeneration", logo("paint brush drawing a sparkle on a small canvas"), "1024x1024", "mocha"],
+ ]],
+ ["Обложки README", "Генерировать 1536x768, потом обрезать до 1280x640. Сохранять в 06 Иллюстрации/Обложки.", "bg", "default", [
+  ["NetworkDoctor", cover("a friendly robot doctor listening to a glowing wifi router with a stethoscope"), "1536x768", "nord"],
+  ["AutoTranslator", cover("two floating speech bubbles exchanging glowing letters over an open book"), "1536x768", "tokyo"],
+  ["ContestReminder", cover("a big calendar with a trophy on top and paper notes flying around"), "1536x768", "sunset"],
+  ["Moon Bundle", cover("an open gift box under a crescent moon with small packages floating out"), "1536x768", "default"],
+  ["GraphicsGeneration", cover("a magic paint brush painting a colorful landscape on a floating canvas"), "1536x768", "mocha"]
+ ]],
+ ["Визуальная новелла", "Фоны локаций: один seed на утро, вечер и ночь - комната та же, меняется свет. Сохранять в 01 Фоны/Визуальная новелла.", "bg", "latte", [
+  ["Класс утром", vn("school classroom with desks and a blackboard", "bright morning light"), "1344x768"],
+  ["Класс на закате", vn("school classroom with desks and a blackboard", "orange sunset light through windows"), "1344x768", "sunset"],
+  ["Крыша школы", vn("school rooftop with a fence and water tank", "orange sunset"), "1344x768", "sunset"],
+  ["Комната", vn("cozy bedroom with a bed, desk and posters", "night with a desk lamp on"), "1344x768", "mocha"],
+  ["Улица", vn("city street with small shops", "bright morning"), "1344x768", "solar"],
+  ["Поезд", vn("train interior with seats and windows", "orange sunset"), "1344x768", "sunset"],
+  ["Парк", vn("park with a bench and cherry trees", "bright morning"), "1344x768", "sakura"],
+  ["Пляж", vn("beach with a wooden pier", "orange sunset"), "1344x768", "ocean"],
+  ["Кафе", vn("small cozy cafe", "night with warm lamps"), "1344x768", "gruvbox"],
+  ["Храм", vn("shrine with torii gates", "night with lanterns"), "1344x768", "rosepine"],
+  ["Коридор больницы", vn("hospital corridor", "night with cold lights"), "1344x768", "nord"],
+  ["Зал замка", vn("castle throne hall", "night with candles"), "1344x768", "dracula"],
+  ["Окно диалога", "visual novel dialogue text box, wide, semi transparent dark panel, ornate thin gold edges, empty, front view, game ui asset, {P}, solid flat mid grey background, masterpiece", "1536x640", "rosepine"],
+  ["Главное меню", "visual novel main menu background, (empty left third for buttons:1.3), dreamy scene on the right with a girl silhouette looking at the moon, anime background art, {P}, masterpiece", "1344x768", "dracula"],
+  ["Кнопки", "set of game ui buttons in three states normal hover pressed, rounded, empty, flat, front view, {P}, solid flat mid grey background, masterpiece", "1024x1024", "rosepine"]
+ ]],
+ ["Сезонное", "Готовые праздничные варианты. Сохранять в папку по типу, подпапка Сезонное.", "st", "default", [
+  ["Новый год: маскот", mascot("wearing a santa hat, holding a small gift box, snowflakes around"), "1024x1024", "nord", "ch"],
+  ["Новый год: лист", sheet("winter holiday stickers: christmas tree, gift box, snow globe, candy cane, bell, star, mitten, hot cocoa, snowflake, ornament ball, sled, fireworks"), "1024x1024", "nord"],
+  ["Новый год: фон", dark("snowy village at night, warm string lights on houses, pine trees, gentle snowfall, fireworks in the sky"), "1344x768", "nord", "bg"],
+  ["Хэллоуин: маскот", mascot("wearing a small witch hat, holding a glowing pumpkin lantern"), "1024x1024", "autumn", "ch"],
+  ["Хэллоуин: предметы", sheet("halloween stickers: plain pumpkin, witch hat, wrapped candy, cauldron, crescent moon, dripping candle, potion bottle, broom, spider web, old key, spell book, lantern"), "1024x1024", "dracula"],
+  ["Хэллоуин: существа (с лицами)", zoo("little ghost, black cat, bat, friendly spider, owl, raven, baby vampire bat, pumpkin-headed scarecrow, witch toad, zombie bunny, skeleton dog, mummy kitten"), "1024x1024", "dracula", "liv"],
+  ["Весна: фон", light("cherry blossom alley with petals falling, soft sunlight"), "1344x768", "sakura", "bg"],
+  ["Лето: лист", sheet("summer stickers: sun, watermelon slice, ice cream, beach ball, palm tree, sunglasses, seashell, surfboard, lemonade, straw hat, flip flops, wave"), "1024x1024", "solar"],
+  ["Осень: фон", dark("cozy autumn street in the rain, falling orange leaves, warm cafe windows"), "1344x768", "autumn", "bg"],
+  ["День рождения: лист", sheet("birthday stickers: balloons, cake with candle, gift box, party hat, confetti, cupcake, party popper, candles, ribbon, card, crown, sparkler"), "1024x1024", "latte"]
+ ]]
+];
+
+// ---------------- отрисовка ----------------
+function get(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }
+function put(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+var cur = get("prompt-pal", "auto"), sty = get("prompt-sty", "sticker"), cards = [];
+var palBy = {}, styBy = {}; PAL.forEach(function (p) { palBy[p[0]] = p; }); STY.forEach(function (x) { styBy[x[0]] = x; });
+if (!palBy[cur]) cur = "auto";
+if (!styBy[sty]) sty = "sticker";
+
+function palKey(it, sec) { return cur === "auto" ? (it[3] || sec[3]) : cur; }
+// Генератор: "smart" - модель, которая понимает обычный текст и умеет прозрачный фон; "sdxl" - серый фон, веса в скобках и отдельный Negative.
+var GEN = [["smart", "Умная модель (прозрачный фон)"], ["sdxl", "SDXL (серый фон, Negative)"]], gen = get("prompt-gen", "smart");
+if (gen !== "sdxl") gen = "smart";
+function smart(t) {
+  return t.replace(/\(([^():]+):[\d.]+\)/g, "$1")                      // веса SDXL такой модели не нужны
+    .replace(/solid flat mid grey background|pure black background/g, "fully transparent background (PNG with alpha channel), no backdrop, no ground shadow")
+    .replace(/, masterpiece(, best quality)?/g, "");
+}
+function text(it, pal, st) { var t = it[1].replace("{P}", palBy[pal][2]).replace("{S}", styBy[st][2]); return gen === "smart" ? smart(t) : t; }
+// Негативный промпт: из него убирается то, что противоречит выбранной манере (например, 3d render для пластилина).
+function neg(it, sec, st) {
+  var drop = it[1].indexOf("{S}") >= 0 ? styBy[st][3] : [];
+  return N[it[4] || sec[2]].split(", ").filter(function (w) { return drop.indexOf(w) < 0; }).join(", ");
+}
+// Промпт и негатив одним текстом: такую запись A1111 и Forge разбирают сами (вставить в поле промпта и нажать стрелку под Generate).
+// Умной модели отдельное поле негатива не нужно - запреты дописываются обычной фразой.
+function both(t, n) { return gen === "smart" ? t + ".\nAvoid: " + n + "." : t + "\nNegative prompt: " + n; }
+function rand(a) { return a[Math.floor(Math.random() * a.length)]; }
+function toast(msg) { var t = document.getElementById("toast"); t.textContent = msg; t.className = "on"; clearTimeout(toast.t); toast.t = setTimeout(function () { t.className = ""; }, 1800); }
+function copy(s, msg) {
+  function done() { toast(msg || "Скопировано"); }
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(s).then(done, fb); else fb();
+  function fb() { var a = document.createElement("textarea"); a.value = s; a.style.position = "fixed"; a.style.opacity = "0"; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); } catch (e) {} a.remove(); done(); }
+}
+function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+function chips(id, list, now, pick) {
+  var box = document.getElementById(id); box.innerHTML = "";
+  list.forEach(function (p) {
+    var b = el("button", "pal" + (p[0] === now ? " on" : ""));
+    if (p[3] && p[3].length && p[3][0].charAt(0) === "#") { var sw = el("span", "sw"); p[3].forEach(function (c) { var i = el("i"); i.style.background = c; sw.appendChild(i); }); b.appendChild(sw); }
+    b.appendChild(el("span", null, p[1]));
+    b.onclick = function () { pick(p[0]); };
+    box.appendChild(b);
+  });
+}
+function drawChips() {
+  chips("pals", PAL, cur, function (k) { cur = k; put("prompt-pal", k); drawChips(); drawMain(); });
+  chips("stys", STY, sty, function (k) { sty = k; put("prompt-sty", k); drawChips(); drawMain(); });
+  chips("gens", GEN, gen, function (k) { gen = k; put("prompt-gen", k); drawChips(); drawMain(); });
+}
+function drawMain() {
+  var m = document.getElementById("main"), nav = document.getElementById("nav"), q = document.getElementById("q").value.trim().toLowerCase();
+  m.innerHTML = ""; nav.innerHTML = ""; cards = [];
+  var hidden = 0;
+  setTimeout(function () { document.getElementById("done").textContent = (showDone ? "Готовые показаны: " : "Готовые скрыты: ") + hidden; }, 0);
+  S.forEach(function (sec, si) {
+    var items = sec[4].filter(function (it) {
+      if (q && (sec[0] + " " + it[0] + " " + it[1]).toLowerCase().indexOf(q) < 0) return false;
+      if (!isDone(it, sec)) return true;
+      hidden++; return showDone;
+    });
+    if (!items.length) return;
+    var a = el("a", null, sec[0]); a.href = "#s" + si; nav.appendChild(a);
+    var h = el("h2", null, sec[0]); h.id = "s" + si; m.appendChild(h);
+    m.appendChild(el("p", "sub", sec[1]));
+    var g = el("div", "grid");
+    items.forEach(function (it) {
+      var key = palKey(it, sec), t = text(it, key, sty), c = el("div", "c"), styled = it[1].indexOf("{S}") >= 0;
+      if (isDone(it, sec)) c.className += " done";
+      c.appendChild(el("b", null, it[0]));
+      c.appendChild(el("div", "meta", "Размер " + it[2] + "   Цвета: " + palBy[key][1] + (styled ? "   Манера: " + styBy[sty][1] : "")));
+      var p = el("div", "p", t); p.title = "Нажмите, чтобы скопировать"; p.onclick = function () { copy(t); }; c.appendChild(p);
+      var ng = neg(it, sec, sty), r = el("div", "row"), b1 = el("button", "b main", "Копировать всё"), b0 = el("button", "b", "Промпт"), b2 = el("button", "b", "Negative");
+      b1.title = "Промпт и негатив одним текстом"; b1.onclick = function () { copy(both(t, ng), "Скопированы промпт и негатив"); };
+      b0.onclick = function () { copy(t); }; b2.onclick = function () { copy(ng); };
+      r.appendChild(b1);
+      if ((it[4] || sec[2]) === "bg") {           // фонам можно дописать одну случайную деталь
+        var b3 = el("button", "b", "С изюминкой");
+        b3.onclick = function () { var w = rand(TW); copy(both(t.replace(/, (anime background art|flat vector landscape illustration|flat vector style|eye-level view)/, ", " + w + ", $1"), ng), "Добавлено: " + w); };
+        r.appendChild(b3);
+      }
+      var nm = names(it), b4 = el("button", "b", "Имена");
+      b4.title = nm; b4.onclick = function () { copy(nm, "Имена: " + (nm.length > 60 ? nm.slice(0, 60) + "..." : nm)); };
+      r.appendChild(b0); r.appendChild(b2); r.appendChild(b4); c.appendChild(r); g.appendChild(c);
+      cards.push({ el: c, it: it, sec: sec });
+    });
+    m.appendChild(g);
+  });
+}
+// ---------------- что уже сгенерировано ----------------
+// Карточка готова, если все её имена файлов есть в библиотеке. При выбранной палитре смотрим папку с её
+// названием (и папки без палитры, например 03 Маскоты); в режиме «Как задумано» - папку задуманной палитры.
+var HAVE = window.HAVE || {}, showDone = get("prompt-done", "") === "1", palName = {};
+PAL.forEach(function (p) { palName[p[1]] = 1; });
+function have(n, pal) {
+  for (var d in HAVE) {
+    if (pal !== null && d !== pal && palName[d]) continue;
+    for (var i = 0; i < HAVE[d].length; i++) if (HAVE[d][i] === n || HAVE[d][i].indexOf(n + "_") === 0) return true;
+  }
+  return false;
+}
+function isDone(it, sec) {
+  // «Как задумано» - готова, только если сделана в своей задуманной палитре; иначе - в выбранной.
+  var pal = palBy[palKey(it, sec)][1];
+  return names(it).split(", ").every(function (n) { return have(n, pal); });
+}
+document.getElementById("done").onclick = function () { showDone = !showDone; put("prompt-done", showDone ? "1" : ""); drawMain(); };
+
+// Случайный: промпт, палитра и манера выбираются сами, карточка подсвечивается.
+document.getElementById("rnd").onclick = function () {
+  if (!cards.length) return;
+  var c = rand(cards), pal = rand(PAL.slice(1))[0], st = rand(STY)[0], styled = c.it[1].indexOf("{S}") >= 0;
+  copy(both(text(c.it, pal, st), neg(c.it, c.sec, st)), "Скопировано: " + c.it[0] + " / " + palBy[pal][1] + (styled ? " / " + styBy[st][1] : ""));
+  c.el.scrollIntoView({ block: "center", behavior: "smooth" });
+  c.el.classList.add("flash"); setTimeout(function () { c.el.classList.remove("flash"); }, 1600);
+};
+document.getElementById("q").oninput = drawMain;
+drawChips(); drawMain();
+</script>
+</body>
+</html>

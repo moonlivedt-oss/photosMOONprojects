@@ -1,0 +1,14 @@
+line-length = 120
+extend-exclude = ["_thumbs", "_models"]
+
+[lint]
+select = ["E", "F", "W", "B", "UP", "SIM", "I"]
+ignore = ["E501", "E731", "B905", "SIM105", "UP031"]
+
+[lint.per-file-ignores]
+"imaging/__init__.py" = ["F401"]
+"app.py" = ["E402"]
+"tests/*" = ["E402"]
+
+[lint.isort]
+known-first-party = ["imaging", "ui", "search"]

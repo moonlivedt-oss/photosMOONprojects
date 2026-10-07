@@ -1,0 +1,27 @@
+{
+ "size": [
+  1400,
+  860
+ ],
+ "sort": "name",
+ "max": true,
+ "tab": 1,
+ "split_in": [
+  160,
+  223,
+  223
+ ],
+ "split_mid": [
+  194,
+  232
+ ],
+ "split_lib": [
+  210,
+  1355,
+  321
+ ],
+ "archive": true,
+ "gen_dir": "",
+ "gen_since": 1790897962.477098,
+ "lib_section": "::heavy"
+}

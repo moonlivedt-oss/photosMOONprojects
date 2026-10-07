@@ -1,0 +1,4 @@
+Hero Patterns - Steve Schoger, https://heropatterns.com
+Лицензия узоров: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/) - при публикации указать автора.
+SVG взяты из npm-пакета hero-patterns 2.1.0 (MIT, Alec Lomas). Окрашены под палитры Промпты.html:
+фон - основа палитры, узор - её самый контрастный цвет, полупрозрачно.

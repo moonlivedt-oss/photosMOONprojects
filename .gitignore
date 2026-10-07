@@ -1,0 +1,21 @@
+# модели CLIP: больше 100 МБ, качаются py -3.14 _tools/get_models.py
+_tools/_models/
+
+# кэши и состояние окна на этом компьютере
+_tools/_thumbs/
+_tools/_prompts_cache.json
+_tools/_errors.log*
+_tools/library.db*
+_tools/settings.json
+__pycache__/
+.ruff_cache/
+*.tmp*
+
+# собирается само по папкам библиотеки
+Gallery.html
+_tools/done.js
+
+# неразобранное и отменённое
+00 Входящие/*
+_sources/_undone/
+_duplicates/

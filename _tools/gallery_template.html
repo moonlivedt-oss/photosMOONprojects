@@ -1,0 +1,75 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Библиотека картинок</title>
+<style>
+:root{--bg:#15151c;--card:#1f1f29;--fg:#e8e6f0;--dim:#9a98a8;--acc:#9d8cff;--chk:#2a2a36}
+:root[data-theme=light]{--bg:#f4f3f8;--card:#fff;--fg:#1d1c24;--dim:#6b6978;--acc:#6a55e0;--chk:#e6e4ee}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,Segoe UI,sans-serif}
+header{position:sticky;top:0;z-index:2;background:var(--bg);padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--chk)}
+h1{font-size:17px;margin:0 12px 0 0}input{flex:1;min-width:180px;padding:7px 10px;border-radius:8px;border:1px solid var(--chk);background:var(--card);color:var(--fg)}
+button{padding:6px 10px;border-radius:8px;border:1px solid var(--chk);background:var(--card);color:var(--fg);cursor:pointer}
+nav{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px}nav a{color:var(--acc);text-decoration:none;font-size:13px}
+section{padding:4px 16px 12px}h2{font-size:16px;margin:14px 0 4px}h3{font-size:13px;color:var(--dim);margin:10px 0 6px;font-weight:500}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--sz,130px),1fr));gap:10px}
+#sz{flex:0 0 110px;min-width:0;padding:0;accent-color:var(--acc)}h2 span{color:var(--dim);font-weight:400;font-size:13px}
+#up{position:fixed;right:16px;bottom:16px;z-index:3;display:none}
+.it{background:var(--card);border-radius:10px;overflow:hidden;cursor:zoom-in}
+.th{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:repeating-conic-gradient(var(--chk) 0 25%,transparent 0 50%) 0 0/16px 16px}
+.th img{max-width:92%;max-height:92%}.cap{padding:5px 8px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cap span{color:var(--dim)}
+#big{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:5;padding:16px}
+#big img{max-width:100%;max-height:82vh;background:repeating-conic-gradient(#333 0 25%,#222 0 50%) 0 0/16px 16px}#big p{color:#ddd;margin:10px 0 0;text-align:center}
+select{padding:6px 8px;border-radius:8px;border:1px solid var(--chk);background:var(--card);color:var(--fg)}
+.it{position:relative}.cp{position:absolute;top:6px;right:6px;font-size:11px;padding:3px 7px;opacity:0;transition:opacity .12s}.it:hover .cp,.cp:focus{opacity:1}
+:root[data-pv=light] .th,:root[data-pv=light] #big img{background:#fff}:root[data-pv=dark] .th,:root[data-pv=dark] #big img{background:#000}
+#big button{margin-top:8px}
+</style></head><body>
+<header><h1>Библиотека картинок</h1><input id="q" placeholder="Поиск по названию...">
+<select id="fs" title="Раздел"></select><select id="ft" title="Тема оформления"></select>
+<select id="so" title="Порядок"><option value="name">По разделам</option><option value="new">Сначала новые</option></select>
+<input id="sz" type="range" min="80" max="280" value="130" title="Размер плиток">
+<button id="pv" title="Фон под картинками">Фон: шахматка</button><button id="th">Тема</button><span id="n" style="color:var(--dim)"></span></header>
+<nav id="nav"></nav><main id="m"></main><div id="big"><img id="bi"><p id="bp"></p><button id="bc">Копировать путь</button></div>
+<button id="up" title="Наверх">Наверх</button>
+<script>
+var D=/*DATA*/null,m=document.getElementById("m"),shown=[],cur=0,BS=String.fromCharCode(92),R=document.documentElement;
+function $(i){return document.getElementById(i)}
+function get(k){try{return localStorage.getItem(k)}catch(e){return null}}function put(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+if(get("gth"))R.dataset.theme=get("gth");
+$("th").onclick=function(){var t=R.dataset.theme==="light"?"dark":"light";R.dataset.theme=t;put("gth",t)};
+var PV=["chk","light","dark"],PVN={chk:"шахматка",light:"светлый",dark:"тёмный"};
+function pv(v){R.dataset.pv=v;$("pv").textContent="Фон: "+PVN[v];put("gpv",v)}
+pv(PVN[get("gpv")]?get("gpv"):"chk");$("pv").onclick=function(){pv(PV[(PV.indexOf(R.dataset.pv)+1)%3])};
+function enc(p){return p.split("/").map(encodeURIComponent).join("/")}
+function abs(it){return D.root+BS+it.file.split("/").join(BS)}
+function copy(t,el){var o=el.textContent;function ok(){el.textContent="Скопировано";setTimeout(function(){el.textContent=o},900)}
+ function fb(){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();document.execCommand("copy");a.remove();ok()}
+ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok,fb);else fb()}
+function un(t){var a=document.createElement("textarea");a.innerHTML=t;return a.value}
+function stem(it){return it.file.split("/").pop().replace(/\.[^.]+$/,"")}
+(function(){var fs=$("fs"),ft=$("ft"),c={};fs.innerHTML='<option value="">Все разделы</option>';
+ D.sections.forEach(function(s){fs.innerHTML+='<option>'+s.name+'</option>';s.groups.forEach(function(g){g.items.forEach(function(it){var k=stem(it);c[k]=(c[k]||0)+1})})});
+ ft.innerHTML='<option value="">Все темы</option>';Object.keys(c).sort().forEach(function(k){if(c[k]>=3)ft.innerHTML+='<option>'+k+'</option>'})})();
+function card(it,sub){var i=shown.length;shown.push(it);var d=document.createElement("div");d.className="it";
+ d.innerHTML='<div class="th"><img loading="lazy" src="'+enc(it.file)+'"></div><div class="cap" title="'+it.file+'">'+(sub||it.name)+' <span>'+it.info+'</span></div><button class="cp">Путь</button>';
+ d.onclick=function(){open(i)};d.lastChild.onclick=function(e){e.stopPropagation();copy(abs(it),this)};return d}
+function draw(){var q=$("q").value.trim().toLowerCase(),fsec=$("fs").value,ft=$("ft").value,nav=$("nav");m.innerHTML="";shown=[];nav.innerHTML="";
+ function ok(s,g,it){return(!fsec||un(s.name)===fsec)&&(!ft||stem(it)===ft)&&(!q||(s.name+" "+g.name+" "+it.file).toLowerCase().indexOf(q)>=0)}
+ if($("so").value==="new"){var all=[];D.sections.forEach(function(s){s.groups.forEach(function(g){g.items.forEach(function(it){if(ok(s,g,it))all.push(it)})})});
+  all.sort(function(a,b){return b.t-a.t});var sec=document.createElement("section"),gr=document.createElement("div");gr.className="grid";
+  all.forEach(function(it){gr.appendChild(card(it,it.file.split("/").slice(-2).join(" / ")))});sec.appendChild(gr);m.appendChild(sec)}
+ else D.sections.forEach(function(s,si){var sec=document.createElement("section"),any=0;sec.id="s"+si;sec.innerHTML="<h2>"+s.name+"</h2>";
+  s.groups.forEach(function(g){var items=g.items.filter(function(it){return ok(s,g,it)});if(!items.length)return;any+=items.length;
+   if(g.name){var h=document.createElement("h3");h.textContent=g.name;sec.appendChild(h)}
+   var gr=document.createElement("div");gr.className="grid";items.forEach(function(it){gr.appendChild(card(it))});sec.appendChild(gr)});
+  if(any){sec.firstChild.innerHTML=s.name+" <span>"+any+"</span>";m.appendChild(sec);var a=document.createElement("a");a.href="#s"+si;a.textContent=s.name+" ("+any+")";nav.appendChild(a)}});
+ $("n").textContent=shown.length+" шт., собрано "+D.built}
+function open(i){cur=(i+shown.length)%shown.length;var it=shown[cur];$("bi").src=enc(it.file);$("bp").textContent=it.file+"  -  "+it.info;$("big").style.display="flex"}
+$("big").onclick=function(){this.style.display="none"};$("bc").onclick=function(e){e.stopPropagation();copy(abs(shown[cur]),this)};
+document.onkeydown=function(e){var q=$("q");
+ if($("big").style.display!=="flex"){if(e.key==="/"&&document.activeElement!==q){e.preventDefault();q.focus()}
+  else if(e.key==="Escape"&&document.activeElement===q){q.value="";draw();q.blur()}return}
+ if(e.key==="Escape")$("big").style.display="none";if(e.key==="ArrowRight")open(cur+1);if(e.key==="ArrowLeft")open(cur-1)};
+function sz(v){R.style.setProperty("--sz",v+"px");$("sz").value=v;put("gsz",v)}sz(+get("gsz")||130);$("sz").oninput=function(){sz(this.value)};
+window.onscroll=function(){$("up").style.display=scrollY>600?"block":"none"};$("up").onclick=function(){scrollTo({top:0,behavior:"smooth"})};
+$("q").placeholder="Поиск по названию...  ( / )";
+$("q").oninput=$("fs").onchange=$("ft").onchange=$("so").onchange=draw;draw();
+</script></body></html>
