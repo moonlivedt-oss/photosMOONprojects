@@ -457,7 +457,7 @@ class Toast(QWidget):
 
     def say(self, text, ms=3200):
         self.text = text
-        fm = self.bg_modetMetrics()
+        fm = self.fontMetrics()
         w = min(self.win.width() - 80, fm.horizontalAdvance(text) + 64)
         h = 42
         bottom = self.win.height() - (self.win.statusBar().height() if self.win.statusBar() else 0)
@@ -510,7 +510,7 @@ class Toast(QWidget):
         p.setBrush(QBrush(g))
         p.drawEllipse(dot.adjusted(-self.bump * 2, -self.bump * 2, self.bump * 2, self.bump * 2))
         p.setPen(QColor(C["text"]))
-        fm = self.bg_modetMetrics()
+        fm = self.fontMetrics()
         p.drawText(QRectF(dot.right() + 10, r.top(), r.width() - 50, r.height()),
                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
                    fm.elidedText(self.text, Qt.TextElideMode.ElideMiddle, int(r.width() - 50)))
