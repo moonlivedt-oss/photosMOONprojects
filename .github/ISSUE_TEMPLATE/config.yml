@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: FAQ / Решение проблем
+    url: https://github.com/moonlivedt-oss/photosMOONprojects#faq--решение-проблем
+    about: Частые проблемы («Нужны пакеты», нет поиска по смыслу, окно закрылось) уже разобраны в README.

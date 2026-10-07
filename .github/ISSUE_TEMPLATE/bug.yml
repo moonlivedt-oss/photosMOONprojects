@@ -1,0 +1,68 @@
+name: Баг
+description: Что-то работает не так, как ожидалось
+title: "[Баг] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за отчёт! Сначала загляни в [FAQ / Решение проблем](https://github.com/moonlivedt-oss/photosMOONprojects#faq--решение-проблем) - частые случаи («Нужны пакеты», нет кнопки поиска по смыслу) уже разобраны.
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Опиши проблему кратко и по делу.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как воспроизвести
+      description: Пошагово - что нажимал(а), какой файл бросал(а) во входящие.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидал(а)
+    validations:
+      required: false
+  - type: dropdown
+    id: where
+    attributes:
+      label: Где проявляется
+      options:
+        - Входящие (нарезка, раскладка)
+        - Библиотека (плитки, просмотр, поиск)
+        - Поиск по смыслу или подсказка меток
+        - Редактор, сжатие или выгрузка
+        - Командная строка или .cmd
+        - Gallery.html или Prompts.html
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Версия Python и Windows
+      placeholder: "Python 3.14.0 · Windows 11 24H2"
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Журнал ошибок
+      description: Хвост файла `_tools/_errors.log`, если он есть.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Скриншот
+      description: По возможности приложи изображение - перетащи его прямо сюда.
+    validations:
+      required: false

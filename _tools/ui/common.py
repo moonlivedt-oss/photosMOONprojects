@@ -13,6 +13,7 @@ from PyQt6.QtCore import QObject, QRunnable, Qt, QThreadPool, pyqtSignal
 
 import imaging as K
 
+VERSION = "2.0.0"                                   # вместе с ней - CHANGELOG и бейдж в README
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))     # папка _tools
 
 LIB = K.LIB

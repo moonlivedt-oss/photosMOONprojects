@@ -1,12 +1,16 @@
-name: tests
+name: CI
 
 on:
   push:
-    paths: ["_tools/**", "Prompts.html", ".github/workflows/**"]
+    branches: [main]
+    paths: ["_tools/**", "Prompts.html", "_sources/2026-*/**", ".github/workflows/**"]
   pull_request:
+    branches: [main]
 
 jobs:
-  tests:
+  # Всё, что проверяет run-tests.cmd, плюс ruff. Только Windows: окно, .cmd и пути рассчитаны на неё.
+  # Моделей CLIP на CI нет (225 МБ) - их тесты пропускаются; эталонные листы берутся из _sources.
+  check:
     runs-on: windows-latest
     env:
       PYTHONIOENCODING: utf-8
@@ -23,9 +27,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - name: Install
+      - name: Пакеты
         run: python -m pip install pillow numpy PyQt6 onnxruntime ruff
-      - name: Lint
+      - name: Линтер
         run: python -m ruff check .
-      - name: Tests
+      - name: Тесты
         run: python -m unittest discover -s tests -v

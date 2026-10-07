@@ -38,6 +38,7 @@ from ui.common import (
     INBOX,
     LIB,
     PARK,
+    VERSION,
     bg,
     cfg_text,
     finish_bg,
@@ -530,7 +531,7 @@ class Window(QMainWindow):
         self.say("Живой фон: " + ("плывёт" if self.cfg["live_bg"] else "застыл (F9 - включить)"))
 
     def show_help(self):
-        QMessageBox.information(self, "Горячие клавиши", HELP)
+        QMessageBox.information(self, f"Горячие клавиши - Библиотека картинок {VERSION}", HELP)
 
     def open_gallery(self):
         self.gal.stop()
