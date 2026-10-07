@@ -9,13 +9,13 @@
 ### A personal library of icons, stickers and backgrounds with a sorting window: cuts generated sheets, files them, searches by meaning
 
 4x3 sheet cutting with preview · filing by section and palette · semantic search in Russian and English<br>
-tag suggestions · smart folders · edit, compress and export to projects · fully local, no network
+tag suggestions · smart folders · neural background removal and x4 upscaling · fully local, no network
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
-![version](https://img.shields.io/badge/version-2.0.0-cba6f7)
+![version](https://img.shields.io/badge/version-2.1.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/tests-32%20ok-a6e3a1)
+![tests](https://img.shields.io/badge/tests-36%20ok-a6e3a1)
 ![images](https://img.shields.io/badge/pictures-4160-89b4fa)
 ![license](https://img.shields.io/badge/code-MIT-green)
 
@@ -31,7 +31,7 @@ tag suggestions · smart folders · edit, compress and export to projects · ful
 
 ```bash
 py -3.14 -m pip install PyQt6 pillow numpy onnxruntime
-py -3.14 _tools/get_models.py      # semantic search models, ~225 MB, once
+py -3.14 _tools/get_models.py      # neural models, ~460 MB, once (or by part: clip, bg, upscale)
 ```
 
 Then run **`Library.cmd`** - a window opens with two tabs: "Входящие" (Inbox) and "Библиотека" (Library).
@@ -79,6 +79,8 @@ suggested, and everything is filed into the right section and palette.
 | **Semantic search** | crystal-ball button (Ctrl+M): "cat in space", "sad mascot" - no words in file names needed |
 | **Search by image** | drop a file or a tile onto the search field; "Similar" and "Similar by meaning" in the tile menu |
 | **Tags** | suggestions in the inbox and for the selected picture, optional auto-tagging for batch filing; tags and notes are searchable |
+| **Neural editing** | remove any background (BiRefNet-lite), sharp x2/x4 upscaling (Real-ESRGAN, separate models for art and photos); CLI `nobg`, `upscale`, `cut --bg ai` |
+| **Bulk tags, usage log** | apply suggested tags to a whole section; export (Ctrl+E) remembers which project folder a picture went to |
 | **Smart folders** | save a search (words, color, meaning) - the folder in the tree fills itself |
 | **Color search, sets** | 10 colors by dominant colors; sets with palette subfolders shown as one cover |
 | **Editor** (Ctrl+R) | crop, rotate, color, recolor to palette, remove background and fringe, brush, outline, shadow, glow, rounding, resize; recipes; batch edit |

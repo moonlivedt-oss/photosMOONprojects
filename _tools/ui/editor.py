@@ -44,6 +44,7 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
+from imaging import neural
 from ui import prompts
 from ui.animations import TabBar
 from ui.common import LIB, SOURCES, bg, human, in_main, parallel, unique
@@ -60,7 +61,8 @@ NAMES = {"rotate": "поворот", "flip": "отражение", "crop": "об
          "nobg": "фон убран", "outline": "обводка", "square": "квадрат", "resize": "размер",
          "recolor": "перекраска", "defringe": "кайма убрана", "brush": "кисть", "shadow": "тень",
          "glow": "свечение", "round": "скругление", "center": "квадрат по центру",
-         "angle": "наклон", "fill": "заливка фона", "pad": "поля"}
+         "angle": "наклон", "fill": "заливка фона", "pad": "поля", "nobg_ai": "фон убран нейросетью",
+         "upscale": "увеличение нейросетью"}
 ADJ_TIPS = {"shadows": "Плюс - вытянуть тёмные места, минус - сделать глубже",
             "highlights": "Плюс - ярче светлое, минус - вернуть пересвеченное",
             "sharp": "Плюс - резче, минус - размыть",
@@ -86,7 +88,8 @@ def step_text(o):
              "fill": lambda: o.get("color", ""), "pad": lambda: "%d%%" % round(o.get("k", 0.1) * 100),
              "square": lambda: "поля %d%%" % round(o.get("pad", 0.06) * 100),
              "round": lambda: "%d%%" % round(o["rad"] * 100), "brush": lambda: "стереть" if o["mode"] == "erase" else "вернуть",
-             "flip": lambda: "по горизонтали" if o["dir"] == "h" else "по вертикали"}.get(k)
+             "flip": lambda: "по горизонтали" if o["dir"] == "h" else "по вертикали",
+             "upscale": lambda: "x%d" % o.get("x", 4)}.get(k)
     try:
         return n + (" " + extra() if extra and extra() else "")
     except (KeyError, TypeError):
@@ -859,10 +862,24 @@ class EditDialog(QDialog):
         r5 = QHBoxLayout()
         r5.addWidget(self.side, 1)
         r5.addWidget(self.button("Изменить размер", lambda: self.add(op="resize", size=self.side.value())))
+        self.up_kind = QComboBox()
+        for t, v in (("Само определит", "auto"), ("Рисунок, наклейка", "art"), ("Фон, фото", "photo")):
+            self.up_kind.addItem(t, v)
+        self.up_kind.setToolTip("Модель для рисунков бережёт контуры и заливки, для фото - текстуры")
+        r6 = QHBoxLayout()
+        r6.addWidget(self.up_kind, 1)
+        for x in (2, 4):
+            b = self.button("x%d" % x, lambda _c=False, x=x: self.add(op="upscale", x=x, kind=self.up_kind.currentData()),
+                            "Увеличить в %d раза нейросетью (Real-ESRGAN): чётко, а не мыльно" % x)
+            b.setEnabled(neural.upscale_available())
+            r6.addWidget(b)
+        r5w = QVBoxLayout()
+        r5w.addLayout(r5)
+        r5w.addLayout(r6)
         g1w = QVBoxLayout()
         g1w.addLayout(g1)
         g1w.addLayout(r4)
-        return self.page(self.box("Поворот и отражение", g1w), self.box("Обрезка", v2), self.box("Размер", r5))
+        return self.page(self.box("Поворот и отражение", g1w), self.box("Обрезка", v2), self.box("Размер", r5w))
 
     def page_color(self):
         g3 = QGridLayout()
@@ -918,9 +935,15 @@ class EditDialog(QDialog):
         self.margin = QSpinBox(minimum=1, maximum=50, value=10, suffix=" %")
         self.margin.setToolTip("Ширина полей - доля длинной стороны")
         self.fill_c = ColorButton("#ffffff", "Цвет фона", self)
+        self.ai_bg = self.button("Убрать фон нейросетью", lambda: self.add(op="nobg_ai"),
+                                 "Любой фон, не только однотонный (BiRefNet). Первый раз - секунд 10")
+        if not neural.bg_available():
+            self.ai_bg.setEnabled(False)
+            self.ai_bg.setToolTip("Нет модели: py -3.14 _tools/get_models.py")
         g4 = QGridLayout()
         rows = ((self.button("Убрать фон", lambda: self.add(op="nobg", tol=self.tol.value()),
                              "Однотонный фон, связанный с краями; белые детали внутри рисунка остаются"), self.tol),
+                (self.ai_bg,),
                 (self.button("Убрать кайму", lambda: self.add(op="defringe", px=self.fringe.value()),
                              "Светлый ореол от старого фона вокруг рисунка"), self.fringe),
                 (self.button("Обводка", lambda: self.add(op="outline", px=self.px.value(), color=self.outline_c.color),

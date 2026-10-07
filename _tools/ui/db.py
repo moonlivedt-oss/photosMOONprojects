@@ -3,6 +3,7 @@
 import os
 import sqlite3
 import threading
+import time
 from collections import Counter
 
 import numpy as np
@@ -27,6 +28,7 @@ def conn():
                 CREATE INDEX IF NOT EXISTS tags_tag ON tags(tag);
                 CREATE TABLE IF NOT EXISTS clip(rel TEXT PRIMARY KEY, mt REAL, vec BLOB);
                 CREATE TABLE IF NOT EXISTS smart(name TEXT PRIMARY KEY, query TEXT, color TEXT, sem INT);
+                CREATE TABLE IF NOT EXISTS exports(rel TEXT, dest TEXT, t REAL, PRIMARY KEY(rel, dest));
             """)
         return _conn
 
@@ -133,6 +135,7 @@ def moved(a, b):
             c.execute("DELETE FROM tags WHERE rel=?", (a,))
             c.execute("UPDATE OR REPLACE notes SET rel=? WHERE rel=?", (b, a))
             c.execute("UPDATE OR REPLACE clip SET rel=? WHERE rel=?", (b, a))
+            c.execute("UPDATE OR REPLACE exports SET rel=? WHERE rel=?", (b, a))
 
 
 def forget(rel):
@@ -180,3 +183,25 @@ def delete_smart(name):
         c = conn()
         with c:
             c.execute("DELETE FROM smart WHERE name=?", (name,))
+
+
+def delete_tag(tag):
+    """Убрать метку у всех картинок. Возвращает, у скольких она была."""
+    with _lock:
+        c = conn()
+        with c:
+            return c.execute("DELETE FROM tags WHERE tag=?", (tag,)).rowcount
+
+
+def log_export(rels, dest):
+    """Картинки ушли в папку проекта - запомнить где (панель справа показывает «Выгружено в»)."""
+    with _lock:
+        c = conn()
+        with c:
+            c.executemany("INSERT OR REPLACE INTO exports VALUES (?,?,?)", [(r, dest, time.time()) for r in rels])
+
+
+def exports_of(rel):
+    """[(папка, время)] - куда выгружалась картинка, свежие сначала."""
+    with _lock:
+        return conn().execute("SELECT dest, t FROM exports WHERE rel=? ORDER BY t DESC", (rel,)).fetchall()

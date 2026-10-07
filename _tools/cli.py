@@ -17,6 +17,7 @@ import numpy as np
 from PIL import Image
 
 import imaging as K
+from imaging import neural
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -26,11 +27,7 @@ except Exception:
 
 def cmd_cut(a):
     names = [x.strip() for x in a.names.split(",")] if a.names else []
-    grid = (
-        tuple(int(v) for v in a.grid.lower().replace("х", "x").split("x"))
-        if a.grid
-        else None
-    )
+    grid = tuple(int(v) for v in a.grid.lower().replace("х", "x").split("x")) if a.grid else None
     for src in a.files:
         try:
             pieces, _ = K.cut(K.load(src), grid, a.size, a.bg, a.outline, a.pad)
@@ -38,9 +35,7 @@ def cmd_cut(a):
             print(f"{os.path.basename(src)}: не получилось - {e}")
             continue
         stem = os.path.splitext(os.path.basename(src))[0]
-        out = a.out or os.path.join(
-            os.path.dirname(os.path.abspath(src)), stem + " - нарезка"
-        )
+        out = a.out or os.path.join(os.path.dirname(os.path.abspath(src)), stem + " - нарезка")
         print(f"{os.path.basename(src)}: найдено {len(pieces)}")
         for i, piece in enumerate(pieces):
             name = names[i] if i < len(names) else f"{stem}_{i + 1:02d}"
@@ -102,9 +97,7 @@ def cmd_dupes(a):
     for i in range(len(paths)):
         if gone[i]:
             continue
-        same = (np.abs(ratios - ratios[i]) / ratios < K.SAME_RATIO) & (
-            np.abs(vecs - vecs[i]).mean(1) < K.SAME_DIFF
-        )
+        same = (np.abs(ratios - ratios[i]) / ratios < K.SAME_RATIO) & (np.abs(vecs - vecs[i]).mean(1) < K.SAME_DIFF)
         same[: i + 1] = False
         same &= ~gone
         group = [i] + list(np.flatnonzero(same))
@@ -134,54 +127,78 @@ def cmd_gallery(_a):
         print(f"  {s}: {n}")
 
 
+def _neural(a, ready, tail, fn):
+    """Нейросеть по файлам: результат - png рядом с исходником, исходник не трогается."""
+    if not ready():
+        print("Нет модели: py -3.14 _tools/get_models.py")
+        return
+    for src in a.files:
+        try:
+            out = fn(K.load(src))
+        except Exception as e:
+            print(f"{os.path.basename(src)}: не получилось - {e}")
+            continue
+        dst = f"{os.path.splitext(src)[0]} {tail}.png"
+        K.save(out, dst, "png")
+        print(f"{os.path.basename(src)} -> {os.path.basename(dst)}  {out.width}x{out.height}")
+
+
+def cmd_upscale(a):
+    def run(im):
+        kind = ("art" if K.is_art(im) else "photo") if a.kind == "auto" else a.kind
+        return neural.upscale(im, a.x, kind)
+
+    _neural(a, neural.upscale_available, f"x{a.x}", run)
+
+
+def cmd_nobg(a):
+    _neural(a, neural.bg_available, "без фона", neural.remove_bg_ai)
+
+
 def main():
     p = argparse.ArgumentParser(description="Инструменты библиотеки картинок")
     sub = p.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("cut", help="лист с рисунками -> отдельные квадратные картинки")
     c.add_argument("files", nargs="+")
-    c.add_argument(
-        "--grid", help="строго по сетке, например 4x3 (иначе рисунки ищутся сами)"
-    )
-    c.add_argument(
-        "--size", type=int, default=256, help="сторона результата, 0 - не менять"
-    )
+    c.add_argument("--grid", help="строго по сетке, например 4x3 (иначе рисунки ищутся сами)")
+    c.add_argument("--size", type=int, default=256, help="сторона результата, 0 - не менять")
     c.add_argument("--format", default="webp", choices=["webp", "png"])
     c.add_argument("--names", help="имена по порядку через запятую")
     c.add_argument(
         "--bg",
         default="auto",
-        choices=["auto", "remove", "keep"],
-        help="однотонный фон листа",
+        choices=["auto", "remove", "ai", "keep"],
+        help="фон листа: однотонный убрать (auto/remove), любой - нейросетью (ai), оставить (keep)",
     )
     c.add_argument("--outline", type=int, default=0, help="белая обводка, px")
-    c.add_argument(
-        "--pad", type=float, default=0.06, help="поля вокруг рисунка, доля стороны"
-    )
+    c.add_argument("--pad", type=float, default=0.06, help="поля вокруг рисунка, доля стороны")
     c.add_argument("--out", help="папка результата (иначе '<лист> - нарезка' рядом)")
-    k = sub.add_parser(
-        "convert", help="перевод формата и уменьшение; ico - сразу 16..256 px"
-    )
+    k = sub.add_parser("convert", help="перевод формата и уменьшение; ico - сразу 16..256 px")
     k.add_argument("files", nargs="+")
-    k.add_argument(
-        "--to", default="webp", choices=["webp", "avif", "png", "jpg", "ico"]
-    )
+    k.add_argument("--to", default="webp", choices=["webp", "avif", "png", "jpg", "ico"])
     k.add_argument("--max", type=int, default=0, help="длинная сторона не больше")
     k.add_argument(
         "--replace",
         action="store_true",
         help="удалить исходник после удачной конвертации",
     )
-    d = sub.add_parser(
-        "dupes", help="одинаковые картинки -> _duplicates (не удаляются)"
-    )
+    d = sub.add_parser("dupes", help="одинаковые картинки -> _duplicates (не удаляются)")
     d.add_argument("dir", nargs="?")
     sub.add_parser("gallery", help="пересобрать Gallery.html")
+    u = sub.add_parser("upscale", help="увеличить нейросетью (Real-ESRGAN) -> '<имя> x4.png' рядом")
+    u.add_argument("files", nargs="+")
+    u.add_argument("--x", type=int, default=4, choices=[2, 4])
+    u.add_argument("--kind", default="auto", choices=["auto", "art", "photo"], help="рисунок или фото")
+    n = sub.add_parser("nobg", help="убрать любой фон нейросетью (BiRefNet) -> '<имя> без фона.png' рядом")
+    n.add_argument("files", nargs="+")
     a = p.parse_args()
     {
         "cut": cmd_cut,
         "convert": cmd_convert,
         "dupes": cmd_dupes,
         "gallery": cmd_gallery,
+        "upscale": cmd_upscale,
+        "nobg": cmd_nobg,
     }[a.cmd](a)
 
 

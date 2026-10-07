@@ -4,6 +4,7 @@ import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
+from imaging import neural
 from imaging.cutting import add_outline, remove_bg, to_square
 from imaging.encoding import encode, has_alpha, is_art, trim
 from imaging.files import fmt_of, hex_rgb, load
@@ -15,6 +16,8 @@ ADJ = [("bright", "Яркость"), ("contrast", "Контраст"), ("sat", "
        ("hue", "Оттенок"), ("warm", "Тепло"), ("shadows", "Тени"), ("highlights", "Света"),
        ("sharp", "Резкость"), ("opacity", "Прозрачность")]
 ADJ_RANGE = {"hue": (-180, 180), "opacity": (0, 100)}      # остальные - -100..100
+
+PREVIEW_MAX = 2400       # предпросмотр после увеличения нейросетью - не больше этой стороны
 
 
 def adjust(im, bright=0, contrast=0, sat=0, hue=0, warm=0, shadows=0, highlights=0, sharp=0, opacity=0, scale=1.0):
@@ -88,6 +91,16 @@ def apply_edits(im, ops, adj=None, scale=1.0, info=None):
             im = trim(im)[0]
         elif k == "nobg":
             im = remove_bg(im, o.get("tol", 38))
+        elif k == "nobg_ai":                    # любой фон - нейросеть (BiRefNet)
+            im = neural.cached("bg", im, neural.remove_bg_ai)
+        elif k == "upscale":                    # x: 2 или 4; kind: auto / art / photo
+            x, kind = o.get("x", 4), o.get("kind", "auto")
+            kind = ("art" if is_art(im) else "photo") if kind == "auto" else kind
+            im = neural.cached("up%d%s" % (x, kind), im, lambda a, x=x, kind=kind: neural.upscale(a, x, kind))
+            if scale < 1 and max(im.size) > PREVIEW_MAX:    # превью: полный размер вырос в x раз, копия - тоже
+                f = PREVIEW_MAX / max(im.size)
+                im = im.resize((max(1, round(im.width * f)), max(1, round(im.height * f))), Image.LANCZOS)
+                scale *= f
         elif k == "outline":
             im = add_outline(im, max(1, round(o["px"] * scale)), o.get("color", "#ffffff"))
         elif k == "square":

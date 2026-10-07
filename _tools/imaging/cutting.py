@@ -2,6 +2,7 @@
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
+from imaging import neural
 from imaging.files import hex_rgb
 
 
@@ -242,12 +243,12 @@ def to_square(im, pad, fill):
 def cut(im, grid=None, size=256, bg_mode="auto", outline=0, pad=0.06, boxes=None):
     """Режет лист на квадратные картинки -> (картинки, их рамки на листе).
     grid - (столбцы, строки) или None (автопоиск); boxes - рамки, поправленные руками.
-    bg_mode - auto | remove | keep; outline - белая обводка в px; pad - поля, доля стороны."""
+    bg_mode - auto | remove | ai (нейросеть) | keep; outline - белая обводка в px; pad - поля, доля стороны."""
     _, uniform = border_color(im)
     has_alpha = np.asarray(im.getchannel("A")).min() < 250
-    removed = bg_mode == "remove" or (bg_mode == "auto" and uniform and not has_alpha)
+    removed = bg_mode in ("remove", "ai") or (bg_mode == "auto" and uniform and not has_alpha)
     if removed:
-        im = remove_bg(im)
+        im = neural.remove_bg_ai(im) if bg_mode == "ai" else remove_bg(im)
     mask = object_mask(im, removed)
     if boxes:
         pieces = [(tuple(int(v) for v in b), mask) for b in boxes]

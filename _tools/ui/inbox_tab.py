@@ -399,7 +399,8 @@ class InboxTab(QWidget):
         grid.addWidget(QLabel("x", objectName="dim"))
         grid.addWidget(self.rows, 1)
         self.bg_mode = QComboBox()
-        for t, v in (("Убрать, если однотонный", "auto"), ("Убрать всегда", "remove"), ("Оставить", "keep")):
+        for t, v in (("Убрать, если однотонный", "auto"), ("Убрать всегда", "remove"),
+                     ("Убрать нейросетью (любой фон)", "ai"), ("Оставить", "keep")):
             self.bg_mode.addItem(t, v)
         self.obv = QSpinBox(minimum=0, maximum=40, suffix=" px")
         self.pad = QSpinBox(minimum=0, maximum=30, suffix=" %")

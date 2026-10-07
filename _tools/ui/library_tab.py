@@ -97,6 +97,9 @@ class Preview(QWidget):
         self.name = QLabel(objectName="head", wordWrap=True)
         self.name.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.where = QLabel(objectName="dim", wordWrap=True)
+        self.used = QLabel(objectName="dim", wordWrap=True)
+        self.used.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.used.hide()
         self.where.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.chips = QHBoxLayout()            # размер, формат, вес - плашками
         self.chips.setSpacing(5)
@@ -163,6 +166,7 @@ class Preview(QWidget):
         v.addSpacing(4)
         v.addWidget(self.name)
         v.addWidget(self.where)
+        v.addWidget(self.used)
         v.addLayout(self.chips)
         v.addSpacing(2)
         v.addWidget(self.pal_lbl)
@@ -256,6 +260,7 @@ class Preview(QWidget):
 
     def show_paths(self, paths, mode):
         self.show_meta(paths)
+        self.show_used(paths[0] if len(paths) == 1 else None)
         for b in self.btns:
             b.setEnabled(bool(paths))
         for i in (0, 5, 10):                        # открыть, похожие, переименовать - только по одной
@@ -290,6 +295,22 @@ class Preview(QWidget):
         except Exception:
             pass
         self.set_chips(chips)
+
+    def show_used(self, path):
+        """Куда картинка выгружалась (Ctrl+E): видно, в каких проектах она уже живёт."""
+        rows = []
+        if path:
+            try:
+                rows = db.exports_of(os.path.relpath(path, LIB))
+            except Exception:
+                rows = []
+        names = []
+        for dest, t in rows[:3]:
+            parts = os.path.normpath(dest).split(os.sep)
+            names.append("%s (%s)" % (" / ".join(parts[-2:]), time.strftime("%d.%m.%Y", time.localtime(t))))
+        self.used.setText("Выгружено в: " + ", ".join(names) + (" и ещё %d" % (len(rows) - 3) if len(rows) > 3 else ""))
+        self.used.setToolTip("\n".join(d for d, _t in rows))
+        self.used.setVisible(bool(rows))
 
     def show_pic(self, path, mode):
         """Крупная картинка - из памяти сразу, иначе в фоне (листание стрелками не тормозит)."""
@@ -786,6 +807,8 @@ class LibTab(QWidget):
         m = QMenu(self)
         if os.path.isdir(role):
             m.addAction("Открыть папку в проводнике", lambda: os.startfile(role))
+        if role.startswith(TAG):
+            m.addAction("Убрать метку у всех картинок", lambda: self.delete_tag(role[len(TAG):]))
         if role.startswith(SMART):
             m.addAction("Переименовать умную папку...", lambda: self.rename_smart(role[len(SMART):]))
             m.addAction("Удалить умную папку", lambda: self.delete_smart(role[len(SMART):]))
@@ -794,10 +817,60 @@ class LibTab(QWidget):
             m.addAction("Сжать весь раздел (%d)..." % len(files), lambda: self.compress(files))
             m.addAction("Выгрузить раздел в папку...", lambda: self.export(files))
             m.addAction("Лист превью раздела...", lambda: self.preview_sheet(files))
+            if self.win.sem.ready():
+                m.addAction("Поставить подсказанные метки (%d)..." % len(files), lambda: self.auto_tag(files))
         if m.isEmpty():
             return
         m.exec(self.tree.mapToGlobal(pos))
         self.show_files()
+
+    def auto_tag(self, files):
+        """Каждой картинке - её подсказанные метки (по готовым векторам, без чтения файлов). Сначала
+        показывается, что получится; метки по одной потом снимаются правым щелчком в дереве."""
+        sem, tagger = self.win.sem, self.win.tagger
+        self.win.say("Подбираю метки для %d картинок..." % len(files))
+
+        def work():
+            plan = {}
+            for p in files:
+                v = sem.vecs_of([p])
+                if len(v):
+                    rel = os.path.relpath(p, LIB)
+                    tags = tagger.suggest_vecs(v, set(db.tags_of(rel)))
+                    if tags:
+                        plan[rel] = tags
+            return plan
+
+        def done(plan):
+            if isinstance(plan, Exception) or not plan:
+                self.win.say("Подсказать нечего" if not isinstance(plan, Exception) else f"Не вышло: {plan}")
+                return
+            count = {}
+            for tags in plan.values():
+                for t in tags:
+                    count[t] = count.get(t, 0) + 1
+            top = sorted(count, key=count.get, reverse=True)
+            text = "\n".join("%s - %d" % (t, count[t]) for t in top[:15]) + ("\n..." if len(top) > 15 else "")
+            ask = QMessageBox.question(self, "Поставить метки",
+                                       "Картинок с подсказками: %d, разных меток: %d.\n\n%s\n\nПоставить?"
+                                       % (len(plan), len(top), text))
+            if ask != QMessageBox.StandardButton.Yes:
+                return
+            for rel, tags in plan.items():
+                db.set_tags([rel], tags, "add")
+            fill_tree(self.tree, planned=False, recent=True)
+            self.describe()
+            self.win.say("Метки поставлены: %d картинок. Лишнюю метку убирает правый щелчок по ней в дереве" % len(plan))
+
+        bg(work, done)
+
+    def delete_tag(self, tag):
+        if QMessageBox.question(self, "Метка", "Убрать метку «%s» у всех картинок?" % tag) \
+                != QMessageBox.StandardButton.Yes:
+            return
+        n = db.delete_tag(tag)
+        fill_tree(self.tree, planned=False, recent=True)
+        self.win.say("Метка «%s» убрана у %d картинок" % (tag, n))
 
     def toggle_sem(self, on):
         self.cfg["semantic"] = on
@@ -1069,6 +1142,7 @@ class LibTab(QWidget):
         m.addAction("Найти похожие", self.find_similar)
         if self.win.sem.ready():
             m.addAction("Похожие по смыслу", lambda: self.find_similar(sem=True))
+            m.addAction("Поставить подсказанные метки", lambda: self.auto_tag(self.paths()))
         m.addAction("Выгрузить в папку...\tCtrl+E", self.export)
         m.addSeparator()
         m.addAction("Переименовать\tF2", self.rename)
@@ -1175,6 +1249,9 @@ class LibTab(QWidget):
                 QMessageBox.warning(self, "Не выгрузилось", str(res))
                 return
             self.win.say("Выгружено: %d шт. в %s" % (res, folder))
+            rels = [os.path.relpath(p, LIB) for p in sel if os.path.splitdrive(p)[0] == os.path.splitdrive(LIB)[0]]
+            db.log_export(rels, folder)
+            self.describe()
             if self.cfg.get("export_open"):
                 os.startfile(folder)
 

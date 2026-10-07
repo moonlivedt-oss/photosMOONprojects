@@ -301,6 +301,59 @@ class Database(unittest.TestCase):
         self.assertEqual((total, bad), (12, []))
         self.assertEqual(len(self.b.with_tag("кружки")), 12)
 
+    def test_export_log_and_tag_delete(self):
+        b = self.b
+        b.log_export(["a/x.png"], "D:/proj/assets")
+        b.log_export(["a/x.png"], "D:/other")
+        b.moved("a/x.png", "b/x.png")
+        self.assertEqual({d for d, _t in b.exports_of("b/x.png")}, {"D:/proj/assets", "D:/other"})
+        b.set_tags(["b/x.png", "c.png"], ["космос", "ночь"])
+        self.assertEqual(b.delete_tag("космос"), 2)
+        self.assertEqual(b.all_tags(), {"ночь": 2})
+
+
+def scene_with_sticker():
+    """Наклейка (кружок с белой обводкой) на пёстром фоне - однотонным способом фон не убрать."""
+    rng = np.random.default_rng(5)
+    bg = Image.fromarray(rng.integers(0, 255, (300, 400, 3), dtype=np.uint8), "RGB").resize((800, 600))
+    d = ImageDraw.Draw(bg)
+    d.ellipse((250, 150, 550, 450), fill=(255, 255, 255))
+    d.ellipse((270, 170, 530, 430), fill=(120, 90, 230))
+    return bg
+
+
+class Neural(unittest.TestCase):
+    def test_remove_any_background(self):
+        from imaging import neural
+
+        if not neural.bg_available():
+            self.skipTest("нет модели BiRefNet")
+        a = np.asarray(neural.remove_bg_ai(scene_with_sticker()).getchannel("A"))
+        self.assertGreater(a[300, 400], 200)  # середина наклейки осталась
+        self.assertLess(a[20:80, 20:80].mean(), 40)  # пёстрый угол стал прозрачным
+
+    def test_upscale_keeps_alpha_and_size(self):
+        from imaging import neural
+
+        if not neural.upscale_available():
+            self.skipTest("нет моделей Real-ESRGAN")
+        im = sticker_sheet().resize((96, 72))
+        for x in (2, 4):
+            big = neural.upscale(im, x, "art")
+            self.assertEqual(big.size, (96 * x, 72 * x))
+            self.assertLess(np.asarray(big.getchannel("A"))[0, 0], 30)
+
+    def test_edit_steps_and_preview_scale(self):
+        from imaging import neural
+
+        if not neural.upscale_available():
+            self.skipTest("нет моделей Real-ESRGAN")
+        im = Image.new("RGBA", (800, 400), (90, 60, 200, 255))
+        info = {}
+        out = K.apply_edits(im, [dict(op="upscale", x=4, kind="photo")], scale=0.5, info=info)
+        self.assertLessEqual(max(out.size), K.editing.PREVIEW_MAX)
+        self.assertAlmostEqual(out.width / info["scale"], 800 / 0.5 * 4, delta=4)
+
 
 class Tagging(unittest.TestCase):
     def test_sheet_of_clocks_gets_time_tags(self):

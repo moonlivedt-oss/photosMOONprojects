@@ -6,6 +6,7 @@ import shutil
 from PIL import Image
 
 import imaging as K
+from imaging import neural
 from ui.common import CLOSING, LIB, archive, clean_name, log_error, procs, short, unique
 from ui.prompts import set_name
 from ui.tagging import tag_saved
@@ -30,15 +31,15 @@ def process(path, o):
     im = K.load(path)
     rec = o.get("recipe")                   # правка кусков: рецепт из редактора (убрать фон, обводка...)
     if o["mode"] == "whole":
-        out = K.remove_bg(im) if o["bg_mode"] == "remove" else im
+        out = {"remove": K.remove_bg, "ai": neural.remove_bg_ai}.get(o["bg_mode"], lambda a: a)(im)
         if rec:
             out = K.apply_edits(out, rec.get("ops", []), rec.get("adj"))
         if o["size"] and max(out.size) > o["size"]:
             k = o["size"] / max(out.size)
             out = out.resize((round(out.width * k), round(out.height * k)), Image.LANCZOS)
         return im, [out], []
-    setka = (o["cols"], o["rows"]) if o["mode"] == "grid" else None
-    pieces, boxes = K.cut(im, setka, o["size"], o["bg_mode"], o["obv"], o["pad"] / 100, boxes=o.get("boxes"))
+    grid = (o["cols"], o["rows"]) if o["mode"] == "grid" else None
+    pieces, boxes = K.cut(im, grid, o["size"], o["bg_mode"], o["obv"], o["pad"] / 100, boxes=o.get("boxes"))
     if rec:                                 # обводка и тень расширяют кусок - снова под нужную сторону
         pieces = [K.resize(K.apply_edits(p, rec.get("ops", []), rec.get("adj")), o["size"]) if o["size"]
                   else K.apply_edits(p, rec.get("ops", []), rec.get("adj")) for p in pieces]
@@ -166,7 +167,7 @@ def store(path, o, pieces, names, dest, squeeze=False):
     """Пишет картинки в раздел. Нетронутый файл нужного формата копируется без пережатия.
     squeeze - сразу сжать с подбором качества (по ядрам), чтобы раздел «Тяжёлые» не копился."""
     os.makedirs(dest, exist_ok=True)
-    same = (o["mode"] == "whole" and o["bg_mode"] != "remove" and len(pieces) == 1 and not o.get("recipe")
+    same = (o["mode"] == "whole" and o["bg_mode"] in ("auto", "keep") and len(pieces) == 1 and not o.get("recipe")
             and os.path.splitext(path)[1].lower() == "." + o["fmt"])
     if same:
         same = K.size_of(path) == pieces[0].size
