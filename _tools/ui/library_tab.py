@@ -76,6 +76,7 @@ from ui.widgets import (
     DestDialog,
     LibList,
     PicView,
+    TagHints,
     fill_tree,
     forget_counts,
     key,
@@ -112,6 +113,9 @@ class Preview(QWidget):
         self.completer.activated.connect(self.complete_tag)
         self.tags.textEdited.connect(self.suggest_tag)
         self.tags.editingFinished.connect(lambda: self.tab.save_tags(self.tags.text()))
+        self.hints = TagHints()
+        self.hints.picked.connect(self.add_hint)
+        self.hint_gen = 0
         self.note = QPlainTextEdit(placeholderText="заметка: где использована, откуда, что поправить")
         self.note.setFixedHeight(54)
         self.note_timer = QTimer(self, singleShot=True, interval=700)
@@ -165,6 +169,7 @@ class Preview(QWidget):
         v.addLayout(self.colors)
         v.addWidget(self.tag_lbl)
         v.addWidget(self.tags)
+        v.addWidget(self.hints)
         v.addWidget(self.note)
         v.addSpacing(4)
         v.addLayout(g)
@@ -218,6 +223,25 @@ class Preview(QWidget):
             w.setVisible(bool(rels))
         self.note.setVisible(len(rels) == 1)
         self.loading_meta = False
+        self.suggest(paths)
+
+    def suggest(self, paths):
+        """Метки по смыслу для выбранного (векторы уже в индексе - считается за доли секунды, в фоне)."""
+        self.hint_gen += 1
+        gen, win = self.hint_gen, self.tab.win
+        self.hints.set_tags([])
+        vecs = win.sem.vecs_of(paths[:50]) if paths and win.sem.ok else []
+        if not len(vecs):
+            return
+        have = {t.strip() for t in self.tags.text().split(",") if t.strip()}
+        bg(lambda: win.tagger.suggest_vecs(vecs, have),
+           lambda res: gen == self.hint_gen and self.hints.set_tags(res if isinstance(res, list) else [], have))
+
+    def add_hint(self, tag):
+        tags = [t.strip() for t in self.tags.text().split(",") if t.strip()]
+        if tag not in tags:
+            self.tags.setText(", ".join(tags + [tag]))
+            self.tab.save_tags(self.tags.text())
 
     def show_set(self, s, cover):
         """Набор (вид «Наборы»): обложка, палитры плашками."""
@@ -510,7 +534,7 @@ class LibTab(QWidget):
         self.win, self.cfg = win, win.cfg
         self.side = max(64, min(THUMB, self.cfg.get("thumb", 128)))
         self.like = None                    # "Похожие на ...": путь картинки-образца
-        self.like_sem = False               # похожие по смыслу (CLIP), а не по рисунку
+        self.like_sem = False               # похожие по смыслу (CLIP), а не по рисунку; like - может быть и не из библиотеки
         self.tree = make_tree()
         self.tree.currentItemChanged.connect(lambda *_: self.leave_similar())
         self.q = QLineEdit(placeholderText="Поиск по всей библиотеке  (Ctrl+F)", objectName="search")
@@ -519,6 +543,9 @@ class LibTab(QWidget):
         self.qt = QTimer(self, singleShot=True, interval=180)        # не перерисовывать на каждую букву
         self.qt.timeout.connect(self.show_files)
         self.q.textChanged.connect(lambda *_: self.qt.start())
+        if win.sem.ok:
+            self.q.setPlaceholderText("Поиск по всей библиотеке  (Ctrl+F)  ·  можно бросить сюда картинку")
+            self.q.installEventFilter(self)
         self.sem = QPushButton(lib_icon("crystal-ball-stand"), "", objectName="tool", checkable=True)
         self.sem.setToolTip("Поиск по смыслу (Ctrl+M): «кот в космосе», «уютная ночная улица»")
         self.sem.setChecked(bool(self.cfg.get("semantic")) and win.sem.ok)
@@ -659,6 +686,8 @@ class LibTab(QWidget):
     # --- навигация
     def eventFilter(self, obj, e):
         t = e.type()
+        if obj is self.q and t in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.Drop):
+            return self.search_drop(e, t)
         if t == QEvent.Type.MouseButtonPress and e.button() == Qt.MouseButton.BackButton:
             self.go_back()
             return True
@@ -1062,6 +1091,35 @@ class LibTab(QWidget):
         self.refresh()
         self.changed.emit()
         self.win.say(text)
+
+    def search_drop(self, e, t):
+        """Картинка (файл из проводника или плитка) в строку поиска - похожие по смыслу на неё."""
+        urls = [u.toLocalFile() for u in e.mimeData().urls()] if e.mimeData().hasUrls() else []
+        pics = [p for p in urls if p.lower().endswith(K.EXT) and not p.lower().endswith(".svg")]
+        if not pics:
+            return False                        # текст бросают как обычно
+        e.acceptProposedAction()
+        if t == QEvent.Type.Drop:
+            self.search_by_image(pics[0])
+        return True
+
+    def search_by_image(self, path):
+        sem = self.win.sem
+        if not sem.ready():
+            self.win.say("Поиск по смыслу ещё учит картинки - ход внизу окна")
+            return
+        self.win.say("Ищу похожие на «%s»..." % os.path.basename(path))
+
+        def done(res):
+            if isinstance(res, Exception):
+                self.win.say(f"Не открылась картинка: {res}")
+                return
+            self.like, self.like_sem = path, True
+            self.q.blockSignals(True)
+            self.q.clear()
+            self.q.blockSignals(False)
+            self.show_files()
+        bg(lambda: sem.embed_file(path), done)
 
     def leave_similar(self):
         self.like, self.like_sem = None, False

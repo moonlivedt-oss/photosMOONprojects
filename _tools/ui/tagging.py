@@ -1,6 +1,7 @@
 """Подсказка меток для кусков во входящих: CLIP сравнивает куски со словарём меток и с соседями в библиотеке."""
 
 import os
+import threading
 
 import numpy as np
 
@@ -141,6 +142,7 @@ class Tagger:
         self.sem = sem
         self.words, self.vecs = [], np.zeros((0, clip.DIM), np.float32)
         self.bias = self.sd = None
+        self.lock = threading.Lock()         # зовут из разных фоновых потоков
 
     def _vocab(self):
         try:
@@ -157,19 +159,27 @@ class Tagger:
             self.bias = lib.mean(0) if lib is not None else np.zeros(len(words))
             self.sd = np.maximum(lib.std(0), 1e-3) if lib is not None else np.full(len(words), 0.02)
 
-    def suggest(self, pieces):
+    def suggest(self, pieces, skip=()):
         """Куски (PIL) -> [метка] по убыванию уверенности. Вызывать из фонового потока."""
         if not self.sem.ok or not pieces:
             return []
-        self._vocab()
-        v = clip.embed_images(list(pieces)[:24])
+        return self.suggest_vecs(clip.embed_images(list(pieces)[:24]), skip)
+
+    def suggest_vecs(self, v, skip=()):
+        """То же по готовым векторам CLIP (картинки библиотеки уже посчитаны). skip - уже стоящие метки."""
+        if not len(v):
+            return []
+        with self.lock:
+            self._vocab()
+            words, vecs, bias, sd = self.words, self.vecs, self.bias, self.sd
+        v = np.asarray(v, np.float32)
         # z-оценка каждой метки по каждому куску: у листа из 12 разных предметов наверх выходят
         # метки, подходящие многим кускам сразу (у будильника и песочных часов - «время»)
-        z = (v @ self.vecs.T - self.bias) / self.sd
-        score = dict(zip(self.words, np.clip(z, 0, None).mean(0)))
+        z = (v @ vecs.T - bias) / sd
+        score = dict(zip(words, np.clip(z, 0, None).mean(0)))
         for tag, w in self._from_neighbors(v).items():
             score[tag] = score.get(tag, 0) + w
-        best = sorted(score, key=score.get, reverse=True)
+        best = sorted((t for t in score if t not in skip), key=score.get, reverse=True)
         if not best:
             return []
         cut = max(FLOOR, SHARE * score[best[0]])

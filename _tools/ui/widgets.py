@@ -30,6 +30,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QGridLayout,
     QHeaderView,
     QInputDialog,
     QListWidget,
@@ -601,3 +602,39 @@ class LibList(QListWidget):
             drag.setPixmap(pm.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio,
                                      Qt.TransformationMode.SmoothTransformation))
         drag.exec(Qt.DropAction.CopyAction)     # только копия: проводник не должен уносить файл из библиотеки
+
+
+class TagHints(QWidget):
+    """Подсказанные метки кнопками по три в ряд; щелчок - picked(метка), «все» - picked по каждой."""
+    picked = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.grid = QGridLayout(self)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setSpacing(4)
+        self.tags = []
+        self.hide()
+
+    def set_tags(self, tags, have=()):
+        while self.grid.count():
+            w = self.grid.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        self.tags = [t for t in tags if t not in have] if isinstance(tags, list) else []
+        for i, t in enumerate(self.tags):
+            b = QPushButton("+ " + t, objectName="chip")
+            b.setToolTip("Добавить метку «%s»" % t)
+            b.clicked.connect(lambda _c, t=t, b=b: (b.setEnabled(False), self.picked.emit(t)))
+            self.grid.addWidget(b, i // 3, i % 3)
+        if len(self.tags) > 1:
+            b = QPushButton("все", objectName="chip")
+            b.setToolTip("Добавить все подсказки")
+            b.clicked.connect(self.pick_all)
+            self.grid.addWidget(b, len(self.tags) // 3, len(self.tags) % 3)
+        self.setVisible(bool(self.tags))
+
+    def pick_all(self):
+        for t in list(self.tags):
+            self.picked.emit(t)
+        self.set_tags([])

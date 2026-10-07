@@ -11,12 +11,32 @@ from ui import db
 from ui.common import CLOSING, LIB, bg, in_main, log_error
 
 BATCH = 16
-GAP = 0.05                  # от лучшего совпадения: дальше - уже случайные картинки
+GAP = 0.05  # от лучшего совпадения: дальше - уже случайные картинки
 READ_SIDE = 448
 # Мелкие однотонные детали (кнопки, полоски) похожи «на всё сразу» и лезут наверх в любом запросе.
 # Их средняя похожесть на общие слова вычитается из оценки - так наверх выходит то, что похоже именно на запрос.
-GENERIC = ("картинка", "предмет", "животное", "пейзаж", "интерфейс", "значок", "человек", "еда", "техника",
-           "узор", "текст", "цвет", "ночь", "день", "игра", "кнопка", "фон", "рисунок", "объект", "вещь")  # хватает для 224 после обрезки середины, а читается быстро (draft у jpg)
+GENERIC = (
+    "картинка",
+    "предмет",
+    "животное",
+    "пейзаж",
+    "интерфейс",
+    "значок",
+    "человек",
+    "еда",
+    "техника",
+    "узор",
+    "текст",
+    "цвет",
+    "ночь",
+    "день",
+    "игра",
+    "кнопка",
+    "фон",
+    "рисунок",
+    "объект",
+    "вещь",
+)  # хватает для 224 после обрезки середины, а читается быстро (draft у jpg)
 
 
 def _read(path):
@@ -27,6 +47,13 @@ def _read(path):
     return im
 
 
+def _rel(path):
+    try:
+        return os.path.relpath(path, LIB)
+    except ValueError:  # другой диск
+        return path
+
+
 class SemIndex:
     def __init__(self):
         self.ok = clip.available()
@@ -35,6 +62,7 @@ class SemIndex:
         self.progress = None  # (готово, всего) пока идёт досчёт
         self.on_progress = None  # окно показывает ход в строке состояния
         self._queries = {}
+        self.outside = {}  # векторы картинок не из библиотеки (поиск по картинке)
         if self.ok:
             try:
                 self.data = db.load_clip()
@@ -135,13 +163,31 @@ class SemIndex:
         order = order[s[order] >= s[order[0]] - GAP]
         return self._existing(order)
 
+    def vecs_of(self, paths):
+        """Готовые векторы картинок библиотеки (без чтения файлов); непосчитанные пропускаются."""
+        out = [self.data[r][1] for r in map(_rel, paths) if r in self.data]
+        return np.stack(out).astype(np.float32) if out else np.zeros((0, clip.DIM), np.float32)
+
+    def embed_file(self, path):
+        """Вектор любой картинки, в том числе не из библиотеки (поиск по картинке). Из фонового потока."""
+        v = clip.embed_images([_read(path)])[0]
+        self.outside[path] = v
+        return v
+
     def similar(self, path, n=60):
-        rel = os.path.relpath(path, LIB)
-        if rel not in self.data or not self.ready():
+        rel = _rel(path)
+        if rel in self.data:
+            v = self.data[rel][1].astype(np.float32)
+        elif path in self.outside:
+            v = self.outside[path]
+        else:
             return []
-        v = self.data[rel][1].astype(np.float32)
-        order, _s = clip.rank(v / max(np.linalg.norm(v), 1e-8), self.mat, n + 1, 0.5)
-        return [p for p in self._existing(order) if os.path.relpath(p, LIB) != rel][:n]
+        if not self.ready():
+            return []
+        # то же, что у текста: «похожесть на всё» (близость к средней картинке библиотеки) вычитается
+        s = self.mat @ (v / max(np.linalg.norm(v), 1e-8)) - self.mat @ self.mat.mean(0)
+        order = np.argsort(-s)[: n + 1]
+        return [p for p in self._existing(order) if _rel(p) != rel][:n]
 
     def _existing(self, order):
         out = []

@@ -276,6 +276,31 @@ class Database(unittest.TestCase):
         self.assertEqual(list(d), ["b/x.png"])
         self.assertTrue(np.allclose(d["b/x.png"][1], v, atol=1e-3))
 
+    def test_batch_sorting_tags_each_sheet(self):
+        from ui import sorting, tagging
+
+        class NoSigs:
+            def find(self, _im):
+                return None
+
+        class FakeTagger:
+            def suggest(self, pieces, skip=()):
+                return ["кружки"] if len(pieces) == 12 else []
+
+        src, dest = os.path.join(self.dir, "лист.png"), os.path.join(self.dir, "раздел")
+        sticker_sheet().save(src)
+        old_lib = tagging.LIB
+        tagging.LIB = self.dir
+        try:
+            o = dict(mode="grid", cols=4, rows=3, bg_mode="auto", obv=0, pad=6, size=64, fmt="png")
+            _steps, total, _skipped, bad, _where = sorting.sort_files(
+                [(src, o, dest)], NoSigs(), False, False, tagger=FakeTagger()
+            )
+        finally:
+            tagging.LIB = old_lib
+        self.assertEqual((total, bad), (12, []))
+        self.assertEqual(len(self.b.with_tag("кружки")), 12)
+
 
 class Tagging(unittest.TestCase):
     def test_sheet_of_clocks_gets_time_tags(self):
@@ -290,6 +315,7 @@ class Tagging(unittest.TestCase):
         tags = Tagger(SemIndex()).suggest(pieces)
         self.assertTrue(1 <= len(tags) <= 6, tags)
         self.assertTrue({"часы", "время"} & set(tags), tags)
+        self.assertFalse(set(tags) & set(Tagger(SemIndex()).suggest(pieces, skip=set(tags))))
 
 
 class Semantic(unittest.TestCase):

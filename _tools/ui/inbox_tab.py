@@ -21,7 +21,6 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QFrame,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -61,11 +60,12 @@ from ui.common import (
 )
 from ui.editor import EditDialog, recipe_by_name, recipes
 from ui.sorting import PRESETS, default_names, process, route, sort_files, store
-from ui.tagging import Tagger, tag_saved
+from ui.tagging import tag_saved
 from ui.theme import C
 from ui.thumbnails import PieceDelegate, _thumbs, backdrop, lib_icon, thumb, thumb_key, tile, to_pix
 from ui.widgets import (
     LibList,
+    TagHints,
     fill_tree,
     flat,
     icon_list,
@@ -427,12 +427,9 @@ class InboxTab(QWidget):
         self.tags = QLineEdit(placeholderText="через запятую: космос, для сайта")
         self.tags.setClearButtonEnabled(True)
         self.tags.setToolTip("Метки ставятся всем сохранённым кускам. Подсказки ниже - щелчок добавляет.")
-        self.tag_box = QWidget()
-        self.tag_grid = QGridLayout(self.tag_box)
-        self.tag_grid.setContentsMargins(0, 0, 0, 0)
-        self.tag_grid.setSpacing(4)
-        self.tag_box.hide()
-        self.tagger, self.tag_gen = Tagger(win.sem), 0
+        self.tag_box = TagHints()
+        self.tag_box.picked.connect(self.add_tag)
+        self.tag_gen = 0
         form.addRow("Метки", self.tags)
         form.addRow("", self.tag_box)
         self.recipe = QComboBox()
@@ -473,6 +470,12 @@ class InboxTab(QWidget):
                                 "раздел «Тяжёлые» не копится. Работает по всем ядрам.")
         self.squeeze.setChecked(self.cfg.get("squeeze", True))
         self.squeeze.toggled.connect(lambda on: self.cfg.__setitem__("squeeze", on))
+        self.auto_tags = QCheckBox("Ставить подсказанные метки")
+        self.auto_tags.setToolTip("Для «Разобрать все» и автораскладки: каждый лист получает метки,\n"
+                                  "которые окно подсказывает по смыслу его кусков")
+        self.auto_tags.setChecked(self.cfg.get("auto_tags", True) and win.sem.ok)
+        self.auto_tags.setVisible(win.sem.ok)
+        self.auto_tags.toggled.connect(lambda on: self.cfg.__setitem__("auto_tags", on))
         self.save_btn = QPushButton("Сохранить в раздел", objectName="primary")
         self.save_btn.setToolTip("Ctrl+S")
         self.save_btn.clicked.connect(self.save_current)
@@ -480,7 +483,7 @@ class InboxTab(QWidget):
         self.all_btn.setToolTip("Помеченные - по своим папкам, остальные - с текущими настройками в выбранный раздел")
         self.all_btn.clicked.connect(self.save_all)
         b2 = QVBoxLayout()
-        for w in (self.route_lbl, self.tree, newdir, self.auto, self.keep, self.squeeze, self.save_btn, self.all_btn):
+        for w in (self.route_lbl, self.tree, newdir, self.auto, self.keep, self.squeeze, self.auto_tags, self.save_btn, self.all_btn):
             b2.addWidget(w)
         box2 = QGroupBox("Куда")
         box2.setLayout(b2)
@@ -789,7 +792,8 @@ class InboxTab(QWidget):
         items = [(f, r["o"], r["dest"]) for f, r in files]
         self.auto_items = [f for f, _r in files]
         keep_src, sigs, squeeze = self.keep.isChecked(), self.win.sigs, self.squeeze.isChecked()
-        bg(lambda: sort_files(items, sigs, keep_src, squeeze), self.auto_done)
+        tagger = self.win.tagger if self.auto_tags.isChecked() else None
+        bg(lambda: sort_files(items, sigs, keep_src, squeeze, tagger=tagger), self.auto_done)
 
     def auto_done(self, res):
         self.auto_busy = False
@@ -851,28 +855,13 @@ class InboxTab(QWidget):
         self.show_tag_hints([])
         if not self.win.sem.ok or not pieces:
             return
-        bg(lambda: self.tagger.suggest(pieces), lambda res: gen == self.tag_gen and self.show_tag_hints(res))
+        bg(lambda: self.win.tagger.suggest(pieces), lambda res: gen == self.tag_gen and self.show_tag_hints(res))
 
     def show_tag_hints(self, tags):
-        while self.tag_grid.count():
-            w = self.tag_grid.takeAt(0).widget()
-            if w:
-                w.deleteLater()
         if isinstance(tags, Exception):
             log_error(f"подсказка меток: {tags}")
             tags = []
-        have = set(self.tag_list())
-        for i, t in enumerate(tags):
-            b = QPushButton("+ " + t, objectName="chip")
-            b.setEnabled(t not in have)
-            b.clicked.connect(lambda _c, t=t, b=b: (self.add_tag(t), b.setEnabled(False)))
-            self.tag_grid.addWidget(b, i // 3, i % 3)
-        if len(tags) > 1:
-            b = QPushButton("все", objectName="chip")
-            b.setToolTip("Добавить все подсказки")
-            b.clicked.connect(lambda: [self.add_tag(t) for t in tags] and self.show_tag_hints(tags))
-            self.tag_grid.addWidget(b, len(tags) // 3, len(tags) % 3)
-        self.tag_box.setVisible(bool(tags))
+        self.tag_box.set_tags(tags, set(self.tag_list()))
 
     def tag_list(self):
         return [t for t in (db.clean_tag(x) for x in self.tags.text().split(",")) if t]
@@ -1057,7 +1046,8 @@ class InboxTab(QWidget):
                 QMessageBox.warning(self, "Не всё получилось",
                                     "\n".join(f"{os.path.basename(f)}: {e}" for f, e in bad))
 
-        bg(lambda: sort_files(items, sigs, keep_src, squeeze, say), done)
+        tagger = self.win.tagger if self.auto_tags.isChecked() else None
+        bg(lambda: sort_files(items, sigs, keep_src, squeeze, say, tagger), done)
 
     def finish(self, text, dest=None):
         self.cfg["archive"] = self.keep.isChecked()

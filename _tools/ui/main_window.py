@@ -57,6 +57,7 @@ from ui.library_tab import LibTab
 from ui.missing import MissingDialog
 from ui.semantic import SemIndex
 from ui.signatures import SigIndex
+from ui.tagging import Tagger
 from ui.theme import QSS, ui_files
 from ui.thumbnails import forget_pixmaps, lib_icon, trim_thumbs
 from ui.weight import WeightDialog
@@ -77,7 +78,9 @@ HELP = """<b>Горячие клавиши</b><table cellspacing=4>
 <tr><td>Ctrl+1 / Ctrl+2</td><td>вкладки Входящие / Библиотека</td></tr>
 <tr><td>Ctrl+F</td><td>поиск по библиотеке; «кот -png» - слово с минусом исключает</td></tr>
 <tr><td>Ctrl+M</td><td>поиск по смыслу (кнопка-шар у поиска): «кот в космосе», «уютная ночная улица» - по-русски и по-английски, без слов в имени файла</td></tr>
-<tr><td>Метки во входящих</td><td>под полем «Метки» - подсказки по смыслу кусков (CLIP); щелчок добавляет, метки получат все сохранённые куски</td></tr>
+<tr><td>Метки во входящих</td><td>под полем «Метки» - подсказки по смыслу кусков (CLIP); щелчок добавляет, метки получат все сохранённые куски. Галка «Ставить подсказанные метки» - то же для «Разобрать все» и автораскладки</td></tr>
+<tr><td>Метки в библиотеке</td><td>под полем меток справа - подсказки для выбранной картинки (или нескольких), щелчок ставит</td></tr>
+<tr><td>Поиск по картинке</td><td>бросьте картинку (файл из проводника или плитку) в строку поиска - похожие по смыслу</td></tr>
 <tr><td>Умные папки</td><td>кнопка-закладка у поиска сохраняет поиск (слова, цвет, смысл) в дерево слева - папка сама пополняется</td></tr>
 <tr><td>Esc</td><td>в библиотеке - очистить поиск, выйти из «Похожих»</td></tr>
 <tr><td>Ctrl+A</td><td>в библиотеке - выделить все плитки</td></tr>
@@ -113,6 +116,7 @@ class Window(QMainWindow):
         self.history = []                   # для Ctrl+Z: [(подпись, [("new", путь) | ("move", было, стало)])]
         self.sigs = SigIndex()
         self.sem = SemIndex()
+        self.tagger = Tagger(self.sem)
         self.setWindowTitle("Библиотека картинок")
         self.setWindowIcon(lib_icon("Звезда"))
         self.resize(*self.cfg.get("size", [1280, 800]))

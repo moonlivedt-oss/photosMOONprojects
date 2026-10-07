@@ -1,0 +1,31 @@
+name: tests
+
+on:
+  push:
+    paths: ["_tools/**", "Prompts.html", ".github/workflows/**"]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONDONTWRITEBYTECODE: "1"
+      QT_QPA_PLATFORM: offscreen
+    defaults:
+      run:
+        working-directory: _tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install
+        run: python -m pip install pillow numpy PyQt6 onnxruntime ruff
+      - name: Lint
+        run: python -m ruff check .
+      - name: Tests
+        run: python -m unittest discover -s tests -v

@@ -16,6 +16,7 @@
    Файл с меткой в имени, например `Космос [ic tokyo]`, сам выбирает нарезку и папку.
 4. Во вкладке «Библиотека» искать по имени, меткам, цвету или **по смыслу**
    (кнопка-шар, Ctrl+M: «кот в космосе», «уютная ночная улица»), сохранять поиски как **умные папки**.
+   Картинку можно бросить в строку поиска - найдутся похожие по смыслу. Под меткой справа - подсказки меток.
 
 Все горячие клавиши - F1 в окне. `Gallery.html` - вся библиотека в браузере (пересобирается сама).
 
@@ -49,7 +50,7 @@ _tools/
     signatures.py       индекс отпечатков; semantic.py - индекс поиска по смыслу; tagging.py - подсказка меток
     editor.py, compress.py, export.py, dupes.py, weight.py, doctor.py, missing.py - окна действий
     widgets.py, thumbnails.py, animations.py, theme.py, common.py - общее для окна
-  tests/                unittest: run-tests.cmd или py -3.14 -m unittest discover -s tests
+  tests/                unittest: run-tests.cmd или py -3.14 -m unittest discover -s tests (на GitHub - сами на каждый push)
   cli/                  .cmd для перетаскивания файлов (нарезать, конвертировать, дубли)
   _models/clip/         модели поиска по смыслу (~225 МБ)
   _thumbs/              кэш миниатюр (можно удалить - пересоздастся)
