@@ -9,14 +9,16 @@
 ### A personal library of icons, stickers and backgrounds with a sorting window: cuts generated sheets, files them, searches by meaning
 
 4x3 sheet cutting with preview · filing by section and palette · semantic search in Russian and English<br>
-tag suggestions · smart folders · neural background removal and x4 upscaling · fully local, no network
+tag and folder suggestions · smart folders · neural background removal and x4 upscaling<br>
+AI assistants (Claude, Cursor) search, view and edit pictures - every change shows up in the window and can be undone
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
-![version](https://img.shields.io/badge/version-2.1.0-cba6f7)
+![version](https://img.shields.io/badge/version-2.2.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/tests-36%20ok-a6e3a1)
+![tests](https://img.shields.io/badge/tests-47%20ok-a6e3a1)
 ![images](https://img.shields.io/badge/pictures-4160-89b4fa)
+![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
 ![license](https://img.shields.io/badge/code-MIT-green)
 
 <img src="_docs/screenshots/hero.webp" alt="Library window: section tree on the left, sticker tiles in the middle, a baby dragon preview with colors and a tag suggestion on the right" width="880">
@@ -38,10 +40,14 @@ Then run **`Library.cmd`** - a window opens with two tabs: "Входящие" (I
 The interface is in Russian.
 
 ```bash
-_tools\run-tests.cmd                            # all tests (32 checks, no window)
+_tools\run-tests.cmd                            # all tests (47 checks, no window)
 py -3.14 _tools/cli.py gallery                  # rebuild Gallery.html - the whole library in a browser
 py -3.14 _tools/cli.py cut sheet.png --grid 4x3  # cut a sheet without the window
 ```
+
+To connect an AI assistant (Claude Code, Claude Desktop, Cursor) use the **"ИИ-помощники"** (AI assistants)
+button in the window or see [AI assistants](#ai-assistants) below. Claude Code opened in this folder finds the
+library by itself.
 
 > Without the models the window works as before; only semantic search and tag suggestions are hidden.
 > The prompts page (`Prompts.html`) and the "what is missing" table need node.
@@ -65,6 +71,8 @@ suggested, and everything is filed into the right section and palette.
 | Smart folders | no | yes | **yes - saved search: words, color, meaning** |
 | Perceptual compression | no | no | **yes - SSIM-based quality, lightest format** |
 | Export to a project | by hand | partly | **yes - format, size, @2x/@3x, atlas, svg sprite** |
+| AI assistants | no | no | **yes - MCP server: search, view, edit, file; everything is undoable** |
+| Undo | recycle bin | partly | **yes - any action, even after restarting the window** |
 | Where data lives | on disk | own database | **on disk, plain files and folders** |
 
 ---
@@ -73,7 +81,9 @@ suggested, and everything is filed into the right section and palette.
 
 | Feature | Details |
 |---|---|
-| **Inbox** | sheets from `00 Входящие`, drag and drop or Ctrl+V; watching the generator folder |
+| **Inbox** | sheets from `00 Входящие`, drag and drop or Ctrl+V; watching the generator folder; a background or illustration is kept whole, a single drawing is cut out |
+| **"Looks like: folder"** | from the meaning of the pieces the window suggests the folder where similar pictures already live |
+| **AI assistants** | Claude, Cursor etc. over MCP or the command line: search, view, tag, move, edit, remove background, upscale, cut sheets, export; their actions pop up in the window with an "Undo" button; read-only mode |
 | **Cutting** | 4x3 grid (neighbours touching by outline are split), auto search, whole picture; background removal, white outline, padding, size, format; hand-editable boxes |
 | **Tag in the name** | a file `Космос [ic tokyo]` picks the cutting, section and palette itself and takes the 12 piece names from `Prompts.html` |
 | **Semantic search** | crystal-ball button (Ctrl+M): "cat in space", "sad mascot" - no words in file names needed |
@@ -87,7 +97,8 @@ suggested, and everything is filed into the right section and palette.
 | **Compression** (Ctrl+K) | "no visible difference" quality (SSIM + color drift), lightest format, KB budget, before/after slider, all CPU cores |
 | **Export** (Ctrl+E) | format, size, @1x/@2x/@3x, budget, svg (vtracer), png+json+css atlas, svg sprite |
 | **Doctor and duplicates** | empty, cut off, leftover background, fringe, neighbour piece; duplicates go to `_duplicates` |
-| **Undo** | Ctrl+Z / Ctrl+Y and a history menu; originals wait in `_sources` |
+| **Undo** | Ctrl+Z / Ctrl+Y, a history menu and an "Undo" button in notifications - for saving, moving, renaming, deleting, compression, edits and assistant actions; history survives restarts; originals wait in `_sources` |
+| **Help** (F1) | sections with search; "What's new" after an update, "Getting started" on the first run |
 
 <div align="center">
 <img src="_docs/screenshots/inbox.webp" alt="Inbox tab: a 4x3 sheet with piece boxes, pieces marked as already present, cutting settings and tag suggestions on the right" width="820">
@@ -97,6 +108,43 @@ suggested, and everything is filed into the right section and palette.
 <div align="center">
 <img src="_docs/screenshots/semantic.webp" alt="Semantic search for a cozy night street with lanterns: 17 night scenes" width="820">
 <br><sub>Semantic search: none of the query words are in the file names</sub>
+</div>
+
+---
+
+## AI assistants
+
+<div align="center">
+<img src="_docs/screenshots/ai.webp" alt="Library window with space icons; a notification at the bottom says the assistant tagged 12 pictures, with an Undo button" width="820">
+<br><sub>The assistant tagged pictures - the window shows it at once and offers to undo</sub>
+</div>
+
+Claude, Cursor and other assistants use the library as a tool: "find stickers with cats and tag them",
+"remove the background from these three and put copies into 02 Наклейки/Котики", "cut the sheet in the inbox",
+"export the space icons to D:/site/assets as 128 px webp".
+
+**Connect** with the "ИИ-помощники" button at the top of the window: Claude Desktop and Cursor in one click,
+a ready command or config block for Claude Code and others. In this folder Claude Code finds the server via
+`.mcp.json`. Without MCP the same operations are available from the shell: `py -3.14 _tools/cli.py api`.
+
+| What | Tools |
+|---|---|
+| Orientation | `overview`, `list_folder`, `inbox`, `palettes`, `history` |
+| Find | `search` (words, tags, color, meaning), `similar`, `duplicates`, `check` (doctor) |
+| Look | `view` - a picture or a numbered contact sheet comes back as an image; `info` |
+| Label | `suggest_tags`, `tag`, `note`, `favorite`, `smart_folder` |
+| File | `rename`, `move`, `trash`, `import_images`, `cut_sheet` |
+| Edit | `edit` (editor recipe, preview first), `remove_background`, `upscale`, `convert` |
+| Deliver | `export` (formats, @2x/@3x, atlas, svg sprite) |
+| Revert | `undo` |
+
+**Safe by design.** Every assistant action goes to a shared journal: the window shows it with an "Undo"
+button and puts it into History (Ctrl+Z). Deleted pictures are not erased but kept in `_sources/_deleted`;
+replaced originals go to `_sources/edit <date>`. Assistants can be limited to search and viewing.
+Guidance for assistants: [AGENTS.md](AGENTS.md).
+
+<div align="center">
+<img src="_docs/screenshots/agents.webp" alt="AI assistants window: permissions, connecting Claude Desktop, Cursor and Claude Code, list of assistant actions" width="560">
 </div>
 
 ---
@@ -123,18 +171,23 @@ py -3.14 _tools/cli.py cut sheet.png --grid 4x3 --names a,b,c --outline 8 --bg a
 py -3.14 _tools/cli.py convert folder --to webp --max 1920 [--replace]
 py -3.14 _tools/cli.py dupes [folder]
 py -3.14 _tools/cli.py gallery
+py -3.14 _tools/cli.py api                                  # assistant tools, JSON output
+py -3.14 _tools/cli.py api search '{"query": "cozy night street"}'
 ```
 
 ## Project layout
 
 `_tools/imaging/` - Qt-free core (cutting, encoding, editing, similarity, CLIP, doctor, sprites);
-`_tools/ui/` - the PyQt6 window; `_tools/tests/` - unittest; `_sources/` - original sheets;
+`_tools/library/` - Qt-free library model shared by the window, the CLI and the MCP server (database,
+action journal, search, tools for assistants); `_tools/mcp_server.py` - the MCP server; `_tools/ui/` - the PyQt6 window; `_tools/tests/` - unittest; `_sources/` - original sheets;
 `_docs/` - README images. Full tree with comments: [README.md](README.md#структура-проекта).
 
 ## Privacy
 
 The window **never goes online**: pictures, tags and semantic search are all computed locally.
 The network is needed once, for `get_models.py` to download the models from Hugging Face.
+The assistant server is local too and sends nothing by itself, but whatever an assistant views or reads
+goes to its model, like any file you show it.
 
 ## License
 
