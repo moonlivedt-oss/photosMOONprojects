@@ -158,23 +158,40 @@ function mascot(x, extra) {
     "A character sticker of " + MASCOT, REF, "Pose: " + x, extra,
     "Full body, centered, with a few small colorful confetti strokes around it", SAME, STYLE, COL, CLEAR) };
 }
+var DARK = "Anime background art, cinematic wide shot, dramatic volumetric lighting with glowing light sources, rich painterly detail concentrated in the lower third and a calmer, darker upper area that leaves room for text or code on top. Gentle depth haze, small storytelling details worth discovering on a second look, no people";
+var LIGHT = "Flat vector landscape illustration, minimalist layered silhouettes with atmospheric perspective, high-key pale washed-out tones, soft morning light, a large calm empty sky. Delicate small details, no people, low contrast overall so dark text placed on top stays easy to read";
+var GRAD = "Abstract background for an app, smooth and calm, no objects, a very subtle fine grain, modern ui wallpaper";
 function dark(x) {
-  return { k: "bg", r: "bd", n: "bg-" + slug(x, 3), p: join(x,
-    "Anime background art, cinematic wide shot, dramatic volumetric lighting with glowing light sources, rich painterly detail concentrated in the lower third and a calmer, darker upper area that leaves room for text or code on top",
-    "Gentle depth haze, small storytelling details worth discovering on a second look, no people", COL,
-    "Highly detailed, polished, high resolution, wallpaper quality") };
+  return { k: "bg", r: "bd", n: "bg-" + slug(x, 3), p: join(x, DARK, COL, "Highly detailed, polished, high resolution, wallpaper quality") };
 }
 function light(x) {
-  return { k: "bg", r: "bl", n: "bg-" + slug(x, 3), p: join(x,
-    "Flat vector landscape illustration, minimalist layered silhouettes with atmospheric perspective, high-key pale washed-out tones, soft morning light, a large calm empty sky",
-    "Delicate small details, no people, low contrast overall so dark text placed on top stays easy to read", COL, "High resolution") };
+  return { k: "bg", r: "bl", n: "bg-" + slug(x, 3), p: join(x, LIGHT, COL, "High resolution") };
+}
+// Набор из 4 цельных картинок за одну генерацию: сетка 2x2, между картинками пурпурные полосы -
+// окно режет по ним (вид ds/ls/gs) и при сохранении увеличивает каждую нейросетью x2.
+// list - описания сцен, names - имена файлов (те же, что у поштучных карточек), r - вид, style - манера.
+function backs(list, names, r, style) {
+  return { k: "sheet", r: r, n: names.join(", "), p: join(
+    "Four separate wallpaper illustrations in one image, arranged in a 2x2 grid; each panel is a 3:2 landscape picture",
+    "The panels are separated by straight solid pure magenta (#ff00ff) gutter lines about 2% of the image width, with a thin magenta border around the whole image; nothing crosses the gutters, and magenta is never used inside the pictures",
+    "Each panel is a complete independent scene with its own composition, edge to edge inside its panel",
+    "Panels, in this order (top left, top right, bottom left, bottom right): " + list.map(function (x, i) { return (i + 1) + ") " + x; }).join("; "),
+    style, "All four share one art style and palette", COL, "Highly detailed, polished, maximum resolution") };
+}
+// Логотипы проектов листом 3x2: шесть значков программ за одну генерацию.
+function logos(list, names) {
+  return { k: "sheet", r: "lg", n: names.join(", "), p: join(
+    "A sheet of 6 app icons arranged in a neat 3x2 grid with wide even gaps; each is a separate rounded square tile with a soft inner glow, the same size and style",
+    "Icons, in this exact order: " + list.join("; "),
+    "One clear central symbol per tile with bold simple shapes, readable even at 16 pixels, soft cel shading and a glossy highlight; no labels under the tiles",
+    COL, "Background around the tiles: fully transparent; if impossible, flat solid dark grey #30303a") };
 }
 function pat(x) {
   return { k: "one", r: "pa", n: "pattern-" + slug(x, 3), p: join("A seamless tileable pattern: " + x,
     "Flat top-down view, motifs evenly distributed with gentle variation in size and rotation, no focal point, subtle low contrast so it works behind text, the edges must tile perfectly", COL) };
 }
 function grad(x) {
-  return { k: "one", r: "gr", n: "gradient-" + slug(x, 3), p: join(x, "Abstract background for an app, smooth and calm, no objects, a very subtle fine grain, modern ui wallpaper", COL) };
+  return { k: "one", r: "gr", n: "gradient-" + slug(x, 3), p: join(x, GRAD, COL) };
 }
 function medal(m, x) {
   return { k: "one", r: "me", n: "medal-" + slug(m, 2) + "-" + slug(x, 2), p: join(
@@ -221,6 +238,8 @@ var N = {
   logo: "words or extra letters, watermark, signature, tiny unreadable details, photorealism, drop shadows outside the tile",
   dia: "misspelled text, wrong or invented code, extra labels, watermark, photorealism, perspective, clutter, background scenery",
   bg: "text, letters, watermark, people, characters, faces, animals in the foreground, ui elements, frames, borders, vignette, oversaturated colors",
+  bgs: "text, letters, watermark, people, characters, faces, animals in the foreground, ui elements, picture frames, vignette, oversaturated colors, magenta inside the pictures, scenes crossing the gutters, unequal panels",
+  grads: "text, watermark, people, objects, ui elements, vignette, color banding, magenta inside the pictures, unequal panels",
   grad: "text, watermark, people, objects, ui elements, frames, borders, vignette, color banding",
   pat: "text, watermark, visible seams or tile edges, vignette, a single central object, perspective, lighting gradient",
   fx: "text, watermark, background scenery, frames, gradients in the background"
@@ -303,6 +322,7 @@ var S = [
   ["Библиотека картинок", cover("a cozy shelf of sticker sheets, icons and small framed backgrounds, a magnifying glass with sparkles", "Библиотека картинок", "Иконки, наклейки и фоны - в одном месте"), "2:1", "default"]
  ]],
  ["Логотипы проектов", "logo", "default", [
+  ["Логотипы: 6 проектов", logos(["NetworkDoctor - a stethoscope wrapped around a glowing wifi signal", "AutoTranslator - two overlapping speech bubbles, one with the letter A and one with the letter Я", "ContestReminder - a calendar page with a small trophy and a ringing bell", "Moon Bundle - a gift box with a crescent moon on the lid and a ribbon", "Moon Core - a crescent moon with a glowing gear inside it", "GraphicsGeneration - a paint brush drawing a sparkle on a small canvas"], ["logo-networkdoctor", "logo-autotranslator", "logo-contestreminder", "logo-moon-bundle", "logo-moon-core", "logo-graphicsgeneration"]), "3:2"],
   ["NetworkDoctor", logo("a stethoscope wrapped around a glowing wifi signal"), "1:1", "nord"],
   ["AutoTranslator", logo("two overlapping speech bubbles, one with the letter A and one with the letter Я"), "1:1", "tokyo"],
   ["ContestReminder", logo("a calendar page with a small trophy and a ringing bell"), "1:1", "sunset"],
@@ -316,49 +336,20 @@ var S = [
   ["Экран запуска", raw("splash-moon-clouds", join("A splash screen background: a soft glowing crescent moon above calm layered clouds",
     "A large empty space in the center for a logo, gentle light rays", "Flat vector style, smooth gradients, minimal and elegant, high resolution", COL), "sp"), "16:9"]
  ]],
- ["Фоны тёмные", "bg", "tokyo", [
-  ["Лофи-комната", dark("cozy lofi study room at night, wooden desk with a glowing monitor and desk lamp, rain streaks on a large window, potted plants, a sleeping cat on the windowsill, blurred city lights outside"), "3:2", "mocha"],
-  ["Подводные руины", dark("sunken ancient ruins under water, god rays from the surface, glowing jellyfish, schools of tiny fish, coral and seaweed silhouettes"), "3:2", "ocean"],
-  ["Космос", dark("deep space with a colorful nebula, a small ringed planet in the lower right, distant galaxies, thin bands of star dust, tiny spaceship silhouette"), "3:2", "dracula"],
-  ["Киберпанк-переулок", dark("rainy cyberpunk back alley, wet asphalt with neon reflections, hanging signs with abstract symbols, steam from vents, cables overhead, vending machine glow"), "3:2", "synthwave"],
-  ["Горный храм", dark("japanese mountain shrine at night, red torii gates, glowing stone lanterns, gentle snowfall, pine trees, stairs going up into fog"), "3:2", "rosepine"],
-  ["Волшебная библиотека", dark("endless magical library, tall bookshelves disappearing into darkness, floating candles, spiral staircase, open books with glowing pages"), "3:2", "gruvbox"],
-  ["Ночная станция", dark("empty old train station at night, single platform, warm street lamps, light fog, rails vanishing into the distance, a lone bench"), "3:2", "onedark"],
-  ["Светящееся дерево", dark("giant ancient tree with glowing blue leaves in a dark valley, swirling fireflies, a small river reflecting the light"), "3:2", "forest"],
-  ["Хижина и сияние", dark("cozy wooden cabin in a snowy forest at night, warm window light, smoke from the chimney, aurora in the sky"), "3:2", "nord"],
-  ["Маяк", dark("lighthouse on a cliff at night, rotating light beam cutting through sea mist, waves crashing below, starry sky"), "3:2", "ocean"],
-  ["Летающие острова", dark("floating islands above clouds at twilight, waterfalls falling into the void, small glowing houses"), "3:2", "sunset"],
-  ["Сад на крыше", dark("quiet rooftop garden above a night city, string lights, a telescope, potted plants, skyline bokeh"), "3:2", "tokyo"],
-  ["Боковая панель (вертикаль)", dark("tall vertical composition, main subject at the bottom, empty dark sky in the upper two thirds, a small glowing lantern on a hill with a lone tree"), "2:5"],
-  ["Поезд среди звёзд", dark("an old steam train crossing a bridge of light between clouds in a starry sky, glowing windows, long trail of sparkling steam"), "3:2", "dracula"],
-  ["Оранжерея на орбите", dark("glass greenhouse dome on a space station, lush plants and hanging vines inside, a blue planet glowing through the glass, soft grow lights"), "3:2", "forest"],
-  ["Рынок фонарей", dark("night lantern market along a canal, hundreds of paper lanterns, empty wooden boats, reflections on still water, stalls with glowing jars"), "3:2", "sunset"],
-  ["Затопленное метро", dark("abandoned flooded subway station, clear shallow water over the rails, glowing moss and mushrooms on the walls, a shaft of moonlight from a broken ceiling"), "3:2", "ocean"],
-  ["Город на спине кита", dark("tiny lantern-lit town built on the back of a giant whale swimming through a sea of clouds at night, far away and small in the frame"), "3:2", "tokyo"],
-  ["Обсерватория", dark("old observatory on a mountain peak, open dome with a brass telescope, milky way overhead, warm light from the doorway"), "3:2", "nord"],
-  ["Грибной лес", dark("giant bioluminescent mushroom forest, glowing spores drifting, narrow wooden walkway, small round doors in the stems"), "3:2", "rosepine"],
-  ["Мастерская часовщика", dark("clockmaker workshop at night, hundreds of clocks and brass gears on the walls, desk lamp glow, moonlight through a round window"), "3:2", "gruvbox"],
-  ["Нижняя панель (панорама)", dark("ultra wide panorama, horizon line in the middle, low detail on the left side, distant mountain range under a starry sky with a thin moon"), "5:2"],
-  ["Ночной сад камней", dark("moonlit zen courtyard with a koi pond, stepping stones and a small wooden bridge, fireflies over the water, maple branches in the foreground"), "3:2", "rosepine"],
-  ["Пустынный караван", dark("desert dunes under a huge full moon, a distant caravan of lanterns, an ancient half-buried statue, shooting stars"), "3:2", "gruvbox"],
-  ["Ледяная пещера", dark("vast ice cave with glowing blue crystals, a frozen waterfall, a small warm campfire deep inside, reflections on the icy floor"), "3:2", "nord"]
+ ["Фоны тёмные: по 4 за раз", "bgs", "default", [
+  ["Тёмные 1: Лофи-комната, Подводные руины, Космос, Киберпанк-переулок", backs(["cozy lofi study room at night, wooden desk with a glowing monitor and desk lamp, rain streaks on a large window, potted plants, a sleeping cat on the windowsill, blurred city lights outside", "sunken ancient ruins under water, god rays from the surface, glowing jellyfish, schools of tiny fish, coral and seaweed silhouettes", "deep space with a colorful nebula, a small ringed planet in the lower right, distant galaxies, thin bands of star dust, tiny spaceship silhouette", "rainy cyberpunk back alley, wet asphalt with neon reflections, hanging signs with abstract symbols, steam from vents, cables overhead, vending machine glow"], ["bg-cozy-lofi-study", "bg-sunken-ancient-ruins", "bg-deep-space-colorful", "bg-rainy-cyberpunk-back"], "ds", DARK), "3:2"],
+  ["Тёмные 2: Горный храм, Волшебная библиотека, Ночная станция, Светящееся дерево", backs(["japanese mountain shrine at night, red torii gates, glowing stone lanterns, gentle snowfall, pine trees, stairs going up into fog", "endless magical library, tall bookshelves disappearing into darkness, floating candles, spiral staircase, open books with glowing pages", "empty old train station at night, single platform, warm street lamps, light fog, rails vanishing into the distance, a lone bench", "giant ancient tree with glowing blue leaves in a dark valley, swirling fireflies, a small river reflecting the light"], ["bg-japanese-mountain-shrine", "bg-endless-magical-library", "bg-empty-old-train", "bg-giant-ancient-tree"], "ds", DARK), "3:2"],
+  ["Тёмные 3: Хижина и сияние, Маяк, Летающие острова, Сад на крыше", backs(["cozy wooden cabin in a snowy forest at night, warm window light, smoke from the chimney, aurora in the sky", "lighthouse on a cliff at night, rotating light beam cutting through sea mist, waves crashing below, starry sky", "floating islands above clouds at twilight, waterfalls falling into the void, small glowing houses", "quiet rooftop garden above a night city, string lights, a telescope, potted plants, skyline bokeh"], ["bg-cozy-wooden-cabin", "bg-lighthouse-cliff-night", "bg-floating-islands-above", "bg-quiet-rooftop-garden"], "ds", DARK), "3:2"],
+  ["Тёмные 4: Боковая панель (вертикаль), Поезд среди звёзд, Оранжерея на орбите, Рынок фонарей", backs(["tall vertical composition, main subject at the bottom, empty dark sky in the upper two thirds, a small glowing lantern on a hill with a lone tree", "an old steam train crossing a bridge of light between clouds in a starry sky, glowing windows, long trail of sparkling steam", "glass greenhouse dome on a space station, lush plants and hanging vines inside, a blue planet glowing through the glass, soft grow lights", "night lantern market along a canal, hundreds of paper lanterns, empty wooden boats, reflections on still water, stalls with glowing jars"], ["bg-tall-vertical-composition", "bg-old-steam-train", "bg-glass-greenhouse-dome", "bg-night-lantern-market"], "ds", DARK), "3:2"],
+  ["Тёмные 5: Затопленное метро, Город на спине кита, Обсерватория, Грибной лес", backs(["abandoned flooded subway station, clear shallow water over the rails, glowing moss and mushrooms on the walls, a shaft of moonlight from a broken ceiling", "tiny lantern-lit town built on the back of a giant whale swimming through a sea of clouds at night, far away and small in the frame", "old observatory on a mountain peak, open dome with a brass telescope, milky way overhead, warm light from the doorway", "giant bioluminescent mushroom forest, glowing spores drifting, narrow wooden walkway, small round doors in the stems"], ["bg-abandoned-flooded-subway", "bg-tiny-lantern-lit", "bg-old-observatory-mountain", "bg-giant-bioluminescent-mushroom"], "ds", DARK), "3:2"],
+  ["Тёмные 6: Мастерская часовщика, Нижняя панель (панорама), Ночной сад камней, Пустынный караван", backs(["clockmaker workshop at night, hundreds of clocks and brass gears on the walls, desk lamp glow, moonlight through a round window", "ultra wide panorama, horizon line in the middle, low detail on the left side, distant mountain range under a starry sky with a thin moon", "moonlit zen courtyard with a koi pond, stepping stones and a small wooden bridge, fireflies over the water, maple branches in the foreground", "desert dunes under a huge full moon, a distant caravan of lanterns, an ancient half-buried statue, shooting stars"], ["bg-clockmaker-workshop-night", "bg-ultra-wide-panorama", "bg-moonlit-zen-courtyard", "bg-desert-dunes-huge"], "ds", DARK), "3:2"],
+  ["Тёмные 7: Ледяная пещера, Купе ночного поезда, Книжная улица в снегу, Стеклянный тоннель под водой", backs(["vast ice cave with glowing blue crystals, a frozen waterfall, a small warm campfire deep inside, reflections on the icy floor", "cozy train compartment at night, rain on the window, a reading lamp, a steaming tea glass, city lights streaking past", "narrow old street of tiny bookshops in the snow at night, warm shop windows, stacked books in the windows, a lone street lamp", "glass tunnel on the sea floor at night, a giant whale gliding above, glowing plankton, soft blue light on the walkway"], ["bg-vast-ice-cave", "bg-cozy-train-compartment", "bg-narrow-old-street", "bg-glass-tunnel-sea"], "ds", DARK), "3:2"]
  ]],
- ["Фоны светлые", "bg", "latte", [
-  ["Холмы", light("soft rolling green hills with a few round trees and small white clouds"), "3:2", "mint"],
-  ["Город у моря", light("white seaside town with blue domes stacked on a hillside, calm sea"), "3:2", "solar"],
-  ["Берёзовый лес", light("misty birch forest at early morning, thin white trunks, light fog"), "3:2", "paper"],
-  ["Светлое кафе", light("bright cozy cafe interior, huge window, hanging plants, wooden tables, sunlight patches"), "3:2", "latte"],
-  ["Бумажные горы", light("paper cut layered mountains with a pastel sky and a pale sun"), "3:2", "sakura"],
-  ["Лавандовое поле", light("lavender fields with a small windmill, soft haze"), "3:2", "latte"],
-  ["Утреннее озеро", light("wide calm lake with reeds and floating lily pads, morning mist"), "3:2", "mint"],
-  ["Сад камней", light("japanese zen garden with raked sand patterns and one maple tree"), "3:2", "paper"],
-  ["Над облаками", light("cloudscape from above, soft pastel cumulus clouds, a tiny paper plane"), "3:2", "sakura"],
-  ["Воздушные шары", light("a few hot air balloons drifting over a pale valley with a winding river"), "3:2", "solar"],
-  ["Стеклянная оранжерея", light("bright glass conservatory with tall palms, white iron arches, sunlight through the roof"), "3:2", "mint"],
-  ["Ветряки на побережье", light("white wind turbines on a grassy coast, long soft shadows, calm pale sea"), "3:2", "latte"],
-  ["Рисовые террасы", light("terraced rice fields on gentle slopes, small farmhouse, morning mist in the valley"), "3:2", "mint"],
-  ["Солнечная библиотека", light("sunlit library reading room, tall arched windows, wooden ladders, dust motes in the light"), "3:2", "paper"],
-  ["Мост в тумане", light("long white footbridge over a misty river, willow trees, ducks far away on the water"), "3:2", "sakura"]
+ ["Фоны светлые: по 4 за раз", "bgs", "default", [
+  ["Светлые 1: Холмы, Город у моря, Берёзовый лес, Светлое кафе", backs(["soft rolling green hills with a few round trees and small white clouds", "white seaside town with blue domes stacked on a hillside, calm sea", "misty birch forest at early morning, thin white trunks, light fog", "bright cozy cafe interior, huge window, hanging plants, wooden tables, sunlight patches"], ["bg-soft-rolling-green", "bg-white-seaside-town", "bg-misty-birch-forest", "bg-bright-cozy-cafe"], "ls", LIGHT), "3:2"],
+  ["Светлые 2: Бумажные горы, Лавандовое поле, Утреннее озеро, Сад камней", backs(["paper cut layered mountains with a pastel sky and a pale sun", "lavender fields with a small windmill, soft haze", "wide calm lake with reeds and floating lily pads, morning mist", "japanese zen garden with raked sand patterns and one maple tree"], ["bg-paper-cut-layered", "bg-lavender-fields-small", "bg-wide-calm-lake", "bg-japanese-zen-garden"], "ls", LIGHT), "3:2"],
+  ["Светлые 3: Над облаками, Воздушные шары, Стеклянная оранжерея, Ветряки на побережье", backs(["cloudscape from above, soft pastel cumulus clouds, a tiny paper plane", "a few hot air balloons drifting over a pale valley with a winding river", "bright glass conservatory with tall palms, white iron arches, sunlight through the roof", "white wind turbines on a grassy coast, long soft shadows, calm pale sea"], ["bg-cloudscape-above-soft", "bg-few-hot-air", "bg-bright-glass-conservatory", "bg-white-wind-turbines"], "ls", LIGHT), "3:2"],
+  ["Светлые 4: Рисовые террасы, Солнечная библиотека, Мост в тумане, Солнечный чердак", backs(["terraced rice fields on gentle slopes, small farmhouse, morning mist in the valley", "sunlit library reading room, tall arched windows, wooden ladders, dust motes in the light", "long white footbridge over a misty river, willow trees, ducks far away on the water", "sunny attic workshop under a slanted roof, potted plants, a drafting table, light through a round window"], ["bg-terraced-rice-fields", "bg-sunlit-library-reading", "bg-long-white-footbridge", "bg-sunny-attic-workshop"], "ls", LIGHT), "3:2"]
  ]],
  ["Схемы для справочника C++", "dia", "tokyo", [
   ["unique_ptr: один владелец", diagram("ownership with std::unique_ptr: a box «std::unique_ptr<Widget> a» points to a heap object «Widget»; an arrow «std::move(a)» moves ownership to «b», after which «a» is shown empty with «nullptr»; Russian captions «один владелец» and «после перемещения»", "unique ptr owner"), "3:2"],
@@ -429,15 +420,9 @@ var S = [
   ["Плата", pat("circuit board traces with small nodes"), "1:1", "tokyo"],
   ["Горошек", pat("polka dots of two sizes"), "1:1", "mint"]
  ]],
- ["Про запас: градиенты", "grad", "default", [
-  ["Меш-градиент", grad("A mesh gradient with large soft blurred color blobs"), "3:2"],
-  ["Северное сияние", grad("Aurora borealis ribbons of light flowing across a dark sky"), "3:2", "nord"],
-  ["Матовое стекло", grad("Frosted glass panels overlapping, blurred colors behind the glass, glassmorphism"), "3:2", "mocha"],
-  ["Свечение в центре", grad("A soft radial glow in the center fading to dark edges"), "3:2", "dracula"],
-  ["Жидкий хром", grad("Liquid chrome waves, iridescent and smooth"), "3:2", "synthwave"],
-  ["Шёлк", grad("Silk fabric folds with soft light sliding over them"), "3:2", "rosepine"],
-  ["Голографическая плёнка", grad("Holographic foil with soft rainbow sheen and gentle wrinkles"), "3:2", "tokyo"],
-  ["Лучи в дымке", grad("Diagonal light rays through haze"), "3:2", "sunset"]
+ ["Про запас: градиенты", "grads", "default", [
+  ["Градиенты 1: Меш-градиент, Северное сияние, Матовое стекло, Свечение в центре", backs(["A mesh gradient with large soft blurred color blobs", "Aurora borealis ribbons of light flowing across a dark sky", "Frosted glass panels overlapping, blurred colors behind the glass, glassmorphism", "A soft radial glow in the center fading to dark edges"], ["gradient-mesh-gradient-large", "gradient-aurora-borealis-ribbons", "gradient-frosted-glass-panels", "gradient-soft-radial-glow"], "gs", GRAD), "3:2"],
+  ["Градиенты 2: Жидкий хром, Шёлк, Голографическая плёнка, Лучи в дымке", backs(["Liquid chrome waves, iridescent and smooth", "Silk fabric folds with soft light sliding over them", "Holographic foil with soft rainbow sheen and gentle wrinkles", "Diagonal light rays through haze"], ["gradient-liquid-chrome-waves", "gradient-silk-fabric-folds", "gradient-holographic-foil-soft", "gradient-diagonal-light-rays"], "gs", GRAD), "3:2"]
  ]],
  ["Про запас: сезонное", "st", "default", [
   ["Новый год: лист", sheet(["christmas tree", "christmas stocking", "snow globe", "candy cane", "holly wreath", "string of lights", "knitted mitten", "hot cocoa with marshmallows", "ice skates", "ornament ball", "wooden sled", "fireworks"]), "3:2", "nord"],
@@ -448,6 +433,50 @@ var S = [
   ["Лето: лист", sheet(["sunscreen bottle", "watermelon slice", "coconut drink", "beach ball", "palm tree", "sunglasses", "seashell", "surfboard", "lemonade", "straw hat", "flip flops", "sandcastle"]), "3:2", "solar"],
   ["Осень: фон", dark("cozy autumn street in the rain, falling orange leaves, warm cafe windows"), "3:2", "autumn", "bg"],
   ["День рождения: лист", sheet(["balloons", "cake with candle", "gift box", "party hat", "confetti", "cupcake", "pinata", "paper streamers", "ribbon bow", "greeting card", "goodie bag", "sparkler"]), "3:2", "latte"]
+ ]],
+ ["Про запас: фоны тёмные по одному", "bg", "tokyo", [
+  ["Лофи-комната", dark("cozy lofi study room at night, wooden desk with a glowing monitor and desk lamp, rain streaks on a large window, potted plants, a sleeping cat on the windowsill, blurred city lights outside"), "3:2", "mocha"],
+  ["Подводные руины", dark("sunken ancient ruins under water, god rays from the surface, glowing jellyfish, schools of tiny fish, coral and seaweed silhouettes"), "3:2", "ocean"],
+  ["Космос", dark("deep space with a colorful nebula, a small ringed planet in the lower right, distant galaxies, thin bands of star dust, tiny spaceship silhouette"), "3:2", "dracula"],
+  ["Киберпанк-переулок", dark("rainy cyberpunk back alley, wet asphalt with neon reflections, hanging signs with abstract symbols, steam from vents, cables overhead, vending machine glow"), "3:2", "synthwave"],
+  ["Горный храм", dark("japanese mountain shrine at night, red torii gates, glowing stone lanterns, gentle snowfall, pine trees, stairs going up into fog"), "3:2", "rosepine"],
+  ["Волшебная библиотека", dark("endless magical library, tall bookshelves disappearing into darkness, floating candles, spiral staircase, open books with glowing pages"), "3:2", "gruvbox"],
+  ["Ночная станция", dark("empty old train station at night, single platform, warm street lamps, light fog, rails vanishing into the distance, a lone bench"), "3:2", "onedark"],
+  ["Светящееся дерево", dark("giant ancient tree with glowing blue leaves in a dark valley, swirling fireflies, a small river reflecting the light"), "3:2", "forest"],
+  ["Хижина и сияние", dark("cozy wooden cabin in a snowy forest at night, warm window light, smoke from the chimney, aurora in the sky"), "3:2", "nord"],
+  ["Маяк", dark("lighthouse on a cliff at night, rotating light beam cutting through sea mist, waves crashing below, starry sky"), "3:2", "ocean"],
+  ["Летающие острова", dark("floating islands above clouds at twilight, waterfalls falling into the void, small glowing houses"), "3:2", "sunset"],
+  ["Сад на крыше", dark("quiet rooftop garden above a night city, string lights, a telescope, potted plants, skyline bokeh"), "3:2", "tokyo"],
+  ["Боковая панель (вертикаль)", dark("tall vertical composition, main subject at the bottom, empty dark sky in the upper two thirds, a small glowing lantern on a hill with a lone tree"), "2:5"],
+  ["Поезд среди звёзд", dark("an old steam train crossing a bridge of light between clouds in a starry sky, glowing windows, long trail of sparkling steam"), "3:2", "dracula"],
+  ["Оранжерея на орбите", dark("glass greenhouse dome on a space station, lush plants and hanging vines inside, a blue planet glowing through the glass, soft grow lights"), "3:2", "forest"],
+  ["Рынок фонарей", dark("night lantern market along a canal, hundreds of paper lanterns, empty wooden boats, reflections on still water, stalls with glowing jars"), "3:2", "sunset"],
+  ["Затопленное метро", dark("abandoned flooded subway station, clear shallow water over the rails, glowing moss and mushrooms on the walls, a shaft of moonlight from a broken ceiling"), "3:2", "ocean"],
+  ["Город на спине кита", dark("tiny lantern-lit town built on the back of a giant whale swimming through a sea of clouds at night, far away and small in the frame"), "3:2", "tokyo"],
+  ["Обсерватория", dark("old observatory on a mountain peak, open dome with a brass telescope, milky way overhead, warm light from the doorway"), "3:2", "nord"],
+  ["Грибной лес", dark("giant bioluminescent mushroom forest, glowing spores drifting, narrow wooden walkway, small round doors in the stems"), "3:2", "rosepine"],
+  ["Мастерская часовщика", dark("clockmaker workshop at night, hundreds of clocks and brass gears on the walls, desk lamp glow, moonlight through a round window"), "3:2", "gruvbox"],
+  ["Нижняя панель (панорама)", dark("ultra wide panorama, horizon line in the middle, low detail on the left side, distant mountain range under a starry sky with a thin moon"), "5:2"],
+  ["Ночной сад камней", dark("moonlit zen courtyard with a koi pond, stepping stones and a small wooden bridge, fireflies over the water, maple branches in the foreground"), "3:2", "rosepine"],
+  ["Пустынный караван", dark("desert dunes under a huge full moon, a distant caravan of lanterns, an ancient half-buried statue, shooting stars"), "3:2", "gruvbox"],
+  ["Ледяная пещера", dark("vast ice cave with glowing blue crystals, a frozen waterfall, a small warm campfire deep inside, reflections on the icy floor"), "3:2", "nord"]
+ ]],
+ ["Про запас: фоны светлые по одному", "bg", "latte", [
+  ["Холмы", light("soft rolling green hills with a few round trees and small white clouds"), "3:2", "mint"],
+  ["Город у моря", light("white seaside town with blue domes stacked on a hillside, calm sea"), "3:2", "solar"],
+  ["Берёзовый лес", light("misty birch forest at early morning, thin white trunks, light fog"), "3:2", "paper"],
+  ["Светлое кафе", light("bright cozy cafe interior, huge window, hanging plants, wooden tables, sunlight patches"), "3:2", "latte"],
+  ["Бумажные горы", light("paper cut layered mountains with a pastel sky and a pale sun"), "3:2", "sakura"],
+  ["Лавандовое поле", light("lavender fields with a small windmill, soft haze"), "3:2", "latte"],
+  ["Утреннее озеро", light("wide calm lake with reeds and floating lily pads, morning mist"), "3:2", "mint"],
+  ["Сад камней", light("japanese zen garden with raked sand patterns and one maple tree"), "3:2", "paper"],
+  ["Над облаками", light("cloudscape from above, soft pastel cumulus clouds, a tiny paper plane"), "3:2", "sakura"],
+  ["Воздушные шары", light("a few hot air balloons drifting over a pale valley with a winding river"), "3:2", "solar"],
+  ["Стеклянная оранжерея", light("bright glass conservatory with tall palms, white iron arches, sunlight through the roof"), "3:2", "mint"],
+  ["Ветряки на побережье", light("white wind turbines on a grassy coast, long soft shadows, calm pale sea"), "3:2", "latte"],
+  ["Рисовые террасы", light("terraced rice fields on gentle slopes, small farmhouse, morning mist in the valley"), "3:2", "mint"],
+  ["Солнечная библиотека", light("sunlit library reading room, tall arched windows, wooden ladders, dust motes in the light"), "3:2", "paper"],
+  ["Мост в тумане", light("long white footbridge over a misty river, willow trees, ducks far away on the water"), "3:2", "sakura"]
  ]]
 ];
 

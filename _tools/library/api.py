@@ -939,8 +939,10 @@ def cut_sheet(
     if not r and not grid and os.path.splitext(os.path.basename(p))[0].count(",") < 2:
         kind = K.sheet_kind(K.load(p))  # фон - целиком, один рисунок - вырезать, лист - сеткой
         grid = {"whole": "whole", "single": "auto"}.get(kind)
-        if grid == "whole" and size is None:
+        if kind in ("whole", "cells") and size is None:
             size = 1920
+        if kind == "cells":                     # фоны листом 2x2 в пурпурной рамке
+            o.update(mode="cells", cols=2, rows=2, bg_mode="keep", pad=0, obv=0)
     if grid:
         g = grid.lower().replace("х", "x")
         if g in ("auto", "whole"):

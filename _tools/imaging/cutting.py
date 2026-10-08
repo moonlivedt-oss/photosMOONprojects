@@ -228,13 +228,80 @@ def label(s):
     return np.asarray(lab), n
 
 
+GUTTER = (255, 0, 255)                  # пурпурные промежутки между картинками листа: в сценах такого цвета нет
+
+
+def _gutter(im):
+    """Маска пикселей цвета промежутка (#ff00ff с допуском на сжатие)."""
+    a = np.asarray(im.convert("RGB")).astype(np.int16)
+    return (a[..., 0] > 190) & (a[..., 1] < 90) & (a[..., 2] > 190)
+
+
+def _split(g, lum, n, axis):
+    """Где проходят промежутки между n клетками по оси: у каждой границы - линия рядом с серединой,
+    где больше всего цвета промежутка; нет его - самая ровная линия; нет и её - равные доли."""
+    size = g.shape[1 - axis]
+    share, std = g.mean(axis=axis), lum.std(axis=axis)
+    cuts = [0]
+    for k in range(1, n):
+        mid, win = round(size * k / n), max(2, round(size * 0.1))
+        lo, hi = max(1, mid - win), min(size - 1, mid + win)
+        i = lo + int(np.argmax(share[lo:hi]))
+        if share[i] < 0.5:
+            i = lo + int(np.argmin(std[lo:hi]))
+            i = i if std[i] < 8 else mid
+        cuts.append(i)
+    return cuts + [size]
+
+
+def _shave(g, limit=0.15):
+    """Срезать края до последней полосы цвета промежутка (у края клетки бывают строки соседней
+    картинки - модель не рисует полосы ровно посередине). Тёмное небо у края не трогается."""
+    h, w = g.shape
+    rows, cols = g.mean(1) > 0.3, g.mean(0) > 0.3
+
+    def edge(line, n):
+        k = max(1, int(n * limit))
+        head = np.flatnonzero(line[:k])
+        tail = np.flatnonzero(line[n - k:])
+        return (int(head[-1]) + 1 if len(head) else 0), (n - k + int(tail[0]) if len(tail) else n)
+
+    top, bottom = edge(rows, h)
+    left, right = edge(cols, w)
+    return left, top, right, bottom
+
+
+def cells(im, cols, rows, boxes=None):
+    """Лист из нескольких цельных картинок (например, 4 фона сеткой 2x2, разделённых пурпурными
+    полосами) -> (картинки, рамки). Без квадрата и без удаления фона. boxes - рамки, поправленные руками."""
+    im = im.convert("RGBA")
+    g = _gutter(im)
+    if not boxes:
+        lum = np.asarray(im.convert("L")).astype(np.float32)
+        xs, ys = _split(g, lum, cols, 0), _split(g, lum, rows, 1)
+        boxes = [(xs[c], ys[r], xs[c + 1], ys[r + 1]) for r in range(rows) for c in range(cols)]
+    out, final = [], []
+    for b in boxes:
+        b = tuple(int(v) for v in b)
+        x0, y0, x1, y1 = _shave(g[b[1]:b[3], b[0]:b[2]])
+        if x1 - x0 > 16 and y1 - y0 > 16:
+            b = (b[0] + x0, b[1] + y0, b[0] + x1, b[1] + y1)
+        out.append(im.crop(b))
+        final.append(b)
+    return out, final
+
+
 def sheet_kind(im):
     """Что за картинка пришла во входящие: "whole" - цельная (фон, иллюстрация: край пёстрый, без
-    прозрачности), "single" - один рисунок на однотонном фоне, "sheet" - лист с несколькими рисунками.
+    прозрачности), "cells" - несколько цельных картинок в пурпурной рамке (фоны листом 2x2),
+    "single" - один рисунок на однотонном фоне, "sheet" - лист с несколькими рисунками.
     Слипшиеся обводками наклейки находятся одним рисунком - поэтому лист с именами через запятую
     окно всё равно режет сеткой (это решает вызывающий)."""
     im = im.convert("RGBA")
     im.thumbnail((384, 384))
+    g = _gutter(im)
+    if np.concatenate([g[0], g[-1], g[:, 0], g[:, -1]]).mean() > 0.6:
+        return "cells"
     a = np.asarray(im.getchannel("A"))
     edge = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
     if (edge < 16).mean() <= 0.5 and not border_color(im)[1]:

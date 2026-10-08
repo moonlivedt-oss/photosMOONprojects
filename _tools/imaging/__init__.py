@@ -3,6 +3,7 @@
 from imaging.cutting import (
     add_outline,
     border_color,
+    cells,
     cut,
     find_pieces,
     grid_pieces,

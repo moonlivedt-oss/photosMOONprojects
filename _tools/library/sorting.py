@@ -38,6 +38,11 @@ def process(path, o):
             k = o["size"] / max(out.size)
             out = out.resize((round(out.width * k), round(out.height * k)), Image.LANCZOS)
         return im, [out], []
+    if o["mode"] == "cells":                # несколько цельных картинок сеткой (фоны листом)
+        pieces, boxes = K.cells(im, o["cols"], o["rows"], o.get("boxes"))
+        if rec:
+            pieces = [K.apply_edits(p, rec.get("ops", []), rec.get("adj")) for p in pieces]
+        return im, pieces, boxes
     grid = (o["cols"], o["rows"]) if o["mode"] == "grid" else None
     pieces, boxes = K.cut(im, grid, o["size"], o["bg_mode"], o["obv"], o["pad"] / 100, boxes=o.get("boxes"))
     if rec:                                 # обводка и тень расширяют кусок - снова под нужную сторону
@@ -81,6 +86,10 @@ ROUTES = {
     "fr": ("10 Рамки и орнаменты/{pal}", whole(1920)),
     "tx": ("02 Наклейки/{set}/{pal}", GRID),                    # наклейки с надписью и ярлыки
     "sh": ("06 Иллюстрации/Схемы", whole(1600)),
+    "ds": ("01 Фоны/Ночные сцены/{pal}", dict(whole(1920), mode="cells", cols=2, rows=2)),   # фоны листом 2x2
+    "ls": ("01 Фоны/Светлые/{pal}", dict(whole(1920), mode="cells", cols=2, rows=2)),
+    "lg": ("05 Логотипы", dict(GRID, cols=3, rows=2, size=512, fmt="png")),                # логотипы листом 3x2
+    "gs": ("08 Градиенты/{pal}", dict(whole(1920), mode="cells", cols=2, rows=2)),
     "lo": ("05 Логотипы", whole(0, "ico")),
     "co": ("06 Иллюстрации/Обложки", whole(1920)),
 }
@@ -105,15 +114,15 @@ def prompt_data():
             text = fh.read()
         pals = dict(re.findall(r'^\s*\["(\w+)","([^"]+)","', text, re.M))
         sets = {}
-        for m in re.finditer(r'\["([^"]+)",\s*(?:as\()?(sheet|zoo|poses|empties|scenes|captions|labels)\((\[\[.*?\]\]|\[.*?\])(?:,\s*\[(.*?)\])?',
+        for m in re.finditer(r'\["([^"]+)",\s*(?:as\()?(sheet|zoo|poses|empties|scenes|captions|labels|backs|logos)\((\[\[.*?\]\]|\[.*?\])(?:,\s*\[(.*?)\])?',
                              text, re.S):
             title, fn, a, b = m.groups()
-            named = fn in ("poses", "empties", "scenes", "captions", "labels")        # у этих имена кусков заданы вторым списком
+            named = fn in ("poses", "empties", "scenes", "captions", "labels", "backs", "logos")        # у этих имена кусков заданы вторым списком
             items = re.findall(r'"([^"]*)"', b if named and b else a)
             names = items if named else [js_slug(x) for x in items]
             key = set_name(title)
             sets[key] = names
-            sets[({"sheet": "ic", "zoo": "st", "poses": "po", "empties": "es", "scenes": "so", "captions": "tx", "labels": "tx"}[fn], key)] = names
+            sets[({"sheet": "ic", "zoo": "st", "poses": "po", "empties": "es", "scenes": "so", "captions": "tx", "labels": "tx", "backs": "ds", "logos": "lg"}[fn], key)] = names
         _prompts.update(mt=mt, pals=pals, sets=sets)
     return _prompts["pals"], _prompts["sets"]
 
@@ -132,7 +141,7 @@ def route(path):
     pals, _sets = prompt_data()
     tpl, o = ROUTES[kind]
     rel = tpl.format(set=clean_name(text), pal=clean_name(pals.get(pal, pal)))
-    names = sheet_names(kind, text) if o["mode"] == "grid" and kind != "fx" else None
+    names = sheet_names(kind, text) if o["mode"] in ("grid", "cells") and kind != "fx" else None
     return dict(dest=os.path.join(LIB, *rel.split("/")), o=dict(o), names=names, text=text)
 
 
@@ -165,10 +174,23 @@ def default_names(path, n, text=""):
 SQUEEZE = dict(q=0, target=0.99, kind="auto")     # сжатие при раскладке: качество на глаз
 
 
+def enlarge(im, side):
+    """Картинка с листа меньше нужной стороны - увеличить нейросетью x2 (Real-ESRGAN), потом не
+    больше side. Без модели - как есть: Lanczos только размыл бы."""
+    if side and max(im.size) < side and neural.upscale_available():
+        im = neural.upscale(im, 2, "art" if K.is_art(im) else "photo")
+    if side and max(im.size) > side:
+        k = side / max(im.size)
+        im = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
+    return im
+
+
 def store(path, o, pieces, names, dest, squeeze=False):
     """Пишет картинки в раздел. Нетронутый файл нужного формата копируется без пережатия.
     squeeze - сразу сжать с подбором качества (по ядрам), чтобы раздел «Тяжёлые» не копился."""
     os.makedirs(dest, exist_ok=True)
+    if o["mode"] == "cells":                # с листа 2x2 каждый фон вчетверо меньше - увеличить при записи
+        pieces = [enlarge(p, o.get("size", 0)) for p in pieces]
     same = (o["mode"] == "whole" and o["bg_mode"] in ("auto", "keep") and len(pieces) == 1 and not o.get("recipe")
             and os.path.splitext(path)[1].lower() == "." + o["fmt"])
     if same:

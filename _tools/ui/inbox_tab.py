@@ -392,7 +392,8 @@ class InboxTab(QWidget):
         for name, _o, _s in PRESETS:
             self.preset.addItem(name)
         self.mode = QComboBox()
-        for t, v in (("Найти рисунки автоматически", "auto"), ("Резать по сетке", "grid"), ("Не резать (целиком)", "whole")):
+        for t, v in (("Найти рисунки автоматически", "auto"), ("Резать по сетке", "grid"), ("Не резать (целиком)", "whole"),
+                     ("Цельные картинки сеткой (фоны листом)", "cells")):
             self.mode.addItem(t, v)
         self.cols = QSpinBox(minimum=1, maximum=20, value=4)
         self.rows = QSpinBox(minimum=1, maximum=20, value=3)
@@ -654,10 +655,10 @@ class InboxTab(QWidget):
             w.setVisible(mode != "whole")
         self.sheet.editable = mode != "whole"
         for w in (self.cols, self.rows):
-            w.setEnabled(mode == "grid")
+            w.setEnabled(mode in ("grid", "cells"))
         for w in (self.obv, self.pad):
-            w.setEnabled(mode != "whole")
-        self.size_label.setText("Длинная сторона" if mode == "whole" else "Сторона")
+            w.setEnabled(mode not in ("whole", "cells"))
+        self.size_label.setText("Длинная сторона" if mode in ("whole", "cells") else "Сторона")
         self.timer.start()
 
     # --- список входящих
@@ -787,7 +788,7 @@ class InboxTab(QWidget):
             return
         named = os.path.splitext(os.path.basename(path))[0].count(",") >= 2    # имена кусков через запятую - лист
         whole = next(i for i, (_n, o, _s) in enumerate(PRESETS) if o["mode"] == "whole" and o["fmt"] != "ico")
-        want = whole if kind == "whole" and not named else self.user_preset
+        want = whole if (kind == "whole" and not named) or kind == "cells" else self.user_preset
         self.guessing = True
         try:
             if self.preset.currentIndex() != want:
@@ -795,6 +796,12 @@ class InboxTab(QWidget):
             mode = PRESETS[want][1]["mode"]     # прошлый лист мог переключить режим на «один рисунок»
             if kind == "single" and not named and mode == "grid":
                 mode = "auto"
+            if kind == "cells":                 # фоны листом 2x2 - резать по пурпурным полосам
+                mode = "cells"
+                self.loading = True
+                self.cols.setValue(2)
+                self.rows.setValue(2)
+                self.loading = False
             if self.mode.currentData() != mode:
                 self.loading = True
                 self.mode.setCurrentIndex(self.mode.findData(mode))
@@ -802,7 +809,9 @@ class InboxTab(QWidget):
         finally:
             self.guessing = False
         text = {"whole": "Похоже на цельную картинку (фон, иллюстрация) - сохраню целиком.",
-                "single": "Похоже на один рисунок - вырежу его."}.get(kind if not named else "")
+                "single": "Похоже на один рисунок - вырежу его.",
+                "cells": "Похоже на несколько фонов в пурпурной рамке - разрежу по полосам и увеличу каждый x2."
+                }.get(kind if not named or kind == "cells" else "")
         if text:
             self.kind_lbl.setText(text + " Другая заготовка выше - решить иначе.")
         self.kind_lbl.setVisible(bool(text))
