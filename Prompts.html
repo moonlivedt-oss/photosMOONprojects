@@ -18,6 +18,8 @@ header{position:sticky;top:0;z-index:3;background:var(--bg);border-bottom:1px so
 #done:hover{color:var(--fg)}
 main{padding:2px 16px 40px;max-width:1400px}
 h2{font-size:15px;margin:20px 0 8px;color:var(--dim);font-weight:600}
+details>summary{list-style:none;cursor:pointer}details>summary::-webkit-details-marker{display:none}
+details>summary h2{display:inline-block}details>summary h2:before{content:"+ ";color:var(--acc)}details[open]>summary h2:before{content:"- "}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
 .c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
 .c b{font-size:14px}
@@ -75,74 +77,97 @@ var TW = ["a single paper lantern drifting away in the distance", "a constellati
   "a message in a bottle washed ashore", "a hot air balloon far away", "a single blooming flower in an unexpected place", "a swing hanging from a lone branch"];
 
 // ---------------- куски промптов ----------------
-var STYLE = "Style: die-cut sticker art with a thick clean white outline, soft cel shading, glossy highlights, crisp vector-like edges, gentle light from the top left, rich but harmonious detail";
-var CLEAR = "Fully transparent background (PNG with alpha channel), no backdrop, no ground shadow";
+// Модель сильная: понимает длинный текст, держит порядок предметов, пишет надписи (и по-русски) и
+// рисует мелкие детали. Поэтому промпты описывают результат точно, а надписи разрешены там, где они
+// нужны (наклейки с подписью, ярлыки, обложки, схемы); в остальных - запрещены, чтобы модель не
+// подписывала каждый предмет сама.
+var STYLE = "Style: die-cut sticker art with one thick clean white outline around the whole sticker, soft cel shading, glossy highlights, crisp vector-like edges, gentle light from the top left, consistent line weight and lighting across the set, rich but harmonious detail";
+var CLEAR = "Background: fully transparent (PNG with alpha channel), no backdrop, no ground shadow. If transparency is impossible, use one flat solid dark grey #30303a with no texture or gradient - it is removed automatically";
 var COL = "Color palette: {P}";
-var MASCOT = "a cute round blob mascot with a soft periwinkle-lavender body shaped like a chubby teardrop, a small messy tuft of fluffy hair on top, huge glossy dark eyes with star-shaped sparkle highlights, pink blush cheeks, a tiny open smile, short stubby arms and tiny round feet";
-var SAME = "Keep the mascot design exactly the same in every image: same body shape, hair tuft, eyes and colors";
-
+var GRID12 = "arranged in a neat 4x3 grid with wide even gaps; every sticker is separate, not touching, centered in its cell, about the same size and drawn in the same style";
+var NOLABEL = "No labels, numbers or captions under the stickers";
+// Маскот описан по первым рисункам (03 Маскоты/Из проектов): гладкий пушистый комок с маленьким хохолком.
+// «Messy fluffy hair» раньше превращало хохолок в шапку волос - отсюда «a little tuft, never a mop».
+var MASCOT = "a cute round blob mascot: a soft lavender-periwinkle body shaped like a chubby teardrop, slightly wider at the bottom, with a fine fuzzy plush texture; a small soft tuft of three rounded fluffy points on top of the head (a little tuft, never a big mop of hair); huge glossy dark navy eyes with star-shaped sparkle highlights; pink oval blush on the cheeks; a tiny open smile; short stubby arms and tiny round feet";
+var REF = "If a reference image of the mascot is attached, match its design exactly - the reference wins over this description";
+var SAME = "Keep the mascot identical in every image: same body shape, tuft, eyes, proportions and colors";
+var LETTER = "Lettering: Russian, in Cyrillic, spelled exactly as given in the quotes, with no other words anywhere; a bold rounded hand-lettered font with a dark outline and a soft highlight, easy to read at small size";
 function slug(s, n) {
   var STOP = " a an the of with and in on at to for from by under over near into its is no very that ";
   var w = s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(function (x) { return x && STOP.indexOf(" " + x + " ") < 0; });
   return w.slice(0, n || 3).join("-");
 }
 function join() { return Array.prototype.slice.call(arguments).filter(Boolean).join(". ") + "."; }
-// Каждый конструктор возвращает {p: промпт, n: имена файлов через запятую, k: вид}.
+// Каждый конструктор возвращает {p: промпт, n: имена файлов через запятую, k: вид, r: раздел библиотеки}.
 function sheet(items, extra) {
   return { k: "sheet", r: "ic", n: items.map(function (x) { return slug(x, 3); }).join(", "), p: join(
-    "A sticker sheet of 12 different objects arranged in a neat 4x3 grid with wide even gaps; every sticker is separate, not touching, the same size and drawn in the same style",
-    "Objects, in this order: " + items.join(", "),
-    "Each object is a charming, slightly chunky illustration with rounded forms, small tasteful material details (metal, wood, glass, paper or fabric where it fits) and a clear readable silhouette; they are plain things without faces",
-    extra, STYLE, COL, CLEAR) };
+    "A sticker sheet of 12 different objects " + GRID12,
+    "Objects, in this exact order, left to right and top to bottom: " + items.join(", "),
+    "Each object is a charming, slightly chunky illustration with rounded forms, small tasteful material details (metal, wood, glass, paper or fabric where it fits) and a clear silhouette that reads at 32 pixels; they are plain things without faces",
+    extra, NOLABEL, STYLE, COL, CLEAR) };
 }
 function zoo(items, extra) {
   return { k: "sheet", r: "st", n: items.map(function (x) { return slug(x, 3); }).join(", "), p: join(
-    "A sticker sheet of 12 different cute creatures arranged in a neat 4x3 grid with wide even gaps; every sticker is separate, not touching, the same size and drawn in the same style",
-    "Creatures, in this order: " + items.join(", "),
-    "Each one has a friendly expressive face with big shiny eyes and a little blush, a lively individual pose and small details that show its character",
-    extra, STYLE, COL, CLEAR) };
+    "A sticker sheet of 12 different cute creatures " + GRID12,
+    "Creatures, in this exact order: " + items.join(", "),
+    "Each one has a friendly expressive face with big shiny eyes and a little blush, a lively individual pose and small details that show its character (fur, feathers or scales drawn with fine texture)",
+    extra, NOLABEL, STYLE, COL, CLEAR) };
 }
 function poses(list, names) {
   return { k: "sheet", r: "po", n: names.join(", "), p: join(
-    "A character sticker sheet: 12 poses of the same mascot arranged in a neat 4x3 grid with wide even gaps, each separate, not touching, the same size",
-    "The mascot: " + MASCOT, SAME,
-    "Poses, in this order: " + list.join(", "),
-    "Each pose reads clearly at small size, with a few tiny props and colorful confetti strokes where they fit", STYLE, COL, CLEAR) };
+    "A character sticker sheet: 12 poses of the same mascot " + GRID12,
+    "The mascot: " + MASCOT, REF, SAME,
+    "Poses, in this exact order: " + list.join("; "),
+    "Each pose reads clearly at small size, with a few tiny props and colorful confetti strokes where they fit", NOLABEL, STYLE, COL, CLEAR) };
+}
+// Наклейки с подписью - как «Изучено!» со штампом: маскот, поза и короткое слово на ленте.
+// list - [поза, надпись]; надпись повторяется в кавычках, чтобы модель написала её буква в букву.
+function captions(list, names, extra) {
+  return { k: "sheet", r: "tx", n: names.join(", "), p: join(
+    "A sheet of 12 reaction stickers with the same mascot " + GRID12,
+    "The mascot: " + MASCOT, REF, SAME,
+    "Stickers, in this exact order (pose - caption): " + list.map(function (x) { return x[0] + " - «" + x[1] + "»"; }).join("; "),
+    "In every sticker the caption sits on a small curved ribbon banner across the bottom, overlapping the mascot a little, and is part of the die-cut shape; tiny sparkles, hearts and confetti strokes around",
+    extra, LETTER, STYLE, COL, CLEAR) };
+}
+// Ярлыки без маскота: значок и слово - для README, CHANGELOG, постов об обновлении.
+function labels(list, names, extra) {
+  return { k: "sheet", r: "tx", n: names.join(", "), p: join(
+    "A sheet of 12 label stickers " + GRID12,
+    "Each label is a wide rounded pill-shaped badge with a small icon on the left and one word on the right",
+    "Labels, in this exact order (icon - word): " + list.map(function (x) { return x[0] + " - «" + x[1] + "»"; }).join("; "),
+    "Each label has its own accent color from the palette, all the same height", extra, LETTER, STYLE, COL, CLEAR) };
 }
 // Экраны пустоты и ошибок - листом 4x3: каждая сценка на своей «земле», имена заданы явно.
 function empties(list, names) {
   return { k: "sheet", r: "es", n: names.join(", "), p: join(
-    "A sticker sheet of 12 small empty-state illustrations for an app arranged in a neat 4x3 grid with wide even gaps; each one is a tiny self-contained scene on its own soft rounded ground shape, separate, not touching, the same size and drawn in the same style",
-    "Scenes, in this order: " + list.join("; "),
-    "Gentle calm mood with a little touch of humor; objects are plain things without faces", STYLE, COL, CLEAR) };
+    "A sticker sheet of 12 small empty-state illustrations for an app " + GRID12 + "; each one is a tiny self-contained scene on its own soft rounded ground shape",
+    "Scenes, in this exact order: " + list.join("; "),
+    "Gentle calm mood with a little touch of humor; objects are plain things without faces; no words - the app adds its own text", NOLABEL, STYLE, COL, CLEAR) };
 }
 // Онбординг - лист 3x2: шесть сценок с маскотом, окно режет их сеткой 3x2.
 function scenes(list, names) {
   return { k: "sheet", r: "so", n: names.join(", "), p: join(
     "A sticker sheet of 6 small scenes with the same mascot arranged in a neat 3x2 grid with wide even gaps; each scene sits on its own soft rounded ground shape, separate, not touching, the same size",
-    "The mascot: " + MASCOT, SAME,
-    "Scenes, in this order: " + list.join("; "),
-    "Cozy and friendly, each scene readable at a glance", STYLE, COL, CLEAR) };
+    "The mascot: " + MASCOT, REF, SAME,
+    "Scenes, in this exact order: " + list.join("; "),
+    "Cozy and friendly, each scene readable at a glance", NOLABEL, STYLE, COL, CLEAR) };
 }
 function mascot(x, extra) {
   return { k: "one", r: "ma", n: "mascot-" + slug(x, 3), p: join(
-    "A character sticker of " + MASCOT, "Pose: " + x, extra,
+    "A character sticker of " + MASCOT, REF, "Pose: " + x, extra,
     "Full body, centered, with a few small colorful confetti strokes around it", SAME, STYLE, COL, CLEAR) };
-}
-function scene(x, extra) {
-  return { k: "one", r: "sc", n: "scene-" + slug(x, 3), p: join(
-    "A small sticker scene with " + MASCOT, x, extra,
-    "The scene sits on a soft rounded ground shape, cozy and friendly, readable at a glance", SAME, STYLE, COL, CLEAR) };
 }
 function dark(x) {
   return { k: "bg", r: "bd", n: "bg-" + slug(x, 3), p: join(x,
-    "Anime background art, cinematic wide shot, dramatic volumetric lighting with glowing light sources, rich painterly detail concentrated in the lower third and a calmer, darker upper area that leaves room for text",
-    "Gentle depth haze, small storytelling details worth discovering on a second look, no people", COL, "Highly detailed, polished, wallpaper quality") };
+    "Anime background art, cinematic wide shot, dramatic volumetric lighting with glowing light sources, rich painterly detail concentrated in the lower third and a calmer, darker upper area that leaves room for text or code on top",
+    "Gentle depth haze, small storytelling details worth discovering on a second look, no people", COL,
+    "Highly detailed, polished, high resolution, wallpaper quality") };
 }
 function light(x) {
   return { k: "bg", r: "bl", n: "bg-" + slug(x, 3), p: join(x,
     "Flat vector landscape illustration, minimalist layered silhouettes with atmospheric perspective, high-key pale washed-out tones, soft morning light, a large calm empty sky",
-    "Delicate small details, no people, low contrast overall so dark text placed on top stays easy to read", COL) };
+    "Delicate small details, no people, low contrast overall so dark text placed on top stays easy to read", COL, "High resolution") };
 }
 function pat(x) {
   return { k: "one", r: "pa", n: "pattern-" + slug(x, 3), p: join("A seamless tileable pattern: " + x,
@@ -151,51 +176,58 @@ function pat(x) {
 function grad(x) {
   return { k: "one", r: "gr", n: "gradient-" + slug(x, 3), p: join(x, "Abstract background for an app, smooth and calm, no objects, a very subtle fine grain, modern ui wallpaper", COL) };
 }
-function empty(x) {
-  return { k: "one", r: "em", n: "empty-" + slug(x, 3), p: join("An empty-state illustration for an app: " + x,
-    "A small self-contained scene on a soft rounded ground shape, gentle calm mood, a little touch of humor, objects have no faces", STYLE, COL, CLEAR) };
-}
 function medal(m, x) {
   return { k: "one", r: "me", n: "medal-" + slug(m, 2) + "-" + slug(x, 2), p: join(
     "A round achievement medal badge with a polished " + m + " rim decorated with small engraved dots, a " + x + " emblem in the center, a short folded ribbon below",
     "Front view, chunky and satisfying, like a reward in a game", STYLE, COL, CLEAR) };
 }
-function avatar(x) {
-  return { k: "one", r: "aa", n: "avatar-" + slug(x, 3), p: join(
-    "A round profile avatar of a cute " + x + ": face and shoulders, looking at the viewer with a happy expression, inside a solid colored circle",
-    "Big shiny eyes, soft fur or feather texture, a small accessory that gives it personality", STYLE, COL, CLEAR) };
-}
 function fx(x) {
   return { k: "one", r: "fx", n: "fx-" + slug(x, 3), p: join("A sprite sheet of 16 different " + x + " arranged in a 4x4 grid, each separate with wide gaps",
-    "Soft glow, varied sizes and rotations, crisp shapes, no other objects", COL, CLEAR) };
+    "Soft glow, varied sizes and rotations, crisp shapes, no other objects", COL, "Background: pure flat black #000000") };
 }
 function frame(x) {
   return { k: "one", r: "fr", n: "frame-" + slug(x, 3), p: join(x, "A game ui asset, front view, flat, symmetrical, clean precise edges, finely crafted ornament", COL, CLEAR) };
 }
 function logo(x) {
   return { k: "logo", r: "lo", n: "", p: join("An app icon: a rounded square tile with a soft inner glow and " + x,
-    "One clear central symbol with bold simple shapes, readable even at 16 pixels, soft cel shading and a glossy highlight, centered", COL) };
+    "One clear central symbol with bold simple shapes, readable even at 16 pixels, soft cel shading and a glossy highlight, centered, a little margin around the tile", COL,
+    "Background around the tile: fully transparent") };
 }
-function cover(x) {
-  return { k: "cover", r: "co", n: "", p: join("A wide banner illustration: " + x + " on the right third",
-    "A large calm empty area on the left for a title", "Flat vector style with soft gradients, soft light, small charming details", COL) };
+// Обложка README: название и строка о проекте - прямо на картинке, рисунок справа.
+function cover(x, title, sub) {
+  return { k: "cover", r: "co", n: "", p: join("A wide README banner illustration, 2:1",
+    "Left half: the title «" + title + "» in large bold clean rounded lettering, and under it a smaller subtitle in Russian «" + sub + "»; both left-aligned with generous margins, on a calm uncluttered area",
+    "Right half: " + x,
+    "Flat vector style with soft gradients, soft light, small charming details; the text is spelled exactly as in the quotes and nothing else is written", COL) };
+}
+// Учебная схема для справочника C++: подписи кода - моноширинным шрифтом, буква в букву.
+function diagram(x, title) {
+  return { k: "one", r: "sh", n: "scheme-" + slug(title, 3), p: join(
+    "An educational diagram for a C++ learning app explaining " + x,
+    "Clean flat layout on a transparent background: rounded boxes for memory cells and objects, bold arrows, small numbered steps; the mascot appears small in one corner as a friendly guide",
+    "All code identifiers are written exactly as given in quotes, in a monospace font; short Russian captions in a clean sans-serif font; no other text, no invented code",
+    STYLE, COL, CLEAR) };
 }
 function raw(name, p, r) { return { k: "one", n: name, p: p, r: r }; }
 function as(b, r) { b.r = r; return b; }      // другой раздел библиотеки, чем у конструктора по умолчанию
-
 // Запреты: дописываются строкой «Avoid: ...».
 var N = {
-  st: "text, letters, watermark, signature, faces or eyes on objects, drop shadows, ground shadows, background scenery, photorealism, blurry or cut-off edges, thin or double outlines",
-  liv: "text, watermark, scary or creepy look, extra eyes or limbs, humans, drop shadows, background scenery, photorealism, cut-off edges",
-  ch: "text, watermark, extra limbs, extra eyes, missing arms, teeth, scary look, humans, ground shadow, photorealism, any change to the mascot design",
+  st: "text, letters, labels, numbers, watermark, signature, faces or eyes on objects, drop shadows, ground shadows, background scenery, photorealism, blurry or cut-off edges, thin or double outlines",
+  liv: "text, labels, watermark, scary or creepy look, extra eyes or limbs, humans, drop shadows, background scenery, photorealism, cut-off edges",
+  ch: "text, watermark, extra limbs, extra eyes, missing arms, teeth, a big mop of hair, scary look, humans, ground shadow, photorealism, any change to the mascot design",
+  txt: "misspelled, garbled or invented letters, Latin letters instead of Cyrillic, extra words or captions beyond the given ones, watermark, signature, extra limbs or eyes, a big mop of hair, any change to the mascot design, drop shadows, background scenery, photorealism, cut-off edges, thin or double outlines",
+  lab: "misspelled, garbled or invented letters, Latin letters instead of Cyrillic, extra words, watermark, signature, faces on objects, drop shadows, background scenery, photorealism, cut-off edges",
+  cov: "misspelled or garbled text, extra words, slogans, watermark, signature, ui screenshots, people, frames, borders, vignette, clutter behind the title",
+  logo: "words or extra letters, watermark, signature, tiny unreadable details, photorealism, drop shadows outside the tile",
+  dia: "misspelled text, wrong or invented code, extra labels, watermark, photorealism, perspective, clutter, background scenery",
   bg: "text, letters, watermark, people, characters, faces, animals in the foreground, ui elements, frames, borders, vignette, oversaturated colors",
   grad: "text, watermark, people, objects, ui elements, frames, borders, vignette, color banding",
   pat: "text, watermark, visible seams or tile edges, vignette, a single central object, perspective, lighting gradient",
-  fx: "text, watermark, background scenery, background color, frames"
+  fx: "text, watermark, background scenery, frames, gradients in the background"
 };
-
 // ---------------- разделы ----------------
-// [название, запреты, палитра по умолчанию, [[имя, промпт, пропорции, палитра?], ...]]
+// [название, запреты, палитра по умолчанию, [[имя, промпт, пропорции, палитра?, запреты?], ...]]
+// Разделы «Про запас: ...» свёрнуты: для игр и экспериментов, проектам пока не нужны.
 var S = [
  ["Листы наклеек 4x3", "st", "default", [
   ["Интерфейс: основное", sheet(["folder", "gear", "magnifying glass", "trash bin", "cloud", "padlock", "key", "bell", "calendar", "wifi signal", "rocket", "beetle seen from above"]), "3:2"],
@@ -205,11 +237,10 @@ var S = [
   ["Сеть (NetworkDoctor)", sheet(["globe", "wifi router with antennas", "ethernet cable", "broken chain link", "shield with check mark", "satellite dish", "server rack", "signal bars", "plug and socket", "magnet", "tunnel entrance", "first aid kit"]), "3:2", "nord"],
   ["Время и конкурсы (ContestReminder)", sheet(["alarm clock", "hourglass", "stopwatch", "countdown timer display", "megaphone", "trophy cup", "podium with three places", "finish flag", "laurel wreath", "checklist", "target with arrow", "envelope"]), "3:2", "sunset"],
   ["Язык (AutoTranslator)", sheet(["two speech bubbles", "open dictionary", "globe with arrows", "keyboard", "microphone", "sound wave sign", "magnifier over text lines", "scissors", "stack of flash cards", "alphabet blocks", "loudspeaker", "quill pen"]), "3:2", "tokyo"],
+  ["Код и VS Code", sheet(["curly braces block", "puzzle-shaped extension piece", "git branch fork", "bug under a magnifier", "command palette window", "split editor panes", "gear with a code symbol", "package box with a version tag", "terminal prompt arrow", "breakpoint red dot on a line", "merge arrows", "search and replace arrows"], "Clean, modern developer-tool feel"), "3:2", "onedark"],
   ["Реакции", sheet(["thumbs up", "clapping hands", "party popper", "fire", "sparkles", "zzz sleep symbol", "sweat drop", "exclamation mark", "question mark", "broken heart", "crown", "rainbow"]), "3:2"],
   ["Погода", sheet(["sun", "fog bank", "rain cloud", "thunderstorm", "snowflake", "sun behind cloud", "moon with stars", "wind swirl", "umbrella", "thermometer", "tornado", "sunrise"]), "3:2", "mint"],
   ["Еда и уют", sheet(["coffee cup", "tea mug", "donut", "cookie", "cake slice", "pizza slice", "onigiri", "ramen bowl", "milk box", "apple", "candy", "ice cream"]), "3:2", "latte"],
-  ["RPG-лут", sheet(["short sword", "round wooden shield", "red health potion", "blue mana potion", "treasure chest", "stack of gold coins", "rolled map with a wax seal", "magic ring", "bow with an arrow", "leather boots", "spell book with a clasp", "cut crystal gem"]), "3:2", "gruvbox"],
-  ["Алхимия и магия", sheet(["round flask with bubbling liquid", "mortar and pestle", "crystal ball on a stand", "wand with a star tip", "carved rune stone", "dripping candle", "sealed scroll", "iron cauldron", "bundle of dried herbs", "brass balance scale", "amulet on a chain", "magic hand mirror"]), "3:2", "dracula"],
   ["Космос", sheet(["asteroid with a little flag", "ringed planet", "flying saucer", "satellite with solar panels", "space helmet with a mirrored visor", "telescope", "comet", "cratered moon", "space station module", "meteor", "star map", "moon rover"]), "3:2", "tokyo"],
   ["Ретро-техника", sheet(["floppy disk", "cassette tape", "crt monitor", "game cartridge", "joystick", "vinyl record", "pager", "film camera", "boombox", "rotary phone", "instant photo", "portable cassette player"]), "3:2", "synthwave"],
   ["Стол программиста", sheet(["mechanical keyboard", "rubber duck for debugging", "energy drink can", "stack of sticky notes", "laptop with code lines", "headphones", "usb stick", "monitor with a terminal", "branching diagram sign", "small desk plant", "tangled cable", "desk lamp"]), "3:2", "onedark"],
@@ -217,14 +248,21 @@ var S = [
   ["Мастерская", sheet(["hammer", "screwdriver", "pliers", "tape measure", "paint roller", "glue gun", "soldering iron", "toolbox", "hand saw", "spirit level", "roll of tape", "jar of screws"]), "3:2", "autumn"],
   ["Медиа и плеер", sheet(["play button", "pause button", "next track button", "volume knob", "equalizer bars", "repeat arrows", "shuffle arrows", "film reel", "clapperboard", "retro radio", "playlist card", "record button"], "Shapes are friendly and tactile, like soft rubbery buttons"), "3:2", "mocha"],
   ["Учёба и офис", sheet(["pencil", "ruler", "eraser", "paper clip", "stapler", "backpack", "graduation cap", "abacus", "calculator", "highlighter marker", "pencil case", "glue stick"]), "3:2", "solar"],
-  ["Спорт и игры", sheet(["soccer ball", "basketball", "tennis racket", "chess knight", "pair of dice", "playing cards fan", "bowling pin", "skateboard", "whistle", "dumbbell", "yo-yo", "rubik cube"]), "3:2", "onedark"],
   ["Лесные звери (с лицами)", zoo(["fox", "owl", "hedgehog", "squirrel", "fawn", "raccoon", "rabbit", "bear cub", "frog", "badger", "mouse", "bat"]), "3:2", "forest", "liv"],
   ["Морские жители (с лицами)", zoo(["octopus", "crab", "whale", "jellyfish", "seahorse", "sea turtle", "pufferfish", "baby shark", "otter", "seal", "clownfish", "axolotl"]), "3:2", "ocean", "liv"],
   ["Сказочные существа (с лицами)", zoo(["baby dragon", "little ghost", "slime", "tiny golem", "forest spirit", "phoenix chick", "unicorn foal", "kitsune", "mushroom sprite", "griffin cub", "sea serpent", "moth fairy"]), "3:2", "rosepine", "liv"]
  ]],
+ ["Наклейки с надписью", "txt", "default", [
+  ["Учёба: штампы", captions([["stamping a big green rubber stamp with a check mark onto a card, happy and proud", "Изучено!"], ["holding up a glowing light bulb, eyes bright", "Подсказка"], ["reading an open book with small round glasses", "Читаю"], ["shuffling a fan of flash cards", "Повторить"], ["holding a small warm flame in both palms", "Серия!"], ["presenting a shining star badge", "Новое"], ["hand on chin, small question marks floating", "Хм..."], ["lifting a solved glowing puzzle piece", "Решено!"], ["stretching with a sweatband, ready to start", "Разминка"], ["climbing a small staircase of blocks", "Шаг за шагом"], ["rolling a big dice", "Наугад"], ["napping on a closed book with a tiny pillow", "Перерыв"]],
+    ["learn-done", "learn-hint", "learn-reading", "learn-repeat", "learn-streak", "learn-new", "learn-thinking", "learn-solved", "learn-warmup", "learn-steps", "learn-random", "learn-break"]), "3:2"],
+  ["Реакции с надписью", captions([["waving hello with a big smile", "Привет!"], ["holding a small heart with both arms", "Спасибо!"], ["giving a thumbs up next to a check mark", "Готово!"], ["jumping with joy, confetti falling", "Ура!"], ["sheepish, sweat drop, hand behind the head", "Упс..."], ["sad with a single tear, a small crack sign nearby", "Ошибка"], ["holding a tiny spinning hourglass", "Загрузка..."], ["hugging a floppy disk with a sparkle", "Сохранено"], ["clapping, stars around", "Отлично!"], ["tapping a foot, holding a tiny alarm clock", "Жду"], ["waving goodbye with closed happy eyes", "Пока!"], ["pointing forward with determination, a tiny flag", "Вперёд!"]],
+    ["say-hello", "say-thanks", "say-done", "say-hooray", "say-oops", "say-error", "say-loading", "say-saved", "say-great", "say-waiting", "say-bye", "say-go"]), "3:2"],
+  ["Ярлыки для README", labels([["sparkle", "Новое"], ["wrench", "Исправлено"], ["arrow up", "Улучшено"], ["trash bin", "Удалено"], ["flask", "Бета"], ["hourglass", "Скоро"], ["light bulb", "Совет"], ["exclamation mark", "Важно"], ["warning triangle", "Внимание"], ["check mark", "Готово"], ["circular sync arrows", "Обновление"], ["rocket", "Быстрый старт"]],
+    ["tag-new", "tag-fixed", "tag-improved", "tag-removed", "tag-beta", "tag-soon", "tag-tip", "tag-important", "tag-warning", "tag-done", "tag-update", "tag-quick-start"]), "3:2", "default", "lab"]
+ ]],
  ["Маскот", "ch", "default", [
-  ["Грусть (ошибка)", mascot("sad face with a single big tear, drooping hair tuft"), "1:1"],
-  ["Удивление", mascot("surprised with wide eyes and round open mouth, hair tuft standing up"), "1:1"],
+  ["Грусть (ошибка)", mascot("sad face with a single big tear, drooping tuft"), "1:1"],
+  ["Удивление", mascot("surprised with wide eyes and round open mouth, tuft standing up"), "1:1"],
   ["Ждёт (загрузка)", mascot("waiting patiently, holding a tiny alarm clock, tapping one foot"), "1:1"],
   ["Чинит", mascot("holding a big wrench, fixing something, small sparks around"), "1:1"],
   ["Празднует", mascot("jumping with joy, arms raised, confetti falling"), "1:1"],
@@ -234,18 +272,49 @@ var S = [
   ["Показывает влево", mascot("pointing to the left with the whole arm, looking at the viewer"), "1:1"],
   ["Показывает вправо", mascot("pointing to the right with the whole arm, looking at the viewer"), "1:1"],
   ["Сидит на краю", mascot("sitting on an edge with legs dangling down"), "1:1"],
-  ["Держит табличку", mascot("holding a large blank sign board with both arms"), "1:1"],
+  ["Держит табличку", mascot("holding a large blank sign board with both arms; the board is completely empty so any text can be added later"), "1:1"],
   ["В наушниках", mascot("wearing big headphones, eyes closed, music notes floating"), "1:1"],
   ["С глобусом (сеть)", mascot("hugging a small globe with glowing network lines"), "1:1"],
   ["С календарём", mascot("hugging a calendar page with a red circle"), "1:1"],
   ["Сонный в пледе", mascot("wrapped in a blanket, sleepy, zzz above head"), "1:1"],
   ["Выглядывает", mascot("peeking out from behind a wall, only half of the body visible"), "1:1"],
-  ["Лист 12 поз: дела и праздники", poses(["thinking hard with a glowing light bulb popping up above the head", "hiding inside a cardboard box, only the eyes and hair tuft peeking over the edge", "flying with a small jetpack and puffs of soft smoke", "floating cross-legged in calm meditation with a soft glowing aura", "proudly lifting a shiny trophy cup above the head", "taking a photo with a small vintage camera, one eye closed", "wearing a santa hat and holding a small gift box", "wearing a small witch hat and holding a glowing pumpkin lantern", "holding a bouquet of spring flowers", "floating on a swim ring with sunglasses", "jumping into a pile of autumn leaves", "blowing out the candles on a small birthday cake"],
+  ["Лист 12 поз: дела и праздники", poses(["thinking hard with a glowing light bulb popping up above the head", "hiding inside a cardboard box, only the eyes and tuft peeking over the edge", "flying with a small jetpack and puffs of soft smoke", "floating cross-legged in calm meditation with a soft glowing aura", "proudly lifting a shiny trophy cup above the head", "taking a photo with a small vintage camera, one eye closed", "wearing a santa hat and holding a small gift box", "wearing a small witch hat and holding a glowing pumpkin lantern", "holding a bouquet of spring flowers", "floating on a swim ring with sunglasses", "jumping into a pile of autumn leaves", "blowing out the candles on a small birthday cake"],
     ["pose-thinking-bulb", "pose-hiding-box", "pose-jetpack", "pose-meditating", "pose-trophy", "pose-camera", "pose-santa-gift", "pose-witch-pumpkin", "pose-spring-flowers", "pose-swim-ring", "pose-autumn-leaves", "pose-birthday-cake"]), "3:2"],
   ["Лист 12 поз", poses(["sad with a tear", "surprised", "waiting with a clock", "fixing with a wrench", "celebrating", "reading a book", "drinking tea", "waving", "pointing left", "pointing right", "holding a blank sign", "sleeping in a blanket"],
     ["pose-sad-tear", "pose-surprised", "pose-waiting-clock", "pose-fixing-wrench", "pose-celebrating", "pose-reading-book", "pose-drinking-tea", "pose-waving", "pose-pointing-left", "pose-pointing-right", "pose-holding-sign", "pose-sleeping-blanket"]), "3:2"],
   ["Лист 12 поз: хобби", poses(["riding a skateboard", "painting on a tiny easel", "watering a sprout with a little can", "playing with a game controller", "eating ramen with chopsticks", "casting sparkles in a wizard hat", "sleeping on a crescent moon", "carrying a stack of boxes", "typing on a tiny laptop", "holding a heart balloon", "sailing in a paper boat", "strumming a tiny guitar"],
     ["pose-skateboard", "pose-painting", "pose-watering", "pose-gaming", "pose-ramen", "pose-wizard", "pose-moon-nap", "pose-boxes", "pose-typing", "pose-balloon", "pose-paper-boat", "pose-guitar"]), "3:2"]
+ ]],
+ ["Экраны ошибок и пустоты", "st", "default", [
+  ["Экраны: пусто и нет связи", empties(["an empty inbox tray with a tiny cobweb in the corner", "an unplugged power cable lying next to a wall socket with a small grey rain cloud above", "broken wifi signal bars with a bandage", "a magnifying glass over an empty dotted rectangle with a small question mark", "a closed door with a big padlock and a small key lying far away", "a torn paper map with a dotted path that runs off the edge and a small flag on a tiny planet", "an open cardboard box with bubble wrap and nothing inside", "an empty calendar page with a zzz sleep symbol above it", "an empty shopping basket with a single crumb", "an empty bookshelf with one fallen bookmark", "an empty mailbox with its little flag down", "an empty picture frame hanging on a nail"],
+    ["empty-inbox", "empty-offline", "empty-bad-signal", "empty-not-found", "empty-no-access", "empty-404", "empty-no-files", "empty-no-plans", "empty-cart", "empty-shelf", "empty-mailbox", "empty-gallery"]), "3:2"],
+  ["Экраны: состояния", empties(["two gears turning with small sparks and motion lines", "a big check mark with confetti bursting", "a warning triangle with a loose bolt and small sparks", "a tiny rocket on a launchpad with countdown lights", "a crescent moon resting on a small cloud with a nightcap and a zzz symbol", "a cloud with an upward arrow inside a progress ring", "a padlock clicking shut next to a small shield", "an hourglass with the sand almost run out", "a nearly empty battery with a small red warning glow", "a trash bin with a crumpled paper falling in", "a floppy disk with a small sparkle", "a coffee cup with steam curling into a pause symbol"],
+    ["state-loading", "state-success", "state-error", "state-update", "state-night-mode", "state-uploading", "state-locked", "state-timeout", "state-low-battery", "state-deleted", "state-saved", "state-paused"]), "3:2"]
+ ]],
+ ["Обложки README", "cov", "default", [
+  ["NetworkDoctor", cover("a friendly robot doctor listening to a glowing wifi router with a stethoscope", "NetworkDoctor", "Чинит интернет после прокси и туннелей"), "2:1", "nord"],
+  ["AutoTranslator", cover("two floating speech bubbles exchanging glowing letters over an open book", "AutoTranslator", "Перевод и распознавание текста с экрана"), "2:1", "tokyo"],
+  ["ContestReminder", cover("a big calendar with a trophy on top and paper notes flying around", "ContestReminder", "Не пропустить ни одного конкурса"), "2:1", "sunset"],
+  ["Moon Bundle", cover("an open gift box under a crescent moon with small packages floating out", "Moon Bundle", "Установщики для друзей в один щелчок"), "2:1", "default"],
+  ["GraphicsGeneration", cover("a magic paint brush painting a colorful landscape on a floating canvas", "GraphicsGeneration", "Картинки нейросетью на своём компьютере"), "2:1", "mocha"],
+  ["Moon Core", cover("a crescent moon with a glowing gear inside, small code brackets and sliders orbiting around it", "Moon Core", "VS Code - под себя"), "2:1", "dracula"],
+  ["VSCodeLauncher", cover("a stack of colorful extension blocks with a lightning bolt, only a few blocks lit up and the rest resting asleep", "VSCodeLauncher", "VS Code только с нужными расширениями"), "2:1", "onedark"],
+  ["Документация C++", cover("the mascot reading a glowing book with curly braces on the cover, small floating cards with code symbols", "Документация C++", "Справочник и карточки прямо в VS Code"), "2:1", "tokyo"],
+  ["Библиотека картинок", cover("a cozy shelf of sticker sheets, icons and small framed backgrounds, a magnifying glass with sparkles", "Библиотека картинок", "Иконки, наклейки и фоны - в одном месте"), "2:1", "default"]
+ ]],
+ ["Логотипы проектов", "logo", "default", [
+  ["NetworkDoctor", logo("a stethoscope wrapped around a glowing wifi signal"), "1:1", "nord"],
+  ["AutoTranslator", logo("two overlapping speech bubbles, one with the letter A and one with the letter Я"), "1:1", "tokyo"],
+  ["ContestReminder", logo("a calendar page with a small trophy and a ringing bell"), "1:1", "sunset"],
+  ["Moon Bundle", logo("a gift box with a crescent moon on the lid and a ribbon"), "1:1", "default"],
+  ["Moon Core", logo("a crescent moon with a glowing gear inside it"), "1:1", "dracula"],
+  ["GraphicsGeneration", logo("a paint brush drawing a sparkle on a small canvas"), "1:1", "mocha"]
+ ]],
+ ["Онбординг и заставки", "ch", "default", [
+  ["Онбординг: 6 шагов", scenes(["the mascot opens a big round door with warm light pouring out and waves hello", "the mascot chooses colorful blocks from a small shelf, curious and focused", "the mascot stacks blocks into a small tower, tongue out in concentration", "the mascot rides a small rocket taking off from an open laptop", "the mascot gives a thumbs up next to a big check mark", "the mascot waves goodbye from a tiny hot air balloon floating away"],
+    ["scene-welcome", "scene-choose", "scene-setup", "scene-launch", "scene-done", "scene-goodbye"]), "3:2"],
+  ["Экран запуска", raw("splash-moon-clouds", join("A splash screen background: a soft glowing crescent moon above calm layered clouds",
+    "A large empty space in the center for a logo, gentle light rays", "Flat vector style, smooth gradients, minimal and elegant, high resolution", COL), "sp"), "16:9"]
  ]],
  ["Фоны тёмные", "bg", "tokyo", [
   ["Лофи-комната", dark("cozy lofi study room at night, wooden desk with a glowing monitor and desk lamp, rain streaks on a large window, potted plants, a sleeping cat on the windowsill, blurred city lights outside"), "3:2", "mocha"],
@@ -291,7 +360,60 @@ var S = [
   ["Солнечная библиотека", light("sunlit library reading room, tall arched windows, wooden ladders, dust motes in the light"), "3:2", "paper"],
   ["Мост в тумане", light("long white footbridge over a misty river, willow trees, ducks far away on the water"), "3:2", "sakura"]
  ]],
- ["Паттерны и текстуры", "pat", "default", [
+ ["Схемы для справочника C++", "dia", "tokyo", [
+  ["unique_ptr: один владелец", diagram("ownership with std::unique_ptr: a box «std::unique_ptr<Widget> a» points to a heap object «Widget»; an arrow «std::move(a)» moves ownership to «b», after which «a» is shown empty with «nullptr»; Russian captions «один владелец» and «после перемещения»", "unique ptr owner"), "3:2"],
+  ["shared_ptr: счётчик", diagram("std::shared_ptr reference counting: three pointers «p1», «p2», «p3» point to one heap object with a small counter badge «use_count = 3»; one pointer goes away and the badge shows «2»; Russian caption «объект живёт, пока есть владельцы»", "shared ptr counter"), "3:2"],
+  ["Копирование и перемещение", diagram("copy versus move: on the left «std::string b = a;» duplicates a buffer of letters into a second buffer; on the right «std::string b = std::move(a);» hands the same buffer to «b» and leaves «a» empty; Russian captions «копия» and «перемещение»", "copy vs move"), "3:2"],
+  ["Ссылка и указатель", diagram("reference versus pointer: «int x = 5;» as a memory box; «int& r = x;» drawn as a second name tag on the same box; «int* p = &x;» drawn as a separate box holding an address arrow to x; Russian captions «другое имя» and «хранит адрес»", "reference vs pointer"), "3:2"]
+ ]],
+ ["Медали и достижения", "st", "default", [
+  ["Достижения учёбы", as(captions([["proudly wearing a bronze medal", "1 день"], ["holding a silver medal high", "7 дней"], ["hugging a big gold medal", "30 дней"], ["standing on a small stack of flash cards", "10 карточек"], ["standing on a tall stack of flash cards", "100 карточек"], ["planting a small flag on a book", "Первая тема"], ["holding a trophy cup", "Все темы"], ["juggling three glowing cards", "Без ошибок"], ["running with motion lines and a stopwatch", "Быстро!"], ["waking up early with a sunrise behind", "Ранняя пташка"], ["reading at night under a moon lamp", "Сова"], ["wearing a small crown", "Мастер"]],
+    ["achieve-day-1", "achieve-days-7", "achieve-days-30", "achieve-cards-10", "achieve-cards-100", "achieve-first-topic", "achieve-all-topics", "achieve-no-mistakes", "achieve-fast", "achieve-early-bird", "achieve-night-owl", "achieve-master"],
+    "Each sticker is framed like an achievement: a round badge shape behind the mascot with a polished rim"), "md"), "3:2", "default", "txt"],
+  ["Медали за дела", as(sheet(["bronze medal with a flame", "silver medal with an open book", "gold medal with a star", "gold medal with a lightning bolt", "silver medal with a shield", "rainbow crystal medal with a crown", "gold medal with a calendar page", "bronze medal with a rocket", "dark obsidian medal with glowing cracks and a crescent moon", "silver medal with a crossed-out bug", "gold medal with a coffee cup", "bronze medal with a stack of books"],
+    "Every object is a round achievement medal badge with a polished rim decorated with small engraved dots and a short folded ribbon below, front view, chunky and satisfying like a reward in a game"), "md"), "3:2"],
+  ["Лист званий", as(sheet(["rank badge one chevron", "rank badge two chevrons", "rank badge three chevrons", "rank badge four chevrons", "rank badge five chevrons", "rank badge bronze", "rank badge silver", "rank badge gold", "rank badge crystal", "rank badge obsidian", "rank badge star", "rank badge crown"],
+    "Every object is a hexagon rank badge; the set reads as a clear progression from simple to legendary"), "md"), "3:2"]
+ ]],
+ ["Про запас: листы для игр", "st", "default", [
+  ["RPG-лут", sheet(["short sword", "round wooden shield", "red health potion", "blue mana potion", "treasure chest", "stack of gold coins", "rolled map with a wax seal", "magic ring", "bow with an arrow", "leather boots", "spell book with a clasp", "cut crystal gem"]), "3:2", "gruvbox"],
+  ["Алхимия и магия", sheet(["round flask with bubbling liquid", "mortar and pestle", "crystal ball on a stand", "wand with a star tip", "carved rune stone", "dripping candle", "sealed scroll", "iron cauldron", "bundle of dried herbs", "brass balance scale", "amulet on a chain", "magic hand mirror"]), "3:2", "dracula"],
+  ["Спорт и игры", sheet(["soccer ball", "basketball", "tennis racket", "chess knight", "pair of dice", "playing cards fan", "bowling pin", "skateboard", "whistle", "dumbbell", "yo-yo", "rubik cube"]), "3:2", "onedark"],
+  ["Лист медалей", as(sheet(["medal with a heart", "medal with a gear", "medal with a music note", "medal with a paint brush", "medal with a compass", "medal with a key", "medal with a leaf", "medal with a feather", "medal with a diamond", "medal with an infinity sign", "medal with a paw print", "medal with a coffee bean"],
+    "Every object is a round achievement medal with a short folded ribbon; rims alternate bronze, silver and gold"), "md"), "3:2"]
+ ]],
+ ["Про запас: аватары", "liv", "default", [
+  ["Лист 12 зверей: ещё", as(zoo(["cat", "penguin", "shiba inu", "alpaca", "quokka", "baby elephant", "meerkat", "parrot", "giraffe calf", "polar bear cub", "chinchilla", "lop eared bunny"],
+    "Each creature is a round profile avatar: face and shoulders inside a solid colored circle, looking at the viewer with a happy expression, with a small accessory that gives it personality"), "av"), "3:2"],
+  ["Лист 12 зверей", as(zoo(["panda", "koala", "red panda", "hamster", "corgi puppy", "tiger cub", "sloth", "capybara", "duckling", "lamb", "monkey", "hippo"],
+    "Each creature is a round profile avatar: face and shoulders inside a solid colored circle, looking at the viewer"), "av"), "3:2"],
+  ["Заглушка", raw("avatar-placeholder", join("A round default avatar: an abstract head and shoulders silhouette, flat, single color, inside a circle", "Clean and minimal", COL, CLEAR), "aa"), "1:1", "mono", "st"]
+ ]],
+ ["Про запас: эффекты и частицы", "fx", "default", [
+  ["Искорки", fx("four-point sparkles"), "1:1"],
+  ["Боке", fx("round bokeh dots"), "1:1", "tokyo"],
+  ["Светлячки", fx("fireflies"), "1:1", "forest"],
+  ["Снежинки", fx("snowflakes"), "1:1", "nord"],
+  ["Лепестки сакуры", fx("cherry blossom petals"), "1:1", "sakura"],
+  ["Кленовые листья", fx("autumn maple leaves"), "1:1", "autumn"],
+  ["Капли дождя", fx("raindrop streaks"), "1:1", "ocean"],
+  ["Падающие звёзды", fx("shooting star trails"), "1:1", "dracula"],
+  ["Волшебная пыль", fx("magic dust swirls"), "1:1", "default"],
+  ["Искры", fx("ember sparks"), "1:1", "gruvbox"],
+  ["Пузыри", fx("soap bubbles"), "1:1", "mint"],
+  ["Ноты", fx("musical notes"), "1:1", "synthwave"]
+ ]],
+ ["Про запас: рамки и орнаменты", "st", "default", [
+  ["Фэнтези-рамка", frame("ornate rectangular frame border with fantasy gold filigree, completely empty center"), "1:1", "gruvbox"],
+  ["Разделитель с луной", frame("horizontal decorative divider line with a small crescent moon in the middle"), "5:2"],
+  ["Угловой орнамент", frame("corner ornament with art nouveau vines, top left corner"), "1:1", "forest"],
+  ["Панель (9-slice)", frame("rounded ui panel with a thin glowing edge, empty center, 9-slice friendly, even border width"), "1:1", "tokyo"],
+  ["Лента под заголовок", frame("ribbon banner for a title, empty, folded ends"), "5:2", "sunset"],
+  ["Облачко реплики", frame("cute speech bubble frame, empty"), "1:1", "latte"],
+  ["Подсказка", frame("tooltip box with a small arrow pointing down, empty"), "1:1", "mocha"],
+  ["Полоса прогресса", frame("progress bar frame, empty, rounded"), "5:2", "mint"]
+ ]],
+ ["Про запас: паттерны и текстуры", "pat", "default", [
   ["Звёзды и луны", pat("tiny stars, dots and small crescent moons scattered"), "1:1"],
   ["Зерно", pat("fine film grain noise, uniform"), "1:1", "mono"],
   ["Акварельная бумага", pat("watercolor paper texture with soft fibers and faint pigment blooms"), "1:1", "paper"],
@@ -307,7 +429,7 @@ var S = [
   ["Плата", pat("circuit board traces with small nodes"), "1:1", "tokyo"],
   ["Горошек", pat("polka dots of two sizes"), "1:1", "mint"]
  ]],
- ["Градиенты", "grad", "default", [
+ ["Про запас: градиенты", "grad", "default", [
   ["Меш-градиент", grad("A mesh gradient with large soft blurred color blobs"), "3:2"],
   ["Северное сияние", grad("Aurora borealis ribbons of light flowing across a dark sky"), "3:2", "nord"],
   ["Матовое стекло", grad("Frosted glass panels overlapping, blurred colors behind the glass, glassmorphism"), "3:2", "mocha"],
@@ -317,74 +439,7 @@ var S = [
   ["Голографическая плёнка", grad("Holographic foil with soft rainbow sheen and gentle wrinkles"), "3:2", "tokyo"],
   ["Лучи в дымке", grad("Diagonal light rays through haze"), "3:2", "sunset"]
  ]],
- ["Экраны ошибок и пустоты", "st", "default", [
-  ["Экраны: пусто и нет связи", empties(["an empty inbox tray with a tiny cobweb in the corner", "an unplugged power cable lying next to a wall socket with a small grey rain cloud above", "broken wifi signal bars with a bandage", "a magnifying glass over an empty dotted rectangle with a small question mark", "a closed door with a big padlock and a small key lying far away", "a torn paper map with a dotted path that runs off the edge and a small flag on a tiny planet", "an open cardboard box with bubble wrap and nothing inside", "an empty calendar page with a zzz sleep symbol above it", "an empty shopping basket with a single crumb", "an empty bookshelf with one fallen bookmark", "an empty mailbox with its little flag down", "an empty picture frame hanging on a nail"],
-    ["empty-inbox", "empty-offline", "empty-bad-signal", "empty-not-found", "empty-no-access", "empty-404", "empty-no-files", "empty-no-plans", "empty-cart", "empty-shelf", "empty-mailbox", "empty-gallery"]), "3:2"],
-  ["Экраны: состояния", empties(["two gears turning with small sparks and motion lines", "a big check mark with confetti bursting", "a warning triangle with a loose bolt and small sparks", "a tiny rocket on a launchpad with countdown lights", "a crescent moon resting on a small cloud with a nightcap and a zzz symbol", "a cloud with an upward arrow inside a progress ring", "a padlock clicking shut next to a small shield", "an hourglass with the sand almost run out", "a nearly empty battery with a small red warning glow", "a trash bin with a crumpled paper falling in", "a floppy disk with a small sparkle", "a coffee cup with steam curling into a pause symbol"],
-    ["state-loading", "state-success", "state-error", "state-update", "state-night-mode", "state-uploading", "state-locked", "state-timeout", "state-low-battery", "state-deleted", "state-saved", "state-paused"]), "3:2"]
- ]],
- ["Онбординг и заставки", "ch", "default", [
-  ["Онбординг: 6 шагов", scenes(["the mascot opens a big round door with warm light pouring out and waves hello", "the mascot chooses colorful blocks from a small shelf, curious and focused", "the mascot stacks blocks into a small tower, tongue out in concentration", "the mascot rides a small rocket taking off from an open laptop", "the mascot gives a thumbs up next to a big check mark", "the mascot waves goodbye from a tiny hot air balloon floating away"],
-    ["scene-welcome", "scene-choose", "scene-setup", "scene-launch", "scene-done", "scene-goodbye"]), "3:2"],
-  ["Экран запуска", raw("splash-moon-clouds", join("A splash screen background: a soft glowing crescent moon above calm layered clouds",
-    "A large empty space in the center for a logo, gentle light rays", "Flat vector style, smooth gradients, minimal and elegant", COL), "sp"), "16:9"]
- ]],
- ["Медали и достижения", "st", "default", [
-  ["Медали за дела", as(sheet(["bronze medal with a flame", "silver medal with an open book", "gold medal with a star", "gold medal with a lightning bolt", "silver medal with a shield", "rainbow crystal medal with a crown", "gold medal with a calendar page", "bronze medal with a rocket", "dark obsidian medal with glowing cracks and a crescent moon", "silver medal with a crossed-out bug", "gold medal with a coffee cup", "bronze medal with a stack of books"],
-    "Every object is a round achievement medal badge with a polished rim decorated with small engraved dots and a short folded ribbon below, front view, chunky and satisfying like a reward in a game"), "md"), "3:2"],
-  ["Лист медалей", as(sheet(["medal with a heart", "medal with a gear", "medal with a music note", "medal with a paint brush", "medal with a compass", "medal with a key", "medal with a leaf", "medal with a feather", "medal with a diamond", "medal with an infinity sign", "medal with a paw print", "medal with a coffee bean"],
-    "Every object is a round achievement medal with a short folded ribbon; rims alternate bronze, silver and gold"), "md"), "3:2"],
-  ["Лист званий", as(sheet(["rank badge one chevron", "rank badge two chevrons", "rank badge three chevrons", "rank badge four chevrons", "rank badge five chevrons", "rank badge bronze", "rank badge silver", "rank badge gold", "rank badge crystal", "rank badge obsidian", "rank badge star", "rank badge crown"],
-    "Every object is a hexagon rank badge; the set reads as a clear progression from simple to legendary"), "md"), "3:2"]
- ]],
- ["Аватары", "liv", "default", [
-  ["Лист 12 зверей: ещё", as(zoo(["cat", "penguin", "shiba inu", "alpaca", "quokka", "baby elephant", "meerkat", "parrot", "giraffe calf", "polar bear cub", "chinchilla", "lop eared bunny"],
-    "Each creature is a round profile avatar: face and shoulders inside a solid colored circle, looking at the viewer with a happy expression, with a small accessory that gives it personality"), "av"), "3:2"],
-  ["Лист 12 зверей", as(zoo(["panda", "koala", "red panda", "hamster", "corgi puppy", "tiger cub", "sloth", "capybara", "duckling", "lamb", "monkey", "hippo"],
-    "Each creature is a round profile avatar: face and shoulders inside a solid colored circle, looking at the viewer"), "av"), "3:2"],
-  ["Заглушка", raw("avatar-placeholder", join("A round default avatar: an abstract head and shoulders silhouette, flat, single color, inside a circle", "Clean and minimal", COL, CLEAR), "aa"), "1:1", "mono", "st"]
- ]],
- ["Эффекты и частицы", "fx", "default", [
-  ["Искорки", fx("four-point sparkles"), "1:1"],
-  ["Боке", fx("round bokeh dots"), "1:1", "tokyo"],
-  ["Светлячки", fx("fireflies"), "1:1", "forest"],
-  ["Снежинки", fx("snowflakes"), "1:1", "nord"],
-  ["Лепестки сакуры", fx("cherry blossom petals"), "1:1", "sakura"],
-  ["Кленовые листья", fx("autumn maple leaves"), "1:1", "autumn"],
-  ["Капли дождя", fx("raindrop streaks"), "1:1", "ocean"],
-  ["Падающие звёзды", fx("shooting star trails"), "1:1", "dracula"],
-  ["Волшебная пыль", fx("magic dust swirls"), "1:1", "default"],
-  ["Искры", fx("ember sparks"), "1:1", "gruvbox"],
-  ["Пузыри", fx("soap bubbles"), "1:1", "mint"],
-  ["Ноты", fx("musical notes"), "1:1", "synthwave"]
- ]],
- ["Рамки и орнаменты", "st", "default", [
-  ["Фэнтези-рамка", frame("ornate rectangular frame border with fantasy gold filigree, completely empty center"), "1:1", "gruvbox"],
-  ["Разделитель с луной", frame("horizontal decorative divider line with a small crescent moon in the middle"), "5:2"],
-  ["Угловой орнамент", frame("corner ornament with art nouveau vines, top left corner"), "1:1", "forest"],
-  ["Панель (9-slice)", frame("rounded ui panel with a thin glowing edge, empty center, 9-slice friendly, even border width"), "1:1", "tokyo"],
-  ["Лента под заголовок", frame("ribbon banner for a title, empty, folded ends"), "5:2", "sunset"],
-  ["Облачко реплики", frame("cute speech bubble frame, empty"), "1:1", "latte"],
-  ["Подсказка", frame("tooltip box with a small arrow pointing down, empty"), "1:1", "mocha"],
-  ["Полоса прогресса", frame("progress bar frame, empty, rounded"), "5:2", "mint"]
- ]],
- ["Логотипы проектов", "st", "default", [
-  ["NetworkDoctor", logo("a stethoscope wrapped around a glowing wifi signal"), "1:1", "nord"],
-  ["AutoTranslator", logo("two overlapping speech bubbles, one with the letter A and one with the letter Я"), "1:1", "tokyo"],
-  ["ContestReminder", logo("a calendar page with a small trophy and a ringing bell"), "1:1", "sunset"],
-  ["Moon Bundle", logo("a gift box with a crescent moon on the lid and a ribbon"), "1:1", "default"],
-  ["Moon Core", logo("a crescent moon with a glowing gear inside it"), "1:1", "dracula"],
-  ["GraphicsGeneration", logo("a paint brush drawing a sparkle on a small canvas"), "1:1", "mocha"]
- ]],
- ["Обложки README", "bg", "default", [
-  ["NetworkDoctor", cover("a friendly robot doctor listening to a glowing wifi router with a stethoscope"), "2:1", "nord"],
-  ["AutoTranslator", cover("two floating speech bubbles exchanging glowing letters over an open book"), "2:1", "tokyo"],
-  ["ContestReminder", cover("a big calendar with a trophy on top and paper notes flying around"), "2:1", "sunset"],
-  ["Moon Bundle", cover("an open gift box under a crescent moon with small packages floating out"), "2:1", "default"],
-  ["GraphicsGeneration", cover("a magic paint brush painting a colorful landscape on a floating canvas"), "2:1", "mocha"],
-  ["Moon Core", cover("a crescent moon with a glowing gear inside, small code brackets and sliders orbiting around it"), "2:1", "dracula"]
- ]],
- ["Сезонное", "st", "default", [
+ ["Про запас: сезонное", "st", "default", [
   ["Новый год: лист", sheet(["christmas tree", "christmas stocking", "snow globe", "candy cane", "holly wreath", "string of lights", "knitted mitten", "hot cocoa with marshmallows", "ice skates", "ornament ball", "wooden sled", "fireworks"]), "3:2", "nord"],
   ["Новый год: фон", dark("snowy village at night, warm string lights on houses, pine trees, gentle snowfall, fireworks in the sky"), "3:2", "nord", "bg"],
   ["Хэллоуин: предметы", sheet(["plain pumpkin", "witch hat", "broom", "spider web", "gravestone", "haunted house", "skull", "candy bucket", "creepy bare tree", "poison apple", "masquerade mask", "tarot card"]), "3:2", "dracula"],
@@ -445,7 +500,13 @@ function drawMain() {
   S.forEach(function (sec) {
     var items = sec[3].filter(function (it) { if (!isDone(it, sec)) return true; hidden++; return showDone; });
     if (!items.length) return;
-    m.appendChild(el("h2", null, sec[0]));
+    var spare = sec[0].indexOf("Про запас") === 0, box = m;
+    if (spare) {                                   // запасные разделы свёрнуты, открытые - запоминаются
+      box = el("details"); box.open = get("open-" + sec[0], "") === "1";
+      box.ontoggle = function () { put("open-" + sec[0], box.open ? "1" : ""); };
+      var sm = el("summary"); sm.appendChild(el("h2", null, sec[0] + "  (" + items.length + ")")); box.appendChild(sm);
+      m.appendChild(box);
+    } else m.appendChild(el("h2", null, sec[0]));
     var g = el("div", "grid");
     items.forEach(function (it) {
       var key = palKey(it, sec), t = full(it, sec, key), c = el("div", "c");
@@ -466,7 +527,7 @@ function drawMain() {
       b4.onclick = function () { copy(nm, "Имена: " + (nm.length > 60 ? nm.slice(0, 60) + "..." : nm)); };
       r.appendChild(b4); c.appendChild(r); g.appendChild(c);
     });
-    m.appendChild(g);
+    box.appendChild(g);
   });
   document.getElementById("done").textContent = (showDone ? "Готовые показаны: " : "Готовые скрыты: ") + hidden;
 }

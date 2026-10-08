@@ -79,6 +79,8 @@ ROUTES = {
     "aa": ("11 Аватары/{pal}", whole(512)),
     "fx": ("09 Эффекты и частицы/{pal}", dict(GRID, rows=4)),
     "fr": ("10 Рамки и орнаменты/{pal}", whole(1920)),
+    "tx": ("02 Наклейки/{set}/{pal}", GRID),                    # наклейки с надписью и ярлыки
+    "sh": ("06 Иллюстрации/Схемы", whole(1600)),
     "lo": ("05 Логотипы", whole(0, "ico")),
     "co": ("06 Иллюстрации/Обложки", whole(1920)),
 }
@@ -103,15 +105,15 @@ def prompt_data():
             text = fh.read()
         pals = dict(re.findall(r'^\s*\["(\w+)","([^"]+)","', text, re.M))
         sets = {}
-        for m in re.finditer(r'\["([^"]+)",\s*(?:as\()?(sheet|zoo|poses|empties|scenes)\(\[(.*?)\](?:,\s*\[(.*?)\])?',
+        for m in re.finditer(r'\["([^"]+)",\s*(?:as\()?(sheet|zoo|poses|empties|scenes|captions|labels)\((\[\[.*?\]\]|\[.*?\])(?:,\s*\[(.*?)\])?',
                              text, re.S):
             title, fn, a, b = m.groups()
-            named = fn in ("poses", "empties", "scenes")        # у этих имена кусков заданы вторым списком
+            named = fn in ("poses", "empties", "scenes", "captions", "labels")        # у этих имена кусков заданы вторым списком
             items = re.findall(r'"([^"]*)"', b if named and b else a)
             names = items if named else [js_slug(x) for x in items]
             key = set_name(title)
             sets[key] = names
-            sets[({"sheet": "ic", "zoo": "st", "poses": "po", "empties": "es", "scenes": "so"}[fn], key)] = names
+            sets[({"sheet": "ic", "zoo": "st", "poses": "po", "empties": "es", "scenes": "so", "captions": "tx", "labels": "tx"}[fn], key)] = names
         _prompts.update(mt=mt, pals=pals, sets=sets)
     return _prompts["pals"], _prompts["sets"]
 
