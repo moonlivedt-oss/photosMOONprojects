@@ -6,8 +6,8 @@ import threading
 import numpy as np
 
 from imaging import clip
-from ui import db
-from ui.common import LIB
+from library import db
+from library.common import LIB
 
 # Частые метки библиотеки. Свои метки (из базы) добавляются к ним сами. «е» вместо «ё» - как в clean_tag.
 VOCAB = (

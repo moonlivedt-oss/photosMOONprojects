@@ -192,18 +192,18 @@ class Export(unittest.TestCase):
 
 class Sorting(unittest.TestCase):
     def test_names_from_list(self):
-        from ui.sorting import default_names
+        from library.sorting import default_names
 
         names = default_names("D:/x/кот, сова, лиса.png", 3)
         self.assertEqual(names, ["кот", "сова", "лиса"])
 
     def test_names_with_prefix(self):
-        from ui.sorting import default_names
+        from library.sorting import default_names
 
         self.assertEqual(default_names("D:/x/лист.png", 2, "звери"), ["звери_01", "звери_02"])
 
     def test_tag_in_file_name(self):
-        from ui.sorting import route
+        from library.sorting import route
 
         r = route(os.path.join(K.LIB, "00 Входящие", "Космос [ic tokyo].png"))
         self.assertIsNotNone(r)
@@ -212,7 +212,7 @@ class Sorting(unittest.TestCase):
 
 class Prompts(unittest.TestCase):
     def test_page_is_parsed(self):
-        from ui import prompts
+        from library import prompts
 
         if not shutil.which("node"):
             self.skipTest("нет node")
@@ -227,7 +227,7 @@ class Prompts(unittest.TestCase):
 
 class Database(unittest.TestCase):
     def setUp(self):
-        from ui import db
+        from library import db
 
         self.b = db
         self.old = db.DB
@@ -277,7 +277,7 @@ class Database(unittest.TestCase):
         self.assertTrue(np.allclose(d["b/x.png"][1], v, atol=1e-3))
 
     def test_batch_sorting_tags_each_sheet(self):
-        from ui import sorting, tagging
+        from library import sorting, tagging
 
         class NoSigs:
             def find(self, _im):
@@ -358,8 +358,8 @@ class Neural(unittest.TestCase):
 class Tagging(unittest.TestCase):
     def test_sheet_of_clocks_gets_time_tags(self):
         from imaging import clip
+        from library.tagging import Tagger
         from ui.semantic import SemIndex
-        from ui.tagging import Tagger
 
         sheet = glob.glob(os.path.join(K.LIB, "_sources", "20*", "alarm-clock, hourglass*"))
         if not clip.available() or not sheet:

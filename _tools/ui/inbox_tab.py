@@ -39,7 +39,9 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
-from ui import db
+from library import db
+from library.sorting import PRESETS, default_names, process, route, sort_files, store
+from library.tagging import tag_saved
 from ui.animations import Floaty
 from ui.common import (
     CLOSING,
@@ -59,8 +61,6 @@ from ui.common import (
     short,
 )
 from ui.editor import EditDialog, recipe_by_name, recipes
-from ui.sorting import PRESETS, default_names, process, route, sort_files, store
-from ui.tagging import tag_saved
 from ui.theme import C
 from ui.thumbnails import PieceDelegate, _thumbs, backdrop, lib_icon, thumb, thumb_key, tile, to_pix
 from ui.widgets import (
@@ -723,7 +723,7 @@ class InboxTab(QWidget):
             return
         p = it.data(ROLE)
         if QMessageBox.question(self, "В корзину", f"Убрать лист в корзину: {os.path.basename(p)}?") \
-                == QMessageBox.StandardButton.Yes and QFile.moveToTrash(p):
+                == QMessageBox.StandardButton.Yes and QFile.moveToTrash(p)[0]:
             self.path = None
             self.reload()
             self.win.say("Лист в корзине: " + os.path.basename(p))

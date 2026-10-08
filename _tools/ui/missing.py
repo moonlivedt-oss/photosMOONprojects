@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ui import prompts
+from library import prompts
 from ui.common import LIB, bg
 from ui.editor import EditDialog, swatch_icon
 from ui.theme import C

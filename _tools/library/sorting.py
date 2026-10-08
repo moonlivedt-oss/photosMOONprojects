@@ -7,9 +7,9 @@ from PIL import Image
 
 import imaging as K
 from imaging import neural
-from ui.common import CLOSING, LIB, archive, clean_name, log_error, procs, short, unique
-from ui.prompts import set_name
-from ui.tagging import tag_saved
+from library.common import CLOSING, LIB, archive, clean_name, log_error, procs, short, unique
+from library.prompts import set_name
+from library.tagging import tag_saved
 
 # Разделы, которых пока нет на диске: папка создаётся при первом сохранении в неё.
 PLANNED = ["08 Градиенты", "09 Эффекты и частицы", "10 Рамки и орнаменты", "11 Аватары",
@@ -199,7 +199,7 @@ def store(path, o, pieces, names, dest, squeeze=False):
 def sort_files(items, sigs, keep_src, squeeze, say=None, tagger=None):
     """Нарезать и разложить пачку: items = [(лист, настройки, папка)]. Куски, что уже есть в библиотеке
     или уже встречались в этой же пачке, пропускаются. say(текст) - ход работы (из фонового потока);
-    tagger - ставить подсказанные метки (ui.tagging.Tagger).
+    tagger - ставить подсказанные метки (library.tagging.Tagger).
     Возвращает (шаги для Ctrl+Z, сохранено, пропущено повторов, [(лист, ошибка)], {папки})."""
     steps, total, skipped, bad, where, seen = [], 0, 0, [], set(), []
     for n, (f, o, dest) in enumerate(items):

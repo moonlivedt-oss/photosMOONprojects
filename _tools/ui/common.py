@@ -1,26 +1,37 @@
-"""Общее для всего окна: пути, настройки, фоновые задачи, работа с файлами."""
-import json
-import multiprocessing
+"""Общее для окна: роли плиток, фоновые задачи в Qt. Пути, настройки и файлы - в library.common (без Qt)."""
 import os
-import shutil
 import subprocess
-import threading
-import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from concurrent.futures.process import BrokenProcessPool
 
-from PyQt6.QtCore import QObject, QRunnable, Qt, QThreadPool, pyqtSignal
+from PyQt6.QtCore import QFile, QObject, QRunnable, Qt, QThreadPool, pyqtSignal
 
-import imaging as K
+from library import journal
+from library.common import (  # noqa: F401 - окно берёт их отсюда
+    CFG,
+    CLOSING,
+    DELETED,
+    HERE,
+    INBOX,
+    LIB,
+    LOG,
+    PARK,
+    SOURCES,
+    VERSION,
+    archive,
+    cfg_text,
+    clean_name,
+    human,
+    inbox_files,
+    is_image,
+    load_cfg,
+    log_error,
+    parallel,
+    procs,
+    save_cfg,
+    short,
+    stop_procs,
+    unique,
+)
 
-VERSION = "2.1.0"                                   # вместе с ней - CHANGELOG и бейдж в README
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))     # папка _tools
-
-LIB = K.LIB
-INBOX = os.path.join(LIB, K.INBOX)
-SOURCES = os.path.join(LIB, "_sources")
-PARK = os.path.join(SOURCES, "_undone")          # отменённые новые файлы ждут тут Ctrl+Y
-CFG = os.path.join(HERE, "settings.json")
 UI = os.path.join(HERE, "_ui")              # стрелки и галочка для стилей
 ROLE = Qt.ItemDataRole.UserRole                    # путь файла у плитки
 PIX = Qt.ItemDataRole.UserRole + 1                 # миниатюра (QPixmap) - её рисует TileDelegate
@@ -38,37 +49,6 @@ HEAVY_KB = 500                                      # тяжелее этого 
 THUMB = 256                                         # плитки библиотеки рисуются один раз, ползунок их только масштабирует
 
 
-def load_cfg():
-    try:
-        with open(CFG, encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:
-        return {}
-
-
-def cfg_text(cfg):
-    return json.dumps(cfg, ensure_ascii=False, indent=1)
-
-
-def save_cfg(cfg):
-    """Через временный файл: сбой посреди записи не оставит пустые настройки."""
-    K.write_atomic(CFG, cfg_text(cfg), "utf-8")
-
-
-LOG = os.path.join(HERE, "_errors.log")
-
-
-def log_error(text):
-    """Ошибка - в _errors.log (окно запускается через pyw, консоли нет). Журнал не растёт бесконечно."""
-    try:
-        if os.path.exists(LOG) and os.path.getsize(LOG) > 512 * 1024:
-            os.replace(LOG, LOG + ".old")
-        with open(LOG, "a", encoding="utf-8") as fh:
-            fh.write("---- {}\n{}\n".format(time.strftime("%Y-%m-%d %H:%M:%S"), text.rstrip()))
-    except OSError:
-        pass
-
-
 class Relay(QObject):
     done = pyqtSignal(object, object)       # (что вызвать, результат) - уже в главном потоке
 
@@ -83,11 +63,6 @@ def relay():
         _relay = Relay()
         _relay.done.connect(lambda cb, res: cb(res))
     return _relay
-
-
-# Окно закрывается: новые фоновые задачи не начинаются, длинные циклы выходят досрочно -
-# иначе Python завершается, пока потоки читают картинки, и процесс падает.
-CLOSING = threading.Event()
 
 
 def in_main(cb, value):
@@ -123,102 +98,33 @@ def bg(fn, cb):
     QThreadPool.globalInstance().start(Task(fn, cb))
 
 
-# Сжатие одной картинки - это 4-6 пробных кодирований; по одному файлу за раз пачка шла долго.
-# Тяжёлое (job_* из imaging.py) уходит в отдельные процессы, по одному на ядро.
-_procs = None
-
-
-def procs():
-    global _procs
-    if _procs is None:
-        n = max(1, min(8, (os.cpu_count() or 2) - 1))       # одно ядро остаётся окну
-        _procs = ProcessPoolExecutor(n, mp_context=multiprocessing.get_context("spawn"))
-    return _procs
-
-
-def parallel(job, items, stop=None):
-    """job(путь, настройки) по ядрам для items = [(путь, настройки)]. Отдаёт (путь, результат)
-    по мере готовности; результат - исключение, если файл не удался. stop - [True] прерывает."""
-    global _procs
-    try:
-        futs = {procs().submit(job, p, o): p for p, o in items}
-    except BrokenProcessPool:                   # процессы упали (например, на битом файле) - новые
-        _procs = None
-        futs = {procs().submit(job, p, o): p for p, o in items}
-    try:
-        for f in as_completed(futs):
-            if CLOSING.is_set() or (stop and stop[0]):
-                break
-            try:
-                res = f.result()
-            except BrokenProcessPool as e:
-                _procs = None
-                res = e
-            except Exception as e:
-                res = e
-            yield futs[f], res
-    finally:
-        for f in futs:
-            f.cancel()
-
-
 def finish_bg():
     """После закрытия окна: убрать из очереди то, что не началось, и дождаться начатого
     (запись файлов доделывается, чтения миниатюр, отпечатки и кодирование бросаются на полпути)."""
     CLOSING.set()
-    if _procs is not None:
-        _procs.shutdown(wait=False, cancel_futures=True)
-        for pr in list((getattr(_procs, "_processes", None) or {}).values()):
-            pr.terminate()
+    stop_procs()
     pool = QThreadPool.globalInstance()
     pool.clear()
     pool.waitForDone()
 
 
-def clean_name(s):
-    return "".join(c for c in s if c not in '\\/:*?"<>|').strip().rstrip(".")
-
-
-def unique(path):
-    base, ext = os.path.splitext(path)
-    n = 2
-    while os.path.exists(path):
-        path = "%s %d%s" % (base, n, ext)
-        n += 1
-    return path
-
-
-def is_image(name):
-    return name.lower().endswith(K.EXT) and not name.startswith("_")
-
-
-def inbox_files():
-    os.makedirs(INBOX, exist_ok=True)
-    return sorted(os.path.join(INBOX, f) for f in os.listdir(INBOX)
-                  if is_image(f) and os.path.isfile(os.path.join(INBOX, f)))
-
-
-def human(n):
-    return "%.1f МБ" % (n / 1048576) if n >= 1048576 else "%d КБ" % max(1, n // 1024)
-
-
-def short(path):
-    """Путь раздела для подписей: не больше двух последних папок."""
-    try:
-        rel = os.path.relpath(path, LIB).split(os.sep)
-    except ValueError:                      # папка на другом диске
-        rel = os.path.normpath(path).split(os.sep)
-    return " / ".join(rel[-2:])
-
-
-def archive(path):
-    """Убирает разобранный исходник из входящих в _sources/<год-месяц>. Возвращает новый путь."""
-    d = os.path.join(SOURCES, time.strftime("%Y-%m"))
-    os.makedirs(d, exist_ok=True)
-    dst = unique(os.path.join(d, os.path.basename(path)))
-    shutil.move(path, dst)
-    return dst
-
-
 def reveal(path):
     subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
+
+
+def to_trash(paths):
+    """В корзину Windows так, чтобы Ctrl+Z вернул файл, а с ним метки, заметку и избранное.
+    -> (сколько ушло, шаги для истории)."""
+    steps, n = [], 0
+    for p in paths:
+        ok, where = QFile.moveToTrash(p)        # where - путь в корзине, по нему файл вернётся
+        if not ok:
+            continue
+        n += 1
+        if where:
+            steps.append(["move", p, where])
+        try:
+            steps += journal.forget_steps(os.path.relpath(p, LIB))
+        except ValueError:                      # не из библиотеки (другой диск)
+            pass
+    return n, steps

@@ -6,7 +6,7 @@ import time
 
 from PIL import Image
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QFile, QMimeData, QRectF, QStringListModel, Qt, QTimer, QUrl, pyqtSignal
+from PyQt6.QtCore import QEvent, QMimeData, QRectF, QStringListModel, Qt, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -33,7 +33,7 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
-from ui import db, prompts
+from library import db, prompts
 from ui.common import (
     EXT,
     FAV,
@@ -54,6 +54,7 @@ from ui.common import (
     human,
     in_main,
     reveal,
+    to_trash,
     unique,
 )
 from ui.compress import COPY_FORMATS, CompressDialog, copy_files
@@ -265,7 +266,7 @@ class Preview(QWidget):
             b.setEnabled(bool(paths))
         for i in (0, 5, 10):                        # открыть, похожие, переименовать - только по одной
             self.btns[i].setEnabled(len(paths) == 1)
-        fav = self.tab.cfg.get("fav", [])
+        fav = db.favs() if paths else ()
         self.btns[4].setText("Из избранного" if paths and os.path.relpath(paths[0], LIB) in fav else "В избранное")
         self.show_colors(paths[0] if len(paths) == 1 else None)
         mode = None if mode == "chk" else mode      # прозрачное - прямо на свечении, без шахматки
@@ -939,7 +940,7 @@ class LibTab(QWidget):
         keep = set(self.paths())
         self.list.clear()
         self.list.reset_anim()
-        fav = set(self.cfg.get("fav", []))
+        fav = db.favs()
         self.sets_view = root == SETS and not tokens and not self.like
         if self.sets_view:
             self.show_sets()
@@ -1137,7 +1138,7 @@ class LibTab(QWidget):
         m.addAction("Быстрый просмотр\tПробел", self.look)
         m.addAction("Показать в проводнике", self.reveal)
         m.addSeparator()
-        fav = os.path.relpath(self.paths()[0], LIB) in self.cfg.get("fav", [])
+        fav = os.path.relpath(self.paths()[0], LIB) in db.favs()
         m.addAction("Убрать из избранного\tCtrl+D" if fav else "В избранное\tCtrl+D", self.toggle_fav)
         m.addAction("Найти похожие", self.find_similar)
         if self.win.sem.ready():
@@ -1160,11 +1161,12 @@ class LibTab(QWidget):
         m.addAction("В корзину\tDel", self.trash)
         m.exec(self.list.mapToGlobal(pos))
 
-    def done(self, text):
+    def done(self, text, undo=False):
+        """После действия: перерисовать, сообщить; undo - в пузыре кнопка «Отменить»."""
         forget_counts()
         self.refresh()
         self.changed.emit()
-        self.win.say(text)
+        self.win.say(text, undo=undo)
 
     def search_drop(self, e, t):
         """Картинка (файл из проводника или плитка) в строку поиска - похожие по смыслу на неё."""
@@ -1218,15 +1220,13 @@ class LibTab(QWidget):
         sel = [os.path.relpath(p, LIB) for p in self.paths()]
         if not sel:
             return
-        fav = self.cfg.setdefault("fav", [])
+        fav = db.favs()
         add = any(r not in fav for r in sel)
-        for r in sel:
-            if add and r not in fav:
-                fav.append(r)
-            elif not add and r in fav:
-                fav.remove(r)
+        db.set_fav(sel, add)
+        text = ("В избранном: +%d" if add else "Убрано из избранного: %d") % len(sel)
+        self.win.push(text, [["fav", r, r in fav, add] for r in sel])
         self.show_files()
-        self.win.say(("В избранном: +%d" if add else "Убрано из избранного: %d") % len(sel))
+        self.win.say(text)
 
     def look(self):
         if self.list.count():
@@ -1441,18 +1441,11 @@ class LibTab(QWidget):
         bg(lambda: copy_files(sel, fmt, lambda v: in_main(progress, v)), finished)
 
     def trash(self):
+        """Без вопроса «точно?»: всё возвращается кнопкой «Отменить» в пузыре или Ctrl+Z."""
         sel = self.paths()
         if not sel:
             return
-        what = os.path.basename(sel[0]) if len(sel) == 1 else "%d шт." % len(sel)
-        if QMessageBox.question(self, "В корзину", f"Отправить в корзину: {what}?\n(вернуть можно из корзины Windows)") != QMessageBox.StandardButton.Yes:
-            return
-        gone = [p for p in sel if QFile.moveToTrash(p)]
-        n = len(gone)
-        fav = self.cfg.get("fav", [])
-        for p in gone:                      # из избранного тоже, иначе там копятся пути к удалённым
-            rel = os.path.relpath(p, LIB)
-            if rel in fav:
-                fav.remove(rel)
-            db.forget(rel)
-        self.done("В корзине: %d шт." % n)
+        n, steps = to_trash(sel)
+        text = "В корзине: %d шт." % n
+        self.win.push(text, steps)
+        self.done(text, undo=bool(steps))

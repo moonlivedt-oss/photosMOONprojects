@@ -11,4 +11,4 @@ ignore = ["E501", "E731", "B905", "SIM105", "UP031"]
 "tests/*" = ["E402"]
 
 [lint.isort]
-known-first-party = ["imaging", "ui", "search"]
+known-first-party = ["imaging", "library", "ui"]

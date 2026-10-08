@@ -69,6 +69,7 @@ from imaging.similarity import (
     SAME_DIFF,
     SAME_RATIO,
     colors,
+    main_colors,
     same_sig,
     signature,
 )

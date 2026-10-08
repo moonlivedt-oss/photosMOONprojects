@@ -1,4 +1,5 @@
-"""База библиотеки (SQLite, _tools/library.db): отпечатки, метки, заметки, умные папки, векторы CLIP.
+"""База библиотеки (SQLite, _tools/library.db): отпечатки, метки, заметки, избранное, умные папки,
+векторы CLIP, журнал действий. Её одновременно открывают окно и сервер для ИИ - WAL это позволяет.
 Пути - относительно корня библиотеки, как у избранного в настройках."""
 import os
 import sqlite3
@@ -8,7 +9,7 @@ from collections import Counter
 
 import numpy as np
 
-from ui.common import HERE
+from library.common import HERE
 
 DB = os.path.join(HERE, "library.db")
 _lock = threading.RLock()
@@ -29,6 +30,9 @@ def conn():
                 CREATE TABLE IF NOT EXISTS clip(rel TEXT PRIMARY KEY, mt REAL, vec BLOB);
                 CREATE TABLE IF NOT EXISTS smart(name TEXT PRIMARY KEY, query TEXT, color TEXT, sem INT);
                 CREATE TABLE IF NOT EXISTS exports(rel TEXT, dest TEXT, t REAL, PRIMARY KEY(rel, dest));
+                CREATE TABLE IF NOT EXISTS fav(rel TEXT PRIMARY KEY, t REAL);
+                CREATE TABLE IF NOT EXISTS journal(id INTEGER PRIMARY KEY AUTOINCREMENT, t REAL, who TEXT,
+                                                   text TEXT, steps TEXT, undone INT DEFAULT 0);
             """)
         return _conn
 
@@ -136,6 +140,7 @@ def moved(a, b):
             c.execute("UPDATE OR REPLACE notes SET rel=? WHERE rel=?", (b, a))
             c.execute("UPDATE OR REPLACE clip SET rel=? WHERE rel=?", (b, a))
             c.execute("UPDATE OR REPLACE exports SET rel=? WHERE rel=?", (b, a))
+            c.execute("UPDATE OR REPLACE fav SET rel=? WHERE rel=?", (b, a))
 
 
 def forget(rel):
@@ -145,6 +150,7 @@ def forget(rel):
         with c:
             c.execute("DELETE FROM tags WHERE rel=?", (rel,))
             c.execute("DELETE FROM notes WHERE rel=?", (rel,))
+            c.execute("DELETE FROM fav WHERE rel=?", (rel,))
 
 
 def load_clip():
@@ -205,3 +211,20 @@ def exports_of(rel):
     """[(папка, время)] - куда выгружалась картинка, свежие сначала."""
     with _lock:
         return conn().execute("SELECT dest, t FROM exports WHERE rel=? ORDER BY t DESC", (rel,)).fetchall()
+
+
+def favs():
+    """Избранное: множество путей. Раньше жило в settings.json - его переносит окно (take_old_favs)."""
+    with _lock:
+        return {r[0] for r in conn().execute("SELECT rel FROM fav")}
+
+
+def set_fav(rels, on=True):
+    rels = [rels] if isinstance(rels, str) else list(rels)
+    with _lock:
+        c = conn()
+        with c:
+            if on:
+                c.executemany("INSERT OR IGNORE INTO fav VALUES (?,?)", [(r, time.time()) for r in rels])
+            else:
+                c.executemany("DELETE FROM fav WHERE rel=?", [(r,) for r in rels])

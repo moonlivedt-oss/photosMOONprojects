@@ -5,7 +5,7 @@
 import os
 
 from PyQt6 import sip
-from PyQt6.QtCore import QFile, Qt
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -19,8 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
-from ui import db
-from ui.common import EXT, LIB, ROLE, SUB, THUMB, bg, in_main, parallel
+from ui.common import EXT, LIB, ROLE, SUB, THUMB, bg, in_main, parallel, to_trash
 from ui.editor import EditDialog
 from ui.widgets import LibList
 
@@ -198,11 +197,12 @@ class DoctorDialog(QDialog):
         if not sel or QMessageBox.question(self, "В корзину", "Убрать в корзину: %d шт.?\n(вернуть можно из корзины Windows)"
                                            % len(sel)) != QMessageBox.StandardButton.Yes:
             return
-        gone = [p for p in sel if QFile.moveToTrash(p)]
-        for p in gone:
-            self.found.pop(p, None)
-            db.forget(os.path.relpath(p, LIB))
-        self.win.lib.done("В корзине: %d шт." % len(gone))
+        n, steps = to_trash(sel)
+        for p in sel:
+            if not os.path.exists(p):
+                self.found.pop(p, None)
+        self.win.push("В корзине: %d шт." % n, steps)
+        self.win.lib.done("В корзине: %d шт." % n + ("   Ctrl+Z - вернуть" if steps else ""))
         self.show_list()
 
     def reject(self):

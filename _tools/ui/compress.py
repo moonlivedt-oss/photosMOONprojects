@@ -3,7 +3,6 @@ import io
 import math
 import os
 import random
-import shutil
 import time
 
 from PIL import Image
@@ -37,7 +36,8 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
-from ui.common import LIB, SOURCES, bg, human, in_main, parallel, unique
+from library.batch import CAN, COPY_FORMATS, compress_files, copy_files  # noqa: F401
+from ui.common import LIB, bg, human, in_main, parallel
 from ui.theme import C
 from ui.thumbnails import lib_icon, thumb, to_pix
 from ui.widgets import flat
@@ -167,89 +167,6 @@ FORMATS = [
     ("jpg", "jpg"),
     ("clean", "Только почистить (без потерь)"),
 ]
-CAN = ("webp", "avif", "png", "jpg")  # во что умеем пережимать
-
-
-def section(path):
-    """Раздел верхнего уровня - для итогов «где сэкономлено»."""
-    return os.path.relpath(path, LIB).split(os.sep)[0]
-
-
-def compress_files(paths, o, report):
-    """В фоне: сжать файлы по настройкам, по ядрам процессора. Оригиналы уезжают в
-    _sources/compress <дата>, так что Ctrl+Z всё возвращает. report((i, n, имя, было, стало, путь)) -
-    ход работы. Возвращает (шаги для отмены, итоги; в итогах sections - {раздел: [было, стало]})."""
-    arch = os.path.join(SOURCES, "compress " + time.strftime("%Y-%m-%d"))
-    steps, done, skipped, before, after, sections = [], 0, {}, 0, 0, {}
-    items = []
-    for p in paths:
-        src_fmt = K.fmt_of(p)
-        fmt = src_fmt if o["fmt"] in ("", "clean") else o["fmt"]
-        if src_fmt == "svg" or (fmt not in CAN and o["fmt"] not in ("clean", K.BEST)):
-            skipped["не поддерживается"] = skipped.get("не поддерживается", 0) + 1
-            continue
-        if K.is_animated(p):                    # из анимации остался бы один кадр
-            skipped["анимация"] = skipped.get("анимация", 0) + 1
-            continue
-        items.append((p, {k: v for k, v in o.items() if k != "stop"} | dict(fmt=fmt if o["fmt"] != "clean" else "clean")))
-    for i, (p, res) in enumerate(parallel(K.job_compress, items, o.get("stop"))):
-        report((i, len(items), os.path.basename(p), before, after, p))
-        try:
-            if isinstance(res, Exception):
-                raise res
-            data, info = res
-            was = os.path.getsize(p)
-            if data is None or (o.get("smaller", True) and len(data) >= was):
-                skipped["не стало меньше"] = skipped.get("не стало меньше", 0) + 1
-                continue
-            new = os.path.splitext(p)[0] + "." + info["fmt"]
-            keep = unique(os.path.join(arch, os.path.relpath(p, LIB)))
-            os.makedirs(os.path.dirname(keep), exist_ok=True)
-            shutil.move(p, keep)
-            steps.append(("move", p, keep))
-            if os.path.exists(new):
-                new = unique(new)
-            with open(new, "wb") as fh:
-                fh.write(data)
-            steps.append(("new", new))
-            done += 1
-            before += was
-            after += len(data)
-            sec = sections.setdefault(section(p), [0, 0])
-            sec[0] += was
-            sec[1] += len(data)
-        except Exception as e:
-            skipped[f"ошибка: {e}"] = skipped.get(f"ошибка: {e}", 0) + 1
-    return steps, dict(
-        done=done, before=before, after=after, skipped=skipped, total=len(paths), sections=sections
-    )
-
-
-COPY_FORMATS = [("webp", "webp"), ("avif", "avif"), ("png", "png"), ("jpg", "jpg"), ("ico", "ico"),
-                (K.BEST, "самый лёгкий"), ("svg", "svg - контуры")]
-
-
-def copy_files(paths, fmt, report, stop=None):
-    """Копии рядом с оригиналами в другом формате, качество подбирается на глаз, по ядрам.
-    Возвращает (шаги для Ctrl+Z, сделано, не вышло)."""
-    items = [(p, dict(fmt=fmt, q=0, target=0.99, kind="auto")) for p in paths
-             if not p.lower().endswith(".svg") and K.fmt_of(p) != fmt and not K.is_animated(p)]
-    steps, bad = [], 0
-    for i, (p, res) in enumerate(parallel(K.job_compress, items, stop)):
-        report((i, len(items), os.path.basename(p)))
-        if isinstance(res, Exception) or res[0] is None:
-            bad += 1
-            continue
-        data, info = res
-        new = unique(os.path.splitext(p)[0] + "." + info["fmt"])
-        try:
-            with open(new, "wb") as fh:
-                fh.write(data)
-        except OSError:                         # нет места или прав - остальные копии всё равно делаем
-            bad += 1
-            continue
-        steps.append(("new", new))
-    return steps, len(steps), bad
 
 
 def describe(info, src=None, was=None):

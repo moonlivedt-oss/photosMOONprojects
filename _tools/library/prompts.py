@@ -8,7 +8,7 @@ import re
 import shutil
 import subprocess
 
-from ui.common import HERE, LIB, clean_name, log_error
+from library.common import HERE, LIB, clean_name, log_error
 
 PAGE = os.path.join(LIB, "Prompts.html")
 CACHE = os.path.join(HERE, "_prompts_cache.json")
@@ -120,7 +120,7 @@ def names(card):
 
 def dest(card, pal):
     """Папка, куда ляжет карточка в этой палитре (как route() у файла с меткой), или None."""
-    from ui.sorting import ROUTES
+    from library.sorting import ROUTES
     if card["r"] not in ROUTES:
         return None
     pals = {p[0]: p for p in (load() or {"pals": []})["pals"]}
@@ -131,7 +131,7 @@ def dest(card, pal):
 
 
 def has_pal(card):
-    from ui.sorting import ROUTES
+    from library.sorting import ROUTES
     return card["r"] in ROUTES and "{pal}" in ROUTES[card["r"]][0]
 
 

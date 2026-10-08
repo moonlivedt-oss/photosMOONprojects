@@ -1,6 +1,5 @@
 """Выгрузка копий в папку проекта: заготовки, формат, размер."""
 import os
-import shutil
 
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -18,36 +17,9 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
-from ui.common import parallel, unique
+from library.batch import EXPORT_PRESETS, export  # noqa: F401
 from ui.thumbnails import lib_icon
 from ui.widgets import flat
-
-# заготовки выгрузки: имя, настройки (fmt "" - как есть, "iconset" - набор значков, q 0 - подобрать на глаз)
-EXPORT_PRESETS = [
-    ("Своя настройка", None),
-    ("Фон для VS Code (webp, 1920)", dict(fmt="webp", q=0, size=1920, fit="fit")),
-    ("Для README (webp, 1280)", dict(fmt="webp", q=0, size=1280, fit="fit")),
-    ("Для сайта (avif, 1600)", dict(fmt="avif", q=0, size=1600, fit="fit")),
-    (
-        "Для телеграма (png 512, квадрат)",
-        dict(fmt="png", q=100, size=512, fit="square"),
-    ),
-    (
-        "Аватар (png 256, обрезать в квадрат)",
-        dict(fmt="png", q=100, size=256, fit="fill"),
-    ),
-    (
-        "Значок программы (ico + png 256 + favicon)",
-        dict(fmt="iconset", q=100, size=0, fit="square"),
-    ),
-    ("Для сайта: набор @1x @2x @3x (webp)", dict(fmt="webp", q=0, size=0, fit="fit", retina=True)),
-    ("Под лимит Discord (самый лёгкий, до 8 МБ)", dict(fmt="best", q=0, size=0, fit="fit", budget=8000)),
-    ("Наклейка для телеграма (webp 512, до 64 КБ)",
-     dict(fmt="webp", q=0, size=512, fit="square", trim=True, budget=64)),
-    ("Значок в svg (контуры)", dict(fmt="svg", q=0, size=0, fit="fit", trim=True)),
-    ("Атлас для игры или сайта (клетка 128)", dict(fmt="atlas", q=0, size=128, fit="fit")),
-    ("SVG-спрайт для сайта (symbol + use)", dict(fmt="svgsprite", q=0, size=0, fit="fit", trim=True)),
-]
 
 
 class ExportDialog(QDialog):
@@ -215,83 +187,3 @@ class ExportDialog(QDialog):
         super().accept()
 
 
-def export(paths, folder, o, report=None):
-    """Копии картинок в folder по настройкам o (как у compress + retina). Как есть и без размера -
-    простое копирование; пережатие идёт по ядрам. Возвращает число выгруженных картинок."""
-    os.makedirs(folder, exist_ok=True)
-    n, todo = 0, []
-    fmt = o.get("fmt", "")
-    if fmt == "atlas":
-        return export_atlas(paths, folder, o)
-    if fmt == "svgsprite":
-        return export_sprite(paths, folder, o, report)
-    plain = not fmt and not o.get("size") and o.get("fit", "fit") == "fit" and not (
-        o.get("trim") or o.get("retina") or o.get("budget"))
-    for p in paths:
-        stem, ext = os.path.splitext(os.path.basename(p))
-        if p.lower().endswith(".svg") or plain:
-            shutil.copy2(p, unique(os.path.join(folder, stem + ext)))
-            n += 1
-        elif fmt == "iconset":
-            K.icon_set(K.load(p), folder, stem)
-            n += 1
-        else:
-            todo.append((p, dict(o)))
-    for i, (p, res) in enumerate(parallel(K.job_export, todo)):
-        if report:
-            report((n + i, len(paths), os.path.basename(p)))
-        if isinstance(res, Exception):
-            continue
-        stem = os.path.splitext(os.path.basename(p))[0]
-        for tail, f, data in res:
-            with open(unique(os.path.join(folder, stem + tail + "." + f)), "wb") as fh:
-                fh.write(data)
-        n += 1
-    return n
-
-
-def export_atlas(paths, folder, o):
-    """Спрайт-лист png (клетка = «Размер», по умолчанию 128) + JSON (кадры, как у TexturePacker) + CSS."""
-    paths = [p for p in paths if not p.lower().endswith(".svg")]
-    cell = o.get("size") or 128
-    sheet, frames = K.atlas(paths, cell)
-    png = unique(os.path.join(folder, "атлас.png"))
-    stem = os.path.splitext(png)[0]
-    sheet.save(png, "PNG", optimize=True)
-    js, css = K.atlas_files(os.path.basename(png), frames, sheet.size)
-    with open(stem + ".json", "w", encoding="utf-8") as fh:
-        fh.write(js)
-    with open(stem + ".css", "w", encoding="utf-8") as fh:
-        fh.write(css)
-    return len(frames)
-
-
-def export_sprite(paths, folder, o, report=None):
-    """Все значки контурами (vtracer) в один svg с <symbol id=...> и страница-шпаргалка с примерами <use>."""
-    paths = [p for p in paths if not p.lower().endswith(".svg")]
-    names = K.frame_ids(paths)
-    by_path = dict(zip(paths, names))
-    items = []
-    for i, (p, res) in enumerate(parallel(K.job_svg, [(p, dict(o)) for p in paths])):
-        if report:
-            report((i, len(paths), os.path.basename(p)))
-        if not isinstance(res, Exception):
-            items.append((by_path[p], res))
-    items.sort(key=lambda x: names.index(x[0]))
-    svg = unique(os.path.join(folder, "спрайт.svg"))
-    with open(svg, "w", encoding="utf-8") as fh:
-        fh.write(K.svg_sprite(items))
-    demo = ['<!doctype html><meta charset="utf-8"><title>Спрайт</title>',
-            '<style>body{font:14px system-ui;background:#15151c;color:#e8e6f0;padding:20px}'
-            '.g{display:grid;grid-template-columns:repeat(auto-fill,120px);gap:12px}'
-            '.i{background:#1f1f29;border-radius:10px;padding:10px;text-align:center}'
-            'svg.ic{width:64px;height:64px}code{font-size:11px;color:#9a98a8;word-break:break-all}</style>',
-            f"<p>Вставьте содержимое {os.path.basename(svg)} в страницу (или подключите файлом) и пишите "
-            '<code>&lt;svg&gt;&lt;use href="#имя"/&gt;&lt;/svg&gt;</code></p><div class="g">']
-    for name, _d in items:
-        i = K.css_id(name)
-        demo.append(f'<div class="i"><svg class="ic"><use href="{os.path.basename(svg)}#{i}"/></svg><br><code>#{i}</code></div>')
-    demo.append("</div>")
-    with open(os.path.splitext(svg)[0] + " - шпаргалка.html", "w", encoding="utf-8") as fh:
-        fh.write("\n".join(demo))
-    return len(items)

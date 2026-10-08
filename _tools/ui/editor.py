@@ -12,8 +12,6 @@ Ctrl+0 - целиком, Ctrl+1 - пиксель в пиксель, B - подл
 Шаги видны списком: галка выключает шаг, Del убирает, стрелки двигают выше/ниже.
 У кнопок цвета правая кнопка мыши - пипетка: взять цвет с картинки."""
 import os
-import shutil
-import time
 
 import numpy as np
 from PIL import Image
@@ -45,9 +43,10 @@ from PyQt6.QtWidgets import (
 
 import imaging as K
 from imaging import neural
-from ui import prompts
+from library import prompts
+from library.batch import save_edits
 from ui.animations import TabBar
-from ui.common import LIB, SOURCES, bg, human, in_main, parallel, unique
+from ui.common import LIB, bg, human, in_main
 from ui.theme import C
 from ui.thumbnails import lib_icon, to_qimage
 from ui.widgets import flat, key
@@ -615,46 +614,6 @@ class Canvas(QWidget):
         p.drawEllipse(QPointF(box.left() + 13, box.center().y()), 3.5, 3.5)
         p.setPen(QColor(C["text"]))
         p.drawText(box.adjusted(16, 0, 0, 0), Qt.AlignmentFlag.AlignCenter, text)
-
-
-# ---------------------------------------------------------------- сохранение
-def save_edits(paths, ops, adj, copy, report, target=None):
-    """В фоне, по ядрам: рецепт ко всем файлам. target - папка, куда положить новые файлы с теми же
-    именами (перекраска в другую палитру); copy - новый файл рядом; иначе оригинал уезжает
-    в _sources/edit <дата>. Возвращает (шаги для Ctrl+Z, [(было, стало)], [ошибки])."""
-    arch = os.path.join(SOURCES, "edit " + time.strftime("%Y-%m-%d"))
-    steps, done, bad = [], [], []
-    items = [(p, dict(ops=ops, adj=adj)) for p in paths]
-    if target:
-        os.makedirs(target, exist_ok=True)
-    for i, (p, res) in enumerate(parallel(K.job_edit, items)):
-        report((i, len(items), os.path.basename(p)))
-        try:
-            if isinstance(res, Exception):
-                raise res
-            data, fmt, _size = res
-            stem = os.path.splitext(p)[0]
-            if target:
-                new = unique(os.path.join(target, os.path.basename(stem) + "." + fmt))
-            elif copy:
-                new = unique(stem + " правка." + fmt)
-            else:
-                rel = os.path.relpath(p, LIB) if os.path.splitdrive(p)[0].lower() == os.path.splitdrive(LIB)[0].lower() else ""
-                if not rel or rel.startswith(".."):     # файл не из библиотеки - в архив по имени
-                    rel = os.path.basename(p)
-                keep = unique(os.path.join(arch, rel))
-                os.makedirs(os.path.dirname(keep), exist_ok=True)
-                shutil.move(p, keep)
-                steps.append(("move", p, keep))
-                new = stem + "." + fmt
-                if os.path.exists(new):
-                    new = unique(new)
-            K.write_atomic(new, data)
-            steps.append(("new", new))
-            done.append((p, new))
-        except Exception as e:
-            bad.append(f"{os.path.basename(p)}: {e}")
-    return steps, done, bad
 
 
 # ---------------------------------------------------------------- окно

@@ -22,7 +22,8 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
-from ui import db
+from library import db, journal
+from library.tagging import Tagger
 from ui.animations import (
     Aurora,
     DropOverlay,
@@ -58,7 +59,6 @@ from ui.library_tab import LibTab
 from ui.missing import MissingDialog
 from ui.semantic import SemIndex
 from ui.signatures import SigIndex
-from ui.tagging import Tagger
 from ui.theme import QSS, ui_files
 from ui.thumbnails import forget_pixmaps, lib_icon, trim_thumbs
 from ui.weight import WeightDialog
@@ -117,7 +117,12 @@ class Window(QMainWindow):
     def __init__(self):
         super().__init__()
         self.cfg = load_cfg()
-        self.history = []                   # для Ctrl+Z: [(подпись, [("new", путь) | ("move", было, стало)])]
+        take_old_favs(self.cfg)
+        # Ctrl+Z: [(подпись, шаги, id в журнале)]. Журнал общий с ИИ-помощником и переживает перезапуск.
+        last = list(reversed(journal.entries(20, undone=False)))
+        self.history = [(e["text"], e["steps"], e["id"]) for e in last]
+        self.who = {e["id"]: e["who"] for e in last if e["who"] != journal.WINDOW}     # id -> кто сделал, если не окно
+        self.jseen = journal.last_id()      # действия помощника новее этого - ещё не показаны
         self.sigs = SigIndex()
         self.sem = SemIndex()
         self.tagger = Tagger(self.sem)
@@ -210,6 +215,7 @@ class Window(QMainWindow):
         self.sizes = {}                                             # размеры файлов генератора на прошлом опросе
         self.poll = QTimer(self, interval=2000)
         self.poll.timeout.connect(self.check_gen)
+        self.poll.timeout.connect(self.check_journal)
         self.poll.start()
 
         for keys, fn in (("Ctrl+Z", lambda: self.undo()), ("Ctrl+Y", self.redo_last),
@@ -237,9 +243,12 @@ class Window(QMainWindow):
         self.sem_lbl.setText(f"Поиск по смыслу: учу картинки {prog[0]} из {prog[1]}")
         self.sem_lbl.show()
 
-    def say(self, text):
+    def say(self, text, undo=False):
+        """undo - в пузыре кнопка «Отменить» (последнее действие из истории)."""
         if self.isVisible():
-            self.toast.say(text)                # пузырь внизу; строка состояния - пока окно не показано
+            jid = self.history[-1][2] if undo and self.history else None
+            act = ("Отменить", lambda: self.undo(ids={jid})) if jid else None
+            self.toast.say(text, 6000 if act else 3200, act)    # пузырь внизу; строка состояния - пока окно не показано
         else:
             self.statusBar().showMessage(text, 8000)
 
@@ -311,7 +320,9 @@ class Window(QMainWindow):
         forget_counts()
         if not steps:
             return
-        self.history = (self.history + [(text, steps)])[-20:]
+        jid = journal.record(journal.WINDOW, text, steps)
+        self.jseen = max(self.jseen, jid or 0)
+        self.history = (self.history + [(text, steps, jid)])[-20:]
         self.drop_redo()                    # новое действие - вернуть отменённое уже нельзя
         self.update_undo()
 
@@ -329,21 +340,32 @@ class Window(QMainWindow):
         if self.redo:
             m.addAction(f"Вернуть: {self.redo[-1][0]}\tCtrl+Y", self.redo_last)
             m.addSeparator()
-        for i, (text, _s) in enumerate(reversed(self.history)):
-            m.addAction(("Отменить: " if i == 0 else "Отменить до: ") + text, lambda n=i + 1: self.undo(n))
+        for i, (text, _s, jid) in enumerate(reversed(self.history)):
+            who = self.who.get(jid)
+            m.addAction(("Отменить: " if i == 0 else "Отменить до: ") + (f"[{who}] " if who else "") + text,
+                        lambda n=i + 1: self.undo(n))
         if not self.history and not self.redo:
             m.addAction("Действий пока нет").setEnabled(False)
 
-    def undo(self, count=1):
+    def undo(self, count=1, ids=None):
+        """Отменить count последних действий или именно эти (ids - из журнала, свежие отменяются первыми)."""
         if not self.history:
             self.say("Отменять нечего")
             return
+        if ids is not None:
+            pick = [h for h in self.history if h[2] in ids]
+            if not pick:
+                self.say("Уже отменено")
+                return
+            self.history = [h for h in self.history if h[2] not in ids] + pick
+            count = len(pick)
         texts, bad = [], 0
         for _k in range(min(count, len(self.history))):
-            text, steps = self.history.pop()
+            text, steps, jid = self.history.pop()
             done, b = self.undo_steps(steps)
+            journal.mark(jid)
             bad += b
-            self.redo.append((text, steps, done))
+            self.redo.append((text, steps, done, jid))
             texts.append(text)
         self.after_change()
         self.say("Отменено: " + "; ".join(texts) + ("  (не получилось: %d)" % bad if bad else "")
@@ -351,57 +373,34 @@ class Window(QMainWindow):
 
     def undo_steps(self, steps):
         """Откатить шаги. Новые файлы уезжают в _sources/_undone (а не в корзину), чтобы Ctrl+Y
-        мог их вернуть. -> ([(откуда, куда)] - сделанные переносы, ошибок)."""
+        мог их вернуть. -> (сделанное для Ctrl+Y, ошибок)."""
         forget_counts()
-        done, bad = [], 0
-        for step in reversed(steps):
-            try:
-                if step[0] == "new":
-                    if os.path.exists(step[1]):
-                        park = unique(os.path.join(PARK, os.path.basename(step[1])))
-                        os.makedirs(PARK, exist_ok=True)
-                        shutil.move(step[1], park)
-                        done.append((step[1], park))
-                elif os.path.exists(step[2]):
-                    back = step[1] if not os.path.exists(step[1]) else unique(step[1])
-                    os.makedirs(os.path.dirname(back), exist_ok=True)
-                    shutil.move(step[2], back)
-                    self.moved(step[2], back)
-                    done.append((step[2], back))
-                    if os.path.dirname(back) == INBOX:
-                        self.inbox.no_auto.add(back)
-            except Exception:
-                bad += 1
-        return done, bad
+
+        def back_in_inbox(_src, dst):
+            if os.path.dirname(dst) == INBOX:
+                self.inbox.no_auto.add(dst)         # вернулся во входящие - сам не раскладывать
+
+        return journal.undo_steps(steps, LIB, PARK, back_in_inbox)
 
     def redo_last(self):
-        """Ctrl+Y: вернуть последнее отменённое - переносы в обратную сторону."""
+        """Ctrl+Y: вернуть последнее отменённое - переносы в обратную сторону, метки как были."""
         if not self.redo:
             self.say("Возвращать нечего")
             return
-        text, steps, done = self.redo.pop()
+        text, steps, done, jid = self.redo.pop()
         forget_counts()
-        bad = 0
-        for a, b in reversed(done):
-            try:
-                if not os.path.exists(b) or os.path.exists(a):
-                    bad += 1
-                    continue
-                os.makedirs(os.path.dirname(a), exist_ok=True)
-                shutil.move(b, a)
-                self.moved(b, a)
-            except Exception:
-                bad += 1
-        self.history = (self.history + [(text, steps)])[-20:]
+        bad = journal.redo_steps(done, LIB)
+        journal.mark(jid, False)
+        self.history = (self.history + [(text, steps, jid)])[-20:]
         self.after_change()
         self.say("Возвращено: " + text + ("  (не получилось: %d)" % bad if bad else ""))
 
     def drop_redo(self):
         """Отменённое, что уже не вернуть, - из _sources/_undone в корзину."""
-        for _t, _s, done in self.redo:
-            for _a, b in done:
-                if os.path.dirname(b) == PARK and os.path.exists(b):
-                    QFile.moveToTrash(b)
+        for _t, _s, done, _j in self.redo:
+            for d in done:
+                if d[0] == "mv" and os.path.dirname(d[2]) == PARK and os.path.exists(d[2]):
+                    QFile.moveToTrash(d[2])
         self.redo = []
 
     def after_change(self):
@@ -413,17 +412,36 @@ class Window(QMainWindow):
 
     def moved(self, src, dst):
         """Избранное, метки и заметка едут вместе с файлом."""
-        fav = self.cfg.get("fav", [])
         try:
-            a, b = os.path.relpath(src, LIB), os.path.relpath(dst, LIB)
-        except ValueError:                  # путь на другом диске - в избранном его быть не может
-            return
-        if a in fav:
-            fav[fav.index(a)] = b
-        try:
-            db.moved(a, b)
+            db.moved(os.path.relpath(src, LIB), os.path.relpath(dst, LIB))
+        except ValueError:                  # путь на другом диске - в базе его быть не может
+            pass
         except Exception as e:
             log_error(f"метки не переехали: {e}")
+
+    # --- действия ИИ-помощника: появляются в истории (Ctrl+Z отменяет) и всплывают пузырём
+    def check_journal(self):
+        try:
+            new = journal.entries(50, since=self.jseen)
+            gone = journal.undone_among([j for _t, _s, j in self.history])
+        except Exception as e:
+            log_error(f"журнал: {e}")
+            return
+        if gone:                            # помощник сам отменил своё - из истории окна убрать
+            self.history = [h for h in self.history if h[2] not in gone]
+        theirs = [e for e in reversed(new) if e["who"] != journal.WINDOW and not e["undone"]]
+        if new:
+            self.jseen = max(e["id"] for e in new)
+        for e in theirs:
+            self.who[e["id"]] = e["who"]
+            self.history = (self.history + [(e["text"], e["steps"], e["id"])])[-20:]
+        if theirs or gone:
+            self.update_undo()
+            self.after_change()
+        if theirs:
+            last = theirs[-1]
+            more = "  (и ещё %d)" % (len(theirs) - 1) if len(theirs) > 1 else ""
+            self.toast.say(f"{last['who']}: {last['text']}{more}", 6000, ("Отменить", lambda ids={e["id"] for e in theirs}: self.undo(ids=ids)))
 
     # --- приём файлов
     def take(self, files):
@@ -575,6 +593,17 @@ class Window(QMainWindow):
             except Exception as ex:
                 log_error(f"галерея не собралась: {ex}")
         e.accept()
+
+
+def take_old_favs(cfg):
+    """Избранное до 2.2 жило в settings.json - переносим в базу (её видит и ИИ-помощник)."""
+    old = cfg.pop("fav", None)
+    if old:
+        try:
+            db.set_fav(old)
+        except Exception as e:
+            cfg["fav"] = old
+            log_error(f"избранное не перенеслось в базу: {e}")
 
 
 def install_guard(app):

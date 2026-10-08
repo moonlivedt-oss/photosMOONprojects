@@ -363,19 +363,7 @@ def mix(a, b, t):
 
 
 def palette(path, n=6):
-    """Главные цвета картинки (без прозрачных пикселей), от самого заметного: ["#rrggbb", ...]."""
-    with Image.open(path) as im:
-        im.draft("RGB", (128, 128))
-        im = K.upright(im).convert("RGBA")
-    im.thumbnail((96, 96))
-    a = np.asarray(im)
-    px = a[a[..., 3] > 128][:, :3]
-    if not len(px):
-        return []
-    q = Image.fromarray(px.reshape(1, -1, 3).astype(np.uint8), "RGB").quantize(n, method=Image.Quantize.MEDIANCUT)
-    pal = q.getpalette()[:3 * n]
-    counts = sorted(q.getcolors() or [], reverse=True)
-    return ["#{:02x}{:02x}{:02x}".format(*tuple(pal[3 * i:3 * i + 3])) for c, i in counts if c >= len(px) * 0.02]
+    return K.main_colors(path, n)
 
 
 class PieceDelegate(QStyledItemDelegate):

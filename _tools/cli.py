@@ -6,6 +6,9 @@ py -3.14 cli.py cut sheet.png [more.png ...] [--grid 4x3] [--size 256] [--names 
 py -3.14 cli.py convert FILES/DIRS [--to webp|avif|png|jpg|ico] [--max 1920] [--replace]
 py -3.14 cli.py dupes [DIR]
 py -3.14 cli.py gallery
+py -3.14 cli.py api                          # операции для ИИ-помощников и скриптов (JSON)
+py -3.14 cli.py api search '{"query": "ночной город"}'
+py -3.14 cli.py api view '{"paths": ["04 Иконки/x.webp"]}' --out preview.png
 """
 
 import argparse
@@ -16,8 +19,10 @@ import sys
 import numpy as np
 from PIL import Image
 
-import imaging as K
-from imaging import neural
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import imaging as K  # noqa: E402
+from imaging import neural  # noqa: E402
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -155,6 +160,44 @@ def cmd_nobg(a):
     _neural(a, neural.bg_available, "без фона", neural.remove_bg_ai)
 
 
+def cmd_api(a):
+    """Операции library/api.py из командной строки: ответ - JSON в stdout, картинка - файлом (--out)."""
+    import json
+
+    from library import api
+
+    if not a.tool:
+        for name, t in api.TOOLS.items():
+            args = ", ".join(t["schema"]["properties"])
+            mark = "  [меняет]" if t["write"] else ""
+            print(f"{name}({args}){mark}")
+            print("    " + t["desc"].splitlines()[0])
+        print()
+        print("Вызов: cli.py api <операция> '{\"параметр\": значение}'   подробно: cli.py api <операция> --help-tool")
+        return
+    t = api.TOOLS.get(a.tool)
+    if a.help_tool and t:
+        print(t["desc"])
+        print(json.dumps(t["schema"], ensure_ascii=False, indent=1))
+        return
+    try:
+        args = json.loads(a.args) if a.args else {}
+    except ValueError as e:
+        print(json.dumps({"error": f"параметры - не JSON: {e}"}, ensure_ascii=False))
+        sys.exit(2)
+    api.AGENT["who"] = a.who
+    try:
+        res = api.call(a.tool, args)
+    except api.ApiError as e:
+        print(json.dumps({"error": str(e)}, ensure_ascii=False))
+        sys.exit(1)
+    if isinstance(res, api.Picture):
+        out = os.path.abspath(a.out or f"{a.tool}.png")
+        res.im.save(out, "PNG")
+        res = {"image": out, "text": res.text}
+    print(json.dumps(res, ensure_ascii=False, indent=1, default=str))
+
+
 def main():
     p = argparse.ArgumentParser(description="Инструменты библиотеки картинок")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -191,6 +234,12 @@ def main():
     u.add_argument("--kind", default="auto", choices=["auto", "art", "photo"], help="рисунок или фото")
     n = sub.add_parser("nobg", help="убрать любой фон нейросетью (BiRefNet) -> '<имя> без фона.png' рядом")
     n.add_argument("files", nargs="+")
+    ap = sub.add_parser("api", help="операции для ИИ-помощников и скриптов (без параметров - список)")
+    ap.add_argument("tool", nargs="?")
+    ap.add_argument("args", nargs="?", help="параметры одним JSON")
+    ap.add_argument("--out", help="куда сохранить картинку-ответ (view, edit preview)")
+    ap.add_argument("--who", default="ИИ (командная строка)", help="кто действует - так подписано в журнале")
+    ap.add_argument("--help-tool", action="store_true", help="описание и схема параметров операции")
     a = p.parse_args()
     {
         "cut": cmd_cut,
@@ -199,6 +248,7 @@ def main():
         "gallery": cmd_gallery,
         "upscale": cmd_upscale,
         "nobg": cmd_nobg,
+        "api": cmd_api,
     }[a.cmd](a)
 
 

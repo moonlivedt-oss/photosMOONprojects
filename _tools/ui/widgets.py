@@ -43,9 +43,9 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
-from ui import db
+from library import db
+from library.sorting import PLANNED
 from ui.common import CLOSING, FAV, HEAVY, LIB, PIX, RECENT, ROLE, SETS, SMART, TAG, bg, clean_name
-from ui.sorting import PLANNED
 from ui.theme import C
 from ui.thumbnails import TileDelegate, lib_icon, lib_pix, remember, thumb_key, tile_image
 

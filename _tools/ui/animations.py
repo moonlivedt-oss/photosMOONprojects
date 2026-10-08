@@ -444,21 +444,52 @@ class Motion(QObject):
 
 # ---------------------------------------------------------------- сообщения
 class Toast(QWidget):
-    """Сообщение, что всплывает внизу окна и само уходит. Новое сообщение подменяет текст на месте."""
+    """Сообщение, что всплывает внизу окна и само уходит. Новое сообщение подменяет текст на месте.
+    action = (подпись, функция) - кнопка справа («Отменить»); пока над пузырём мышь, он не уходит."""
 
     def __init__(self, win):
         super().__init__(win)
         self.win, self.text, self.v, self.bump, self.bumped = win, "", 0.0, 0.0, 0.0
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.action, self.hot = None, False
+        self.setMouseTracking(True)
         self.hide_timer = QTimer(self, singleShot=True)
-        self.hide_timer.timeout.connect(lambda: self.fade(False))
+        self.hide_timer.timeout.connect(self.leave_later)
         self.cur = None
         self.hide()
 
-    def say(self, text, ms=3200):
-        self.text = text
+    def btn_rect(self):
+        if not self.action:
+            return QRectF()
         fm = self.fontMetrics()
-        w = min(self.win.width() - 80, fm.horizontalAdvance(text) + 64)
+        w = fm.horizontalAdvance(self.action[0]) + 26
+        r = QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5)
+        return QRectF(r.right() - w - 7, r.top() + 7, w, r.height() - 14)
+
+    def leave_later(self):
+        if self.underMouse():
+            self.hide_timer.start(1200)         # читают или тянутся к кнопке - не убегать
+        else:
+            self.fade(False)
+
+    def mouseMoveEvent(self, e):
+        hot = self.btn_rect().contains(e.position())
+        if hot != self.hot:
+            self.hot = hot
+            self.setCursor(Qt.CursorShape.PointingHandCursor if hot else Qt.CursorShape.ArrowCursor)
+            self.update()
+
+    def mousePressEvent(self, e):
+        if self.action and self.btn_rect().contains(e.position()):
+            fn, self.action = self.action[1], None
+            self.fade(False)
+            fn()
+
+    def say(self, text, ms=3200, action=None):
+        self.text, self.action, self.hot = text, action, False
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, not action)
+        fm = self.fontMetrics()
+        extra = fm.horizontalAdvance(action[0]) + 44 if action else 0
+        w = min(self.win.width() - 80, fm.horizontalAdvance(text) + 64 + extra)
         h = 42
         bottom = self.win.height() - (self.win.statusBar().height() if self.win.statusBar() else 0)
         self.base = QRect((self.win.width() - w) // 2, bottom - h - 22, w, h)
@@ -511,9 +542,17 @@ class Toast(QWidget):
         p.drawEllipse(dot.adjusted(-self.bump * 2, -self.bump * 2, self.bump * 2, self.bump * 2))
         p.setPen(QColor(C["text"]))
         fm = self.fontMetrics()
-        p.drawText(QRectF(dot.right() + 10, r.top(), r.width() - 50, r.height()),
+        b = self.btn_rect()
+        room = r.width() - 50 - (b.width() + 12 if self.action else 0)
+        p.drawText(QRectF(dot.right() + 10, r.top(), room, r.height()),
                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-                   fm.elidedText(self.text, Qt.TextElideMode.ElideMiddle, int(r.width() - 50)))
+                   fm.elidedText(self.text, Qt.TextElideMode.ElideMiddle, int(room)))
+        if self.action:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(g) if self.hot else QColor(C["accd"]))
+            p.drawRoundedRect(b, b.height() / 2, b.height() / 2)
+            p.setPen(QColor("#15131f" if self.hot else C["text"]))
+            p.drawText(b, Qt.AlignmentFlag.AlignCenter, self.action[0])
         p.end()
 
 
