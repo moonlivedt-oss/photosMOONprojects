@@ -9,6 +9,7 @@ from imaging.cutting import (
     label,
     object_mask,
     remove_bg,
+    sheet_kind,
     to_square,
 )
 from imaging.doctor import IMPORTED, PROBLEMS, doctor_check, job_doctor

@@ -100,5 +100,5 @@ class DupesDialog(QDialog):
         self.win.push(text, steps)
         self.win.lib.refresh()
         self.win.library_changed()
-        self.win.say(text + ("  (Ctrl+Z - вернуть)" if steps else ""))
+        self.win.say(text, undo=bool(steps))
         self.accept()

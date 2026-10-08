@@ -155,6 +155,15 @@ class Api(unittest.TestCase):
         self.assertEqual(len(os.listdir(self.path("02 Наклейки/Кружки"))), 0)
         self.assertTrue(os.path.exists(src) or os.listdir(C.INBOX))
 
+    def test_duplicates_and_check(self):
+        dot((220, 40, 40, 255)).resize((200, 200)).save(self.path(f"{SEC}/red-planet big.png"))
+        r = api.call("duplicates")
+        self.assertEqual(r["groups"], 1)
+        self.assertEqual([x["name"] for x in r["duplicates"][0]], ["red-planet big", "red-planet"])
+        Image.new("RGBA", (96, 96), (0, 0, 0, 0)).save(self.path(f"{SEC}/empty.png"))
+        r = api.call("check")
+        self.assertIn("Пустая или почти прозрачная", r["items"][0]["problems"])
+
     def test_view_and_read_only(self):
         pic = api.call("view", {"paths": [f"{SEC}/red-planet.png", f"{SEC}/blue-moon.png"]})
         self.assertIn("1. " + SEC, pic.text)

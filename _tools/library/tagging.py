@@ -133,6 +133,7 @@ FLOOR = 0.6  # z-оценка: насколько метка подходит с
 SHARE = 0.5  # и не слабее половины лучшей - иначе к точным меткам липнут случайные
 NEIGHBORS = 12
 NEAR = 0.8  # соседи ближе этого (косинус) делятся своими метками
+FOLDER_NEIGHBORS, FOLDER_NEAR, FOLDER_SHARE = 8, 0.72, 0.5     # «куда положить»: соседи, близость, доля голосов
 
 
 class Tagger:
@@ -164,6 +165,37 @@ class Tagger:
         if not self.sem.ok or not pieces:
             return []
         return self.suggest_vecs(clip.embed_images(list(pieces)[:24]), skip)
+
+    def suggest_all(self, pieces, skip=()):
+        """Куски -> (метки, (папка от корня, доля голосов) или None) - картинки читаются один раз."""
+        if not self.sem.ok or not pieces:
+            return [], None
+        v = clip.embed_images(list(pieces)[:24])
+        return self.suggest_vecs(v, skip), self.suggest_folder(v)
+
+    def suggest_folder(self, v):
+        """Куда положить: папка, где лежат самые похожие картинки библиотеки. Если соседи разбросаны по
+        подпапкам - общий раздел; совсем разные - None."""
+        if not self.sem.ready() or not len(v):
+            return None
+        sim = np.asarray(v, np.float32) @ self.sem.mat.T
+        near, far = {}, {}
+        for row in sim:
+            for i in np.argsort(-row)[:FOLDER_NEIGHBORS]:
+                if row[i] < FOLDER_NEAR:
+                    break
+                d = os.path.dirname(self.sem.paths[i])
+                near[d] = near.get(d, 0) + float(row[i])
+                top = d.split(os.sep)[0]
+                far[top] = far.get(top, 0) + float(row[i])
+        total = sum(near.values())
+        if not total:
+            return None
+        for votes in (near, far):
+            best = max(votes, key=votes.get)
+            if votes[best] / total >= FOLDER_SHARE:
+                return best, votes[best] / total
+        return None
 
     def suggest_vecs(self, v, skip=()):
         """То же по готовым векторам CLIP (картинки библиотеки уже посчитаны). skip - уже стоящие метки."""

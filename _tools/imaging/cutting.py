@@ -228,6 +228,20 @@ def label(s):
     return np.asarray(lab), n
 
 
+def sheet_kind(im):
+    """Что за картинка пришла во входящие: "whole" - цельная (фон, иллюстрация: край пёстрый, без
+    прозрачности), "single" - один рисунок на однотонном фоне, "sheet" - лист с несколькими рисунками.
+    Слипшиеся обводками наклейки находятся одним рисунком - поэтому лист с именами через запятую
+    окно всё равно режет сеткой (это решает вызывающий)."""
+    im = im.convert("RGBA")
+    im.thumbnail((384, 384))
+    a = np.asarray(im.getchannel("A"))
+    edge = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
+    if (edge < 16).mean() <= 0.5 and not border_color(im)[1]:
+        return "whole"
+    return "single" if len(find_pieces(object_mask(im, False))) == 1 else "sheet"
+
+
 def to_square(im, pad, fill):
     a = np.asarray(im.getchannel("A"))
     ys, xs = np.nonzero(a > 8)

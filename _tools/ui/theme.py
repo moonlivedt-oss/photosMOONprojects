@@ -152,6 +152,11 @@ QHeaderView{background:$bg1}
 QHeaderView::section{background:$bg2;color:$dim;border:0;border-right:1px solid $line;border-bottom:1px solid $line;padding:3px 6px}
 QTableCornerButton::section{background:$bg2;border:0}
 QPlainTextEdit{background:$bg2;border:1px solid $line;border-radius:10px;padding:4px 8px}
+QTextBrowser{background:$bg1;border:1px solid $line;border-radius:12px;padding:6px 10px}
+QRadioButton{spacing:8px}
+QRadioButton::indicator{width:15px;height:15px;border:1px solid $line2;border-radius:8px;background:$bg2}
+QRadioButton::indicator:hover{border-color:$acc}
+QRadioButton::indicator:checked{background:qradialgradient(cx:0.5,cy:0.5,radius:0.5,fx:0.5,fy:0.5,stop:0 $acc,stop:0.45 $acc,stop:0.55 $bg2,stop:1 $bg2);border-color:$acc}
 QPlainTextEdit:focus{border-color:$acc}
 
 /* меню */

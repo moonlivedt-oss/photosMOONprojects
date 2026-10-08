@@ -1,4 +1,5 @@
 """Отпечатки библиотеки: «уже есть», «найти похожие», поиск по цвету, дубли."""
+
 import os
 
 import numpy as np
@@ -14,7 +15,7 @@ def build_sigs(old, lib=LIB):
     new = {}
     for f in K.images_in(lib):
         if CLOSING.is_set():
-            return None                         # окно закрыли - недосчитанное не записываем
+            return None  # окно закрыли - недосчитанное не записываем
         if f.lower().endswith(".svg"):
             continue
         rel = os.path.relpath(f, lib)
@@ -23,7 +24,7 @@ def build_sigs(old, lib=LIB):
         except OSError:
             continue
         o = old.get(rel)
-        if o and o[0] == mt and len(o) > 4:        # 5-е поле - версия: отпечатки с поворотом по EXIF
+        if o and o[0] == mt and len(o) > 4:  # 5-е поле - версия: отпечатки с поворотом по EXIF
             new[rel] = o
             continue
         try:
@@ -47,7 +48,7 @@ class SigIndex:
         self.data, self.busy, self.again = {}, False, False
         self.paths, self.ratio, self.vec = [], np.zeros(0), np.zeros((0, 432))
         try:
-            self.data = db.load_sigs()        # база вместо 7-мегабайтного json
+            self.data = db.load_sigs()  # база вместо 7-мегабайтного json
         except Exception:
             self.data = {}
         self._arrays()
@@ -56,8 +57,7 @@ class SigIndex:
         items = [(k, v) for k, v in self.data.items() if len(v[2]) == 432]
         self.paths = [k for k, _v in items]
         self.ratio = np.array([v[1] for _k, v in items], dtype=float)
-        self.vec = (np.stack([np.asarray(v[2], dtype=float) for _k, v in items]) if items
-                    else np.zeros((0, 432)))
+        self.vec = np.stack([np.asarray(v[2], dtype=float) for _k, v in items]) if items else np.zeros((0, 432))
         self.col = {k: (v[3] if len(v) > 3 else "") for k, v in items}
 
     def has_color(self, path, code):
@@ -90,7 +90,7 @@ class SigIndex:
             old, self.data = self.data, res
             self._arrays()
             try:
-                db.save_sigs(res, old)            # только изменившиеся строки
+                db.save_sigs(res, old)  # только изменившиеся строки
             except Exception:
                 pass
         if self.again:
@@ -99,7 +99,7 @@ class SigIndex:
 
     def find(self, im):
         """Путь похожей картинки из библиотеки (относительно LIB) или None."""
-        paths, ratio, vec = self.paths, self.ratio, self.vec        # разом: индекс могут обновить из другого потока
+        paths, ratio, vec = self.paths, self.ratio, self.vec  # разом: индекс могут обновить из другого потока
         if not len(paths):
             return None
         r, v = K.signature(im)
@@ -121,11 +121,19 @@ class SigIndex:
                 i = up[i]
             return i
 
-        for i in range(len(paths) - 1):
-            d = np.abs(vec[i + 1:] - vec[i]).mean(1)
-            ok = (d < K.SAME_DIFF) & (np.abs(ratio[i + 1:] - ratio[i]) / ratio[i] < K.SAME_RATIO)
+        # средняя разница не меньше разницы средних: сравниваем только соседей по средней яркости
+        # отпечатка (окно SAME_DIFF) - вместо всех со всеми; на 4000 картинок секунды вместо 15-20
+        mean = vec.mean(1) if len(paths) else np.zeros(0)
+        order = np.argsort(mean)
+        ms, vs, rs = mean[order], vec[order], ratio[order]
+        for a in range(len(order) - 1):
+            b = int(np.searchsorted(ms, ms[a] + K.SAME_DIFF, "right"))
+            if b <= a + 1:
+                continue
+            d = np.abs(vs[a + 1 : b] - vs[a]).mean(1)
+            ok = (d < K.SAME_DIFF) & (np.abs(rs[a + 1 : b] - rs[a]) / rs[a] < K.SAME_RATIO)
             for j in np.flatnonzero(ok):
-                up[root(i + 1 + int(j))] = root(i)
+                up[root(int(order[a + 1 + j]))] = root(int(order[a]))
         out = {}
         for i, rel in enumerate(paths):
             p = os.path.join(self.lib, rel)

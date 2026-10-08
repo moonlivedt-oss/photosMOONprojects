@@ -551,7 +551,9 @@ def note(path, text):
     r = key(images(path)[0])
     before = db.note_of(r)
     db.set_note(r, text)
-    return dict(path=r.replace(os.sep, "/"), note=text) | record(f"Заметка: {os.path.basename(r)}", [["note", r, before, text]])
+    return dict(path=r.replace(os.sep, "/"), note=text) | record(
+        f"Заметка: {os.path.basename(r)}", [["note", r, before, text]]
+    )
 
 
 @tool(
@@ -933,6 +935,12 @@ def cut_sheet(
     p = absolute(path, inside=False)
     r = sorting.route(p) or {}
     o = dict(r.get("o") or dict(mode="grid", cols=4, rows=3, bg_mode="auto", obv=0, pad=6, size=256, fmt="webp"))
+    kind = None
+    if not r and not grid and os.path.splitext(os.path.basename(p))[0].count(",") < 2:
+        kind = K.sheet_kind(K.load(p))  # фон - целиком, один рисунок - вырезать, лист - сеткой
+        grid = {"whole": "whole", "single": "auto"}.get(kind)
+        if grid == "whole" and size is None:
+            size = 1920
     if grid:
         g = grid.lower().replace("х", "x")
         if g in ("auto", "whole"):
@@ -961,9 +969,18 @@ def cut_sheet(
             for i, h in enumerate(have)
         )
         dest = folder or (rel(r["dest"]) if r else "не задан - нужен folder")
+        how = {"whole": "цельная картинка", "single": "один рисунок"}.get(kind, o["mode"])
+        like = ""
+        sem = sem_index(update=False)
+        if sem.ready() and not folder and not r:
+            tags_, where = tagger(sem).suggest_all(pieces)
+            if where:
+                like = "\nПохоже на раздел: %s (там лежат похожие картинки)" % where[0].replace(os.sep, "/")
+            if tags_:
+                like += "\nМетки по смыслу: " + ", ".join(tags_)
         return Picture(
             sheet(pieces, labels, 150, ["есть" if h else "" for h in have]),
-            f"Кусков: {len(pieces)}, раздел: {dest}\n{text}",
+            f"Кусков: {len(pieces)} ({how}), раздел: {dest}{like}\n{text}",
         )
     if not folder and not r:
         raise ApiError("Куда класть? Задайте folder (например «04 Иконки/Космос»).")
@@ -977,6 +994,62 @@ def cut_sheet(
         steps.append(["move", p, C.archive(p)])
     out = dict(saved=[rel(s) for s in saved], skipped_existing=sum(1 for h in have if h), folder=rel(dest))
     return out | record(f"Нарезано: {len(saved)} шт. в «{rel(dest)}»", steps)
+
+
+# ---------------------------------------------------------------- порядок
+def in_folder(paths, folder):
+    if not folder:
+        return paths
+    root = folder_path(folder)
+    return [p for p in paths if os.path.normcase(p).startswith(os.path.normcase(root) + os.sep)]
+
+
+@tool(
+    "duplicates",
+    "Одинаковые картинки: тот же рисунок в другом размере или формате. В каждой группе первой идёт самая "
+    "крупная - её обычно оставляют, остальные можно убрать trash.",
+    {
+        "folder": {"type": "string", "description": "только в этой папке; пусто - вся библиотека"},
+        "imported": {"type": "boolean", "default": False,
+                     "description": "и в чужих наборах (Kenney, Hero Patterns): там похожие детали - нарочно"},
+    },
+)
+def duplicates(folder=None, imported=False):
+    def quality(p):
+        try:
+            w, h = K.size_of(p)
+            return w * h, os.path.getsize(p)
+        except Exception:
+            return 0, 0
+
+    favs, out = db.favs(), []
+    for g in sig_index().groups():
+        g = sorted(in_folder(g, folder), key=quality, reverse=True)
+        if not imported:
+            g = [p for p in g if not any(x in rel(p).split("/") for x in K.IMPORTED)]
+        if len(g) > 1:
+            out.append([item(p, favs=favs) for p in g])
+    return dict(groups=len(out), duplicates=out)
+
+
+@tool(
+    "check",
+    "Доктор: что не так с картинками - не открывается, пустая, слишком мелкая, фон не убран, рисунок обрезан "
+    "краем, кусок соседа у края, светлая кайма. Чинить - edit (nobg_ai, defringe, trim...) или trash.",
+    {
+        "folder": {"type": "string", "description": "папка; пусто - вся библиотека"},
+        "limit": {"type": "integer", "default": 200},
+    },
+)
+def check(folder=None, limit=200):
+    files = [p for p in in_folder(K.images_in(C.LIB), folder) if not p.lower().endswith(".svg")]
+    names, bad = dict(K.PROBLEMS), []
+    for p, res in batch.run(K.job_doctor, [(p, None) for p in files]):
+        if isinstance(res, Exception) or not res:
+            continue
+        bad.append(dict(path=rel(p), problems=[names[c] for c in res]))
+    bad.sort(key=lambda d: d["path"])
+    return dict(checked=len(files), with_problems=len(bad), items=bad[:limit])
 
 
 # ---------------------------------------------------------------- прочее

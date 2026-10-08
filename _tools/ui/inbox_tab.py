@@ -387,6 +387,8 @@ class InboxTab(QWidget):
 
         # справа - настройки и раздел
         self.preset = QComboBox()
+        self.kind_lbl = QLabel(objectName="dim", wordWrap=True)      # «цельная картинка - сохраню целиком»
+        self.kind_lbl.hide()
         for name, _o, _s in PRESETS:
             self.preset.addItem(name)
         self.mode = QComboBox()
@@ -417,6 +419,7 @@ class InboxTab(QWidget):
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         form.setVerticalSpacing(5)
         form.addRow("Заготовка", self.preset)
+        form.addRow("", self.kind_lbl)
         form.addRow("Нарезка", self.mode)
         form.addRow("Сетка", grid)
         form.addRow("Фон листа", self.bg_mode)
@@ -455,6 +458,10 @@ class InboxTab(QWidget):
         self.no_auto = set()                # вернулись во входящие по Ctrl+Z - сами не раскладывать
         self.route_lbl = QLabel(objectName="dim", wordWrap=True)
         self.route_lbl.hide()
+        self.where_btn = QPushButton(lib_icon("sparkles"), "", objectName="chip")     # «похоже на» - куда положить
+        self.where_btn.clicked.connect(self.take_where)
+        self.where_btn.hide()
+        self.where = None
         newdir = QPushButton(lib_icon("folder"), "Новая папка...")
         newdir.clicked.connect(lambda: new_folder(self, self.tree))
         self.auto = QCheckBox("Помеченные раскладывать сразу")
@@ -484,7 +491,7 @@ class InboxTab(QWidget):
         self.all_btn.setToolTip("Помеченные - по своим папкам, остальные - с текущими настройками в выбранный раздел")
         self.all_btn.clicked.connect(self.save_all)
         b2 = QVBoxLayout()
-        for w in (self.route_lbl, self.tree, newdir, self.auto, self.keep, self.squeeze, self.auto_tags, self.save_btn, self.all_btn):
+        for w in (self.route_lbl, self.where_btn, self.tree, newdir, self.auto, self.keep, self.squeeze, self.auto_tags, self.save_btn, self.all_btn):
             b2.addWidget(w)
         box2 = QGroupBox("Куда")
         box2.setLayout(b2)
@@ -514,6 +521,7 @@ class InboxTab(QWidget):
 
         fill_tree(self.tree)
         self.preset.setCurrentIndex(min(self.cfg.get("preset", 0), len(PRESETS) - 1))
+        self.user_preset = self.preset.currentIndex()     # выбранная руками; цельные картинки её не сбивают
         self.apply_preset()
         self.reload()
 
@@ -618,6 +626,9 @@ class InboxTab(QWidget):
         self.run()
 
     def apply_preset(self):
+        if not getattr(self, "guessing", False):
+            self.user_preset = self.preset.currentIndex()
+            self.kind_lbl.hide()
         _name, o, section = PRESETS[self.preset.currentIndex()]
         self.loading = True
         self.mode.setCurrentIndex(self.mode.findData(o["mode"]))
@@ -745,6 +756,7 @@ class InboxTab(QWidget):
             self.info.setText("Входящих нет")
             self.update_save()
             return
+        self.kind_lbl.hide()
         if self.route:                       # метка в имени: нарезка и папка - по ней
             o = self.route["o"]
             self.loading = True
@@ -760,7 +772,41 @@ class InboxTab(QWidget):
             self.touched()
             self.timer.stop()
             select_path(self.tree, self.route["dest"])
+        else:
+            self.guess_kind(path)
         self.run()
+
+    def guess_kind(self, path):
+        """Без метки в имени: фон или иллюстрация - целиком, один рисунок - вырезать его, лист - как в
+        заготовке. Решение видно под заготовкой; выбор заготовки руками его отменяет."""
+        try:
+            with Image.open(path) as im:
+                im.draft("RGB", (768, 768))
+                kind = K.sheet_kind(K.upright(im))
+        except Exception:
+            return
+        named = os.path.splitext(os.path.basename(path))[0].count(",") >= 2    # имена кусков через запятую - лист
+        whole = next(i for i, (_n, o, _s) in enumerate(PRESETS) if o["mode"] == "whole" and o["fmt"] != "ico")
+        want = whole if kind == "whole" and not named else self.user_preset
+        self.guessing = True
+        try:
+            if self.preset.currentIndex() != want:
+                self.preset.setCurrentIndex(want)
+            mode = PRESETS[want][1]["mode"]     # прошлый лист мог переключить режим на «один рисунок»
+            if kind == "single" and not named and mode == "grid":
+                mode = "auto"
+            if self.mode.currentData() != mode:
+                self.loading = True
+                self.mode.setCurrentIndex(self.mode.findData(mode))
+                self.loading = False
+        finally:
+            self.guessing = False
+        text = {"whole": "Похоже на цельную картинку (фон, иллюстрация) - сохраню целиком.",
+                "single": "Похоже на один рисунок - вырежу его."}.get(kind if not named else "")
+        if text:
+            self.kind_lbl.setText(text + " Другая заготовка выше - решить иначе.")
+        self.kind_lbl.setVisible(bool(text))
+        self.timer.stop()
 
     def show_route(self):
         r = self.route
@@ -816,7 +862,7 @@ class InboxTab(QWidget):
         self.reload()
         fill_tree(self.tree)
         self.changed.emit()
-        self.win.say(text)
+        self.win.say(text, undo=bool(steps))
         QApplication.alert(self.win)
 
     # --- нарезка
@@ -853,16 +899,33 @@ class InboxTab(QWidget):
         """Метки по смыслу кусков (CLIP) - в фоне, щелчок по подсказке добавляет её в поле."""
         self.tag_gen += 1
         gen, pieces = self.tag_gen, list(self.pieces)
-        self.show_tag_hints([])
+        self.show_tag_hints(([], None))
         if not self.win.sem.ok or not pieces:
             return
-        bg(lambda: self.win.tagger.suggest(pieces), lambda res: gen == self.tag_gen and self.show_tag_hints(res))
+        bg(lambda: self.win.tagger.suggest_all(pieces), lambda res: gen == self.tag_gen and self.show_tag_hints(res))
 
-    def show_tag_hints(self, tags):
-        if isinstance(tags, Exception):
-            log_error(f"подсказка меток: {tags}")
-            tags = []
+    def show_tag_hints(self, res):
+        if isinstance(res, Exception):
+            log_error(f"подсказка меток: {res}")
+            res = ([], None)
+        tags, where = res
         self.tag_box.set_tags(tags, set(self.tag_list()))
+        self.where = os.path.join(LIB, where[0]) if where and not self.route else None
+        self.show_where()
+
+    def show_where(self):
+        """Кнопка «Похоже на: раздел» - где в библиотеке лежат самые похожие картинки. Щелчок выбирает раздел."""
+        w = self.where
+        here = self.dest_path()
+        show = bool(w and os.path.isdir(w) and os.path.normcase(w) != os.path.normcase(here or ""))
+        if show:
+            self.where_btn.setText("Похоже на: " + os.path.relpath(w, LIB).replace(os.sep, " / "))
+            self.where_btn.setToolTip("Там лежат самые похожие по смыслу картинки. Щелчок - выбрать этот раздел")
+        self.where_btn.setVisible(show)
+
+    def take_where(self):
+        if self.where and select_path(self.tree, self.where):
+            self.where_btn.hide()
 
     def tag_list(self):
         return [t for t in (db.clean_tag(x) for x in self.tags.text().split(",")) if t]
@@ -957,6 +1020,8 @@ class InboxTab(QWidget):
         else:
             self.save_btn.setText("Сохранить в раздел")
         self.save_btn.setEnabled(bool(self.path and n and d) and not self.auto_busy)
+        if hasattr(self, "where_btn"):
+            self.show_where()
 
     # --- сохранение
     def dest_path(self):
@@ -1052,7 +1117,7 @@ class InboxTab(QWidget):
 
     def finish(self, text, dest=None):
         self.cfg["archive"] = self.keep.isChecked()
-        self.cfg["preset"] = self.preset.currentIndex()
+        self.cfg["preset"] = self.user_preset     # не «целиком», если окно само так решило
         if dest and not (self.route and not self.manual):
             self.cfg.setdefault("dest", {})[str(self.preset.currentIndex())] = dest
         self.path = None
@@ -1061,4 +1126,4 @@ class InboxTab(QWidget):
         self.reload()
         fill_tree(self.tree)
         self.changed.emit()
-        self.win.say(text)
+        self.win.say(text, undo=True)

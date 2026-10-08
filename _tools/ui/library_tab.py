@@ -1,4 +1,5 @@
 """Вкладка «Библиотека»: плитки, панель просмотра, быстрый просмотр, действия с файлами."""
+
 import html
 import os
 import shutil
@@ -102,10 +103,10 @@ class Preview(QWidget):
         self.used.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.used.hide()
         self.where.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.chips = QHBoxLayout()            # размер, формат, вес - плашками
+        self.chips = QHBoxLayout()  # размер, формат, вес - плашками
         self.chips.setSpacing(5)
         self.pal_lbl = QLabel("ЦВЕТА", objectName="faint")
-        self.colors = QHBoxLayout()           # главные цвета картинки: щелчок копирует HEX
+        self.colors = QHBoxLayout()  # главные цвета картинки: щелчок копирует HEX
         self.colors.setSpacing(6)
         self.tag_lbl = QLabel("МЕТКИ И ЗАМЕТКА", objectName="faint")
         self.tags = QLineEdit(placeholderText="метки через запятую: космос, для сайта")
@@ -129,15 +130,23 @@ class Preview(QWidget):
         g = QGridLayout()
         g.setSpacing(6)
         self.btns = []
-        for i, (text, icon, fn, tip) in enumerate((
+        for i, (text, icon, fn, tip) in enumerate(
+            (
                 ("Открыть", "image-file", tab.open_file, "Enter или двойной щелчок по плитке"),
                 ("В проводнике", "folder", tab.reveal, ""),
                 ("Копировать", "camera", tab.copy_image, "Ctrl+Shift+C - картинка вставляется в любой редактор"),
                 ("Путь", "clipboard", tab.copy_path, "Ctrl+C - копировать путь к файлу"),
                 ("В избранное", "star", tab.toggle_fav, "Ctrl+D"),
                 ("Похожие", "magnifying-glass", tab.find_similar, "Найти похожие по рисунку и пропорциям"),
-                ("Выгрузить...", "upload-arrow", tab.export, "Ctrl+E - копии нужного формата и размера в папку проекта"),
-                ("Просмотр", "eye", tab.look, "Пробел - на всё окно, стрелки листают"))):
+                (
+                    "Выгрузить...",
+                    "upload-arrow",
+                    tab.export,
+                    "Ctrl+E - копии нужного формата и размера в папку проекта",
+                ),
+                ("Просмотр", "eye", tab.look, "Пробел - на всё окно, стрелки листают"),
+            )
+        ):
             b = QPushButton(lib_icon(icon), text)
             b.setToolTip(tip)
             b.clicked.connect(fn)
@@ -145,10 +154,12 @@ class Preview(QWidget):
             self.btns.append(b)
         tools = QHBoxLayout()
         tools.setSpacing(6)
-        for text, icon, fn, tip in (("Редактировать", "paint-brush", tab.edit, "Ctrl+R"),
-                                    ("Сжать и конвертировать", "zip-archive", tab.compress, "Ctrl+K"),
-                                    ("Переименовать", "quill-pen", tab.rename, "F2"),
-                                    ("Перенести в раздел", "folder", tab.move, "")):
+        for text, icon, fn, tip in (
+            ("Редактировать", "paint-brush", tab.edit, "Ctrl+R"),
+            ("Сжать и конвертировать", "zip-archive", tab.compress, "Ctrl+K"),
+            ("Переименовать", "quill-pen", tab.rename, "F2"),
+            ("Перенести в раздел", "folder", tab.move, ""),
+        ):
             b = QPushButton(lib_icon(icon), "", objectName="tool")
             b.setToolTip(text + (f"  ({tip})" if tip else ""))
             b.clicked.connect(fn)
@@ -222,8 +233,11 @@ class Preview(QWidget):
             self.note.setPlainText(db.note_of(rels[0]) if len(rels) == 1 else "")
         except Exception:
             pass
-        self.tags.setPlaceholderText("метки через запятую: космос, для сайта" if len(rels) <= 1 else
-                                     "общие метки всех выбранных - добавьте или уберите")
+        self.tags.setPlaceholderText(
+            "метки через запятую: космос, для сайта"
+            if len(rels) <= 1
+            else "общие метки всех выбранных - добавьте или уберите"
+        )
         for w in (self.tag_lbl, self.tags):
             w.setVisible(bool(rels))
         self.note.setVisible(len(rels) == 1)
@@ -239,8 +253,10 @@ class Preview(QWidget):
         if not len(vecs):
             return
         have = {t.strip() for t in self.tags.text().split(",") if t.strip()}
-        bg(lambda: win.tagger.suggest_vecs(vecs, have),
-           lambda res: gen == self.hint_gen and self.hints.set_tags(res if isinstance(res, list) else [], have))
+        bg(
+            lambda: win.tagger.suggest_vecs(vecs, have),
+            lambda res: gen == self.hint_gen and self.hints.set_tags(res if isinstance(res, list) else [], have),
+        )
 
     def add_hint(self, tag):
         tags = [t.strip() for t in self.tags.text().split(",") if t.strip()]
@@ -264,14 +280,14 @@ class Preview(QWidget):
         self.show_used(paths[0] if len(paths) == 1 else None)
         for b in self.btns:
             b.setEnabled(bool(paths))
-        for i in (0, 5, 10):                        # открыть, похожие, переименовать - только по одной
+        for i in (0, 5, 10):  # открыть, похожие, переименовать - только по одной
             self.btns[i].setEnabled(len(paths) == 1)
         fav = db.favs() if paths else ()
         self.btns[4].setText("Из избранного" if paths and os.path.relpath(paths[0], LIB) in fav else "В избранное")
         self.show_colors(paths[0] if len(paths) == 1 else None)
-        mode = None if mode == "chk" else mode      # прозрачное - прямо на свечении, без шахматки
+        mode = None if mode == "chk" else mode  # прозрачное - прямо на свечении, без шахматки
         if not paths:
-            self.pgen = getattr(self, "pgen", 0) + 1      # недогруженная прошлая картинка не всплывёт
+            self.pgen = getattr(self, "pgen", 0) + 1  # недогруженная прошлая картинка не всплывёт
             self.pic.set_pixmap(None)
             self.name.setText("Ничего не выбрано")
             self.where.setText("Щёлкните плитку - здесь появятся сведения, цвета и действия")
@@ -291,8 +307,11 @@ class Preview(QWidget):
             st = os.stat(p)
             if not p.lower().endswith(".svg"):
                 chips.append("%d × %d" % K.size_of(p))
-            chips += [os.path.splitext(p)[1][1:].upper(), human(st.st_size),
-                      time.strftime("%d.%m.%Y", time.localtime(st.st_mtime))]
+            chips += [
+                os.path.splitext(p)[1][1:].upper(),
+                human(st.st_size),
+                time.strftime("%d.%m.%Y", time.localtime(st.st_mtime)),
+            ]
         except Exception:
             pass
         self.set_chips(chips)
@@ -352,8 +371,10 @@ class Preview(QWidget):
             for hexv in res:
                 b = QPushButton(objectName="swatch")
                 b.setFixedSize(26, 26)
-                b.setStyleSheet("QPushButton#swatch{{background:{};border:2px solid {};border-radius:13px;padding:0}}"
-                                "QPushButton#swatch:hover{{border:2px solid #ffffff}}".format(hexv, C["line2"]))
+                b.setStyleSheet(
+                    "QPushButton#swatch{{background:{};border:2px solid {};border-radius:13px;padding:0}}"
+                    "QPushButton#swatch:hover{{border:2px solid #ffffff}}".format(hexv, C["line2"])
+                )
                 b.setToolTip(f"{hexv} - щёлкните, чтобы скопировать")
                 b.setCursor(Qt.CursorShape.PointingHandCursor)
                 b.clicked.connect(lambda _c=False, h=hexv: self.tab.copy_color(h))
@@ -365,9 +386,11 @@ class Preview(QWidget):
 
 def vivid(colors):
     """Для свечения - самый насыщенный из заметных цветов (чёрный и белый светят плохо)."""
+
     def score(h):
         c = QColor(h)
         return c.hsvSaturationF() * (0.4 + c.valueF())
+
     best = max(colors[:4], key=score)
     return best if score(best) > 0.15 else colors[0]
 
@@ -379,7 +402,7 @@ class Look(QDialog):
         super().__init__(tab)
         self.tab, self.row = tab, row
         self.cache, self.loading, self.want = {}, set(), None
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)     # иначе каждое открытие копило окно в памяти
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)  # иначе каждое открытие копило окно в памяти
         self.mode = tab.cfg.get("bg", "chk")
         self.setWindowTitle("Просмотр")
         self.setStyleSheet("QDialog{background:#09090d}")
@@ -388,9 +411,12 @@ class Look(QDialog):
         self.pic.zoomable = True
         self.title = QLabel(objectName="head", alignment=Qt.AlignmentFlag.AlignCenter)
         self.cap = QLabel(objectName="dim", alignment=Qt.AlignmentFlag.AlignCenter)
-        hint = QLabel("←  →  листать      колесо  увеличить      1 или двойной щелчок  пиксель в пиксель      "
-                      "0  целиком      B  подложка      Пробел или Esc  закрыть", objectName="faint",
-                      alignment=Qt.AlignmentFlag.AlignCenter)
+        hint = QLabel(
+            "←  →  листать      колесо  увеличить      1 или двойной щелчок  пиксель в пиксель      "
+            "0  целиком      B  подложка      Пробел или Esc  закрыть",
+            objectName="faint",
+            alignment=Qt.AlignmentFlag.AlignCenter,
+        )
         v = QVBoxLayout(self)
         v.setContentsMargins(20, 20, 20, 14)
         v.addWidget(self.pic, 1)
@@ -419,14 +445,23 @@ class Look(QDialog):
                 nb = self.tab.list.item((self.row + d) % n)
                 if nb and not nb.data(ROLE).lower().endswith(".svg"):
                     self.fetch(nb.data(ROLE))
-        self.cap.setText("%s      %d из %d" % (os.path.dirname(os.path.relpath(p, LIB)).replace(os.sep, "  /  "),
-                                               self.row + 1, n))
+        self.cap.setText(
+            "%s      %d из %d" % (os.path.dirname(os.path.relpath(p, LIB)).replace(os.sep, "  /  "), self.row + 1, n)
+        )
         self.gen += 1
         gen = self.gen
         self.pic.set_glow(None)
         if not p.lower().endswith(".svg"):
-            bg(lambda: palette(p), lambda res: not sip.isdeleted(self) and gen == self.gen
-               and isinstance(res, list) and res and self.pic.set_glow(vivid(res)))
+            bg(
+                lambda: palette(p),
+                lambda res: (
+                    not sip.isdeleted(self)
+                    and gen == self.gen
+                    and isinstance(res, list)
+                    and res
+                    and self.pic.set_glow(vivid(res))
+                ),
+            )
 
     def fetch(self, p, show=False):
         """Картинка для просмотра: из своего маленького кэша или в фоне. show - показать, когда готова."""
@@ -445,19 +480,19 @@ class Look(QDialog):
         def work():
             im = K.load(p)
             im.thumbnail((2400, 2400), Image.LANCZOS)
-            if mode != "chk":                       # шахматку не кладём: прозрачное висит на свечении
+            if mode != "chk":  # шахматку не кладём: прозрачное висит на свечении
                 back = backdrop(im.width, im.height, mode)
                 back.alpha_composite(im)
                 im = back
             return to_qimage(im)
 
         def done(img):
-            if sip.isdeleted(self):                 # просмотр закрыли, пока картинка грузилась
+            if sip.isdeleted(self):  # просмотр закрыли, пока картинка грузилась
                 return
             self.loading.discard(key)
             pm = QPixmap() if isinstance(img, Exception) else QPixmap.fromImage(img)
             self.cache[key] = pm
-            while len(self.cache) > 6:              # держим текущую и соседей
+            while len(self.cache) > 6:  # держим текущую и соседей
                 self.cache.pop(next(iter(self.cache)))
             if self.want == key and self.isVisible():
                 self.pic.set_pixmap(pm)
@@ -529,7 +564,9 @@ def set_cover(s, side=256):
         except Exception:
             continue
         im.thumbnail((cell - 4, cell - 4), Image.LANCZOS)
-        sheet.alpha_composite(im, ((i % cols) * cell + (cell - im.width) // 2, (i // cols) * cell + (cell - im.height) // 2))
+        sheet.alpha_composite(
+            im, ((i % cols) * cell + (cell - im.width) // 2, (i // cols) * cell + (cell - im.height) // 2)
+        )
     return sheet
 
 
@@ -548,6 +585,18 @@ def fsize(p):
         return 0
 
 
+def rename_file(src, dst):
+    """Переименовать; если файл на миг занят (дочитывается миниатюра) - ещё раз чуть позже."""
+    for wait in (0.15, 0.4, None):
+        try:
+            os.rename(src, dst)
+            return
+        except PermissionError:
+            if wait is None:
+                raise
+            time.sleep(wait)
+
+
 class LibTab(QWidget):
     changed = pyqtSignal()
 
@@ -555,14 +604,14 @@ class LibTab(QWidget):
         super().__init__()
         self.win, self.cfg = win, win.cfg
         self.side = max(64, min(THUMB, self.cfg.get("thumb", 128)))
-        self.like = None                    # "Похожие на ...": путь картинки-образца
-        self.like_sem = False               # похожие по смыслу (CLIP), а не по рисунку; like - может быть и не из библиотеки
+        self.like = None  # "Похожие на ...": путь картинки-образца
+        self.like_sem = False  # похожие по смыслу (CLIP), а не по рисунку; like - может быть и не из библиотеки
         self.tree = make_tree()
         self.tree.currentItemChanged.connect(lambda *_: self.leave_similar())
         self.q = QLineEdit(placeholderText="Поиск по всей библиотеке  (Ctrl+F)", objectName="search")
         self.q.setClearButtonEnabled(True)
         self.q.addAction(lib_icon("magnifying-glass"), QLineEdit.ActionPosition.LeadingPosition)
-        self.qt = QTimer(self, singleShot=True, interval=180)        # не перерисовывать на каждую букву
+        self.qt = QTimer(self, singleShot=True, interval=180)  # не перерисовывать на каждую букву
         self.qt.timeout.connect(self.show_files)
         self.q.textChanged.connect(lambda *_: self.qt.start())
         if win.sem.ok:
@@ -632,7 +681,7 @@ class LibTab(QWidget):
             self.split.addWidget(w)
         self.split.setStretchFactor(1, 1)
         sizes = list(self.cfg.get("split_lib", [250, 720, 300]))
-        sizes[0] = max(sizes[0], 210)           # уже - имена разделов и числа не помещаются
+        sizes[0] = max(sizes[0], 210)  # уже - имена разделов и числа не помещаются
         self.split.setSizes(sizes)
         lay = QVBoxLayout(self)
         lay.addWidget(self.split)
@@ -652,10 +701,10 @@ class LibTab(QWidget):
         key("Escape", self, self.escape)
         key("Ctrl+M", self, lambda: self.sem.isVisible() and self.sem.toggle())
         key("Alt+Left", self, self.go_back)
-        for w in (self.list.viewport(), self.tree.viewport()):     # кнопка мыши «назад»
+        for w in (self.list.viewport(), self.tree.viewport()):  # кнопка мыши «назад»
             w.installEventFilter(self)
-        self.tree.setAcceptDrops(True)          # плитки можно бросить на раздел - перенос
-        self.past, self.here = [], None         # прошлые разделы для Alt+← и кнопки мыши «назад»
+        self.tree.setAcceptDrops(True)  # плитки можно бросить на раздел - перенос
+        self.past, self.here = [], None  # прошлые разделы для Alt+← и кнопки мыши «назад»
         self.tree.currentItemChanged.connect(self.track)
         self.show_back()
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -666,9 +715,9 @@ class LibTab(QWidget):
         """Пересобрать дерево и плитки один раз (без сигналов дерево перестраивалось бы с плитками по 2-3 раза)."""
         self.tree.blockSignals(True)
         fill_tree(self.tree, planned=False, recent=True)
-        if not self.tree.currentItem():         # раздел, открытый в прошлый раз
+        if not self.tree.currentItem():  # раздел, открытый в прошлый раз
             select_path(self.tree, self.cfg.get("lib_section"))
-        if not self.tree.currentItem():         # или первый раздел библиотеки
+        if not self.tree.currentItem():  # или первый раздел библиотеки
             for i in range(self.tree.topLevelItemCount()):
                 it = self.tree.topLevelItem(i)
                 if it.data(0, ROLE) and os.path.isdir(it.data(0, ROLE)):
@@ -682,7 +731,7 @@ class LibTab(QWidget):
     def cycle_back(self):
         mode = {"chk": "light", "light": "dark"}.get(self.cfg.get("bg", "chk"), "chk")
         self.cfg["bg"] = mode
-        i = self.win.inbox.bg.findData(mode)          # во входящих та же подложка
+        i = self.win.inbox.bg.findData(mode)  # во входящих та же подложка
         if i >= 0:
             self.win.inbox.bg.setCurrentIndex(i)
         self.show_back()
@@ -705,6 +754,7 @@ class LibTab(QWidget):
             p.fillRect(0, 0, 18, 18, QColor("#f4f2fa" if mode == "light" else "#000000"))
         p.end()
         self.back.setIcon(QIcon(pm))
+
     # --- навигация
     def eventFilter(self, obj, e):
         t = e.type()
@@ -763,7 +813,7 @@ class LibTab(QWidget):
             self.here = role
 
     def go_back(self):
-        if self.like:                           # из «Похожих» - туда, откуда пришли
+        if self.like:  # из «Похожих» - туда, откуда пришли
             self.leave_similar()
             return
         while self.past:
@@ -800,7 +850,7 @@ class LibTab(QWidget):
 
     def tree_menu(self, pos):
         it = self.tree.itemAt(pos)
-        if not it or not it.data(0, ROLE):         # подпись группы
+        if not it or not it.data(0, ROLE):  # подпись группы
             return
         self.tree.setCurrentItem(it)
         files = self.all_shown()
@@ -809,10 +859,10 @@ class LibTab(QWidget):
         if os.path.isdir(role):
             m.addAction("Открыть папку в проводнике", lambda: os.startfile(role))
         if role.startswith(TAG):
-            m.addAction("Убрать метку у всех картинок", lambda: self.delete_tag(role[len(TAG):]))
+            m.addAction("Убрать метку у всех картинок", lambda: self.delete_tag(role[len(TAG) :]))
         if role.startswith(SMART):
-            m.addAction("Переименовать умную папку...", lambda: self.rename_smart(role[len(SMART):]))
-            m.addAction("Удалить умную папку", lambda: self.delete_smart(role[len(SMART):]))
+            m.addAction("Переименовать умную папку...", lambda: self.rename_smart(role[len(SMART) :]))
+            m.addAction("Удалить умную папку", lambda: self.delete_smart(role[len(SMART) :]))
         if files:
             m.addSeparator()
             m.addAction("Сжать весь раздел (%d)..." % len(files), lambda: self.compress(files))
@@ -852,22 +902,28 @@ class LibTab(QWidget):
                     count[t] = count.get(t, 0) + 1
             top = sorted(count, key=count.get, reverse=True)
             text = "\n".join("%s - %d" % (t, count[t]) for t in top[:15]) + ("\n..." if len(top) > 15 else "")
-            ask = QMessageBox.question(self, "Поставить метки",
-                                       "Картинок с подсказками: %d, разных меток: %d.\n\n%s\n\nПоставить?"
-                                       % (len(plan), len(top), text))
+            ask = QMessageBox.question(
+                self,
+                "Поставить метки",
+                "Картинок с подсказками: %d, разных меток: %d.\n\n%s\n\nПоставить?" % (len(plan), len(top), text),
+            )
             if ask != QMessageBox.StandardButton.Yes:
                 return
             for rel, tags in plan.items():
                 db.set_tags([rel], tags, "add")
             fill_tree(self.tree, planned=False, recent=True)
             self.describe()
-            self.win.say("Метки поставлены: %d картинок. Лишнюю метку убирает правый щелчок по ней в дереве" % len(plan))
+            self.win.say(
+                "Метки поставлены: %d картинок. Лишнюю метку убирает правый щелчок по ней в дереве" % len(plan)
+            )
 
         bg(work, done)
 
     def delete_tag(self, tag):
-        if QMessageBox.question(self, "Метка", "Убрать метку «%s» у всех картинок?" % tag) \
-                != QMessageBox.StandardButton.Yes:
+        if (
+            QMessageBox.question(self, "Метка", "Убрать метку «%s» у всех картинок?" % tag)
+            != QMessageBox.StandardButton.Yes
+        ):
             return
         n = db.delete_tag(tag)
         fill_tree(self.tree, planned=False, recent=True)
@@ -932,7 +988,7 @@ class LibTab(QWidget):
     def show_files(self):
         text, code, sem, smart = self.query()
         tokens = text.lower().replace("ё", "е").split()
-        minus = [t[1:] for t in tokens if t.startswith("-") and len(t) > 1]     # «кот -png»: без png
+        minus = [t[1:] for t in tokens if t.startswith("-") and len(t) > 1]  # «кот -png»: без png
         words = [t for t in tokens if not t.startswith("-")]
         sem = sem and bool(words) and self.win.sem.ready()
         it = self.tree.currentItem()
@@ -946,38 +1002,41 @@ class LibTab(QWidget):
             self.show_sets()
             return
         if self.like:
-            root = RECENT                   # порядок задаёт похожесть, сортировку не применяем
+            root = RECENT  # порядок задаёт похожесть, сортировку не применяем
             files = self.win.sem.similar(self.like) if self.like_sem else self.win.sigs.similar(self.like)
         elif sem:
             root = RECENT
             files = self.win.sem.search(" ".join(words))
         elif isinstance(root, str) and root.startswith(TAG):
-            files = [os.path.join(LIB, r) for r in db.with_tag(root[len(TAG):])
-                     if os.path.exists(os.path.join(LIB, r))]
+            files = [
+                os.path.join(LIB, r) for r in db.with_tag(root[len(TAG) :]) if os.path.exists(os.path.join(LIB, r))
+            ]
         elif root == RECENT:
             files = sorted(K.images_in(LIB), key=mtime, reverse=True)[:120]
         elif root == HEAVY:
-            files = sorted((f for f in K.images_in(LIB) if fsize(f) > HEAVY_KB * 1024),
-                           key=fsize, reverse=True)
+            files = sorted((f for f in K.images_in(LIB) if fsize(f) > HEAVY_KB * 1024), key=fsize, reverse=True)
         elif root == FAV:
             files = [os.path.join(LIB, r) for r in sorted(fav) if os.path.exists(os.path.join(LIB, r))]
         elif root and os.path.isdir(root):
             files = K.images_in(root)
-        elif root and not os.path.isdir(root) and not root.startswith("::"):    # раздел пропал (перенесли)
+        elif root and not os.path.isdir(root) and not root.startswith("::"):  # раздел пропал (перенесли)
             files = []
         else:
             files = []
         if tokens and sem:
             files = [p for p in files if not any(w in os.path.relpath(p, LIB).lower() for w in minus)]
         elif tokens:
-            extra = db.search_text()      # метки и заметки: «#космос» или просто «космос»
+            extra = db.search_text()  # метки и заметки: «#космос» или просто «космос»
             words = [w.lstrip("#") for w in words]
 
             def hit(p):
                 rel = os.path.relpath(p, LIB)
                 s = rel.lower().replace("ё", "е") + " " + extra.get(rel, "")
                 return all(w in s for w in words) and not any(w in s for w in minus)
+
             files = [p for p in files if hit(p)]
+            if not files and words and not minus and self.win.sem.ready() and not smart:
+                files, sem, root = self.win.sem.search(" ".join(words)), "fallback", RECENT  # по именам пусто
         if code:
             files = [p for p in files if self.win.sigs.has_color(p, code)]
         how = self.sort.currentData()
@@ -1016,7 +1075,7 @@ class LibTab(QWidget):
         """Вторая строка плитки: подпапка внутри открытого раздела и формат (у тяжёлых - и вес).
         Иначе в «01 Фоны» десяток плиток подписаны одинаково - «Боковая панель»."""
         folder = os.path.relpath(os.path.dirname(p), base)
-        parts = [] if folder == "." else [os.path.basename(folder)]       # весь путь - во всплывающей подсказке
+        parts = [] if folder == "." else [os.path.basename(folder)]  # весь путь - во всплывающей подсказке
         if not parts:
             parts.append(ext[1:].upper())
         if how == "size":
@@ -1030,13 +1089,15 @@ class LibTab(QWidget):
         """Заголовок над плитками и подсказка, если показывать нечего."""
         names = {RECENT: "Недавние", FAV: "Избранное", HEAVY: "Тяжёлые (больше %d КБ)" % HEAVY_KB, SETS: "Наборы"}
         if isinstance(root, str) and root.startswith(TAG):
-            names[root] = "Метка: " + root[len(TAG):]
+            names[root] = "Метка: " + root[len(TAG) :]
         if self.like:
             head = ("Похожие по смыслу на «%s»" if self.like_sem else "Похожие на «%s»") % os.path.basename(self.like)
         elif smart:
             head = f"Умная папка: {smart}"
         elif words:
-            head = ("По смыслу: " if sem else "Поиск: ") + text
+            head = (
+                "По именам ничего - по смыслу: " if sem == "fallback" else "По смыслу: " if sem else "Поиск: "
+            ) + text
         elif root in names:
             head = names[root]
         elif root:
@@ -1045,11 +1106,17 @@ class LibTab(QWidget):
             head = ""
         if code:
             head += "  -  " + dict((c, n) for c, n, _h in K.COLORS).get(code, "").lower()
-        self.title.setText("%s   <span style='color:#8a879a;font-weight:400'>%d</span>" % (html.escape(head), n) if head else "")
+        self.title.setText(
+            "%s   <span style='color:#8a879a;font-weight:400'>%d</span>" % (html.escape(head), n) if head else ""
+        )
         if n:
             self.list.empty = ""
         elif words or code:
-            self.list.empty = "Ничего не нашлось. Поиск идёт по именам файлов и папок во всей библиотеке."
+            self.list.empty = "Ничего не нашлось. Поиск идёт по именам файлов и папок, меткам и заметкам." + (
+                "\nКнопка-шар справа от поиска ищет по смыслу: «кот в космосе», «уютная улица»."
+                if self.win.sem.ok and not sem
+                else ""
+            )
         elif root == FAV:
             self.list.empty = "Избранного пока нет.\nВыберите картинку и нажмите Ctrl+D или «В избранное» справа."
         elif root == HEAVY:
@@ -1060,7 +1127,7 @@ class LibTab(QWidget):
         self.list.viewport().update()
 
     def paths(self):
-        if self.sets_view:                  # в «Наборах» плитки - папки, действия с файлами к ним не применяются
+        if self.sets_view:  # в «Наборах» плитки - папки, действия с файлами к ним не применяются
             return []
         return [i.data(ROLE) for i in self.list.selectedItems()]
 
@@ -1092,7 +1159,9 @@ class LibTab(QWidget):
         self.set_info = {s["path"]: s for s in sets}
         self.show_title(SETS, [], "", len(sets))
         if not sets:
-            self.list.empty = "Наборов пока нет. Набор - папка с подпапками палитр, например «04 Иконки/Космос/Tokyo Night»."
+            self.list.empty = (
+                "Наборов пока нет. Набор - папка с подпапками палитр, например «04 Иконки/Космос/Tokyo Night»."
+            )
         self.load_covers(todo)
         self.describe()
 
@@ -1100,6 +1169,7 @@ class LibTab(QWidget):
         self.cgen = getattr(self, "cgen", 0) + 1
         gen = self.cgen
         for i, s, ck in todo:
+
             def done(img, i=i, s=s, ck=ck):
                 it = self.list.item(i)
                 if gen != self.cgen or isinstance(img, Exception) or not it or it.data(ROLE) != s["path"]:
@@ -1108,6 +1178,7 @@ class LibTab(QWidget):
                 self.covers[ck] = pm
                 it.setData(PIX, pm)
                 self.list.loaded(i)
+
             bg(lambda s=s: to_qimage(set_cover(s)), done)
 
     def describe(self):
@@ -1127,8 +1198,9 @@ class LibTab(QWidget):
         elif sel:
             self.info.setText("Выбрано: %d из %d" % (len(sel), self.list.count()))
         else:
-            self.info.setText("Картинок: %d   Перетащите плитку в другую программу, чтобы вставить туда файл"
-                              % self.list.count())
+            self.info.setText(
+                "Картинок: %d   Перетащите плитку в другую программу, чтобы вставить туда файл" % self.list.count()
+            )
 
     def menu(self, pos):
         if not self.paths():
@@ -1173,7 +1245,7 @@ class LibTab(QWidget):
         urls = [u.toLocalFile() for u in e.mimeData().urls()] if e.mimeData().hasUrls() else []
         pics = [p for p in urls if p.lower().endswith(K.EXT) and not p.lower().endswith(".svg")]
         if not pics:
-            return False                        # текст бросают как обычно
+            return False  # текст бросают как обычно
         e.acceptProposedAction()
         if t == QEvent.Type.Drop:
             self.search_by_image(pics[0])
@@ -1195,6 +1267,7 @@ class LibTab(QWidget):
             self.q.clear()
             self.q.blockSignals(False)
             self.show_files()
+
         bg(lambda: sem.embed_file(path), done)
 
     def leave_similar(self):
@@ -1262,7 +1335,7 @@ class LibTab(QWidget):
         if not sel:
             self.win.say("Выберите картинку (или несколько - правка применится ко всем)")
             return
-        d = EditDialog(self, self.win, sel, on_saved=self.done)
+        d = EditDialog(self, self.win, sel, on_saved=lambda t: self.done(t, undo=True))
         if d.skipped:
             self.win.say("Не правятся (svg, ico, анимация): %d - пропущены" % d.skipped)
         d.exec()
@@ -1302,7 +1375,10 @@ class LibTab(QWidget):
 
     def rename(self):
         sel = self.paths()
-        if len(sel) != 1:
+        if len(sel) > 1:
+            self.rename_many(sel)
+            return
+        if not sel:
             return
         stem, ext = os.path.splitext(os.path.basename(sel[0]))
         name, ok = QInputDialog.getText(self, "Переименовать", "Новое имя:", text=stem)
@@ -1314,13 +1390,38 @@ class LibTab(QWidget):
             QMessageBox.warning(self, "Переименовать", "Такое имя в этой папке уже есть.")
             return
         try:
-            os.rename(sel[0], dst)
-        except OSError as e:                     # файл открыт в другой программе
+            rename_file(sel[0], dst)
+        except OSError as e:  # файл открыт в другой программе
             QMessageBox.warning(self, "Переименовать", "Не получилось: %s" % (e.strerror or e))
             return
         self.win.moved(sel[0], dst)
         self.win.push("Переименовано: " + name + ext, [("move", sel[0], dst)])
-        self.done("Переименовано: " + name + ext)
+        self.done("Переименовано: " + name + ext, undo=True)
+
+    def rename_many(self, sel):
+        """Несколько картинок - одно имя с номерами по порядку плиток: «кот 01», «кот 02»..."""
+        order = {p: i for i, p in enumerate(self.all_shown())}
+        sel = sorted(sel, key=lambda p: order.get(p, 0))
+        common = os.path.commonprefix([os.path.splitext(os.path.basename(p))[0] for p in sel]).rstrip(" _-")
+        name, ok = QInputDialog.getText(self, "Переименовать: %d шт." % len(sel),
+                                        "Общее имя (номера добавятся сами):", text=common)
+        name = clean_name(name)
+        if not ok or not name:
+            return
+        width = max(2, len(str(len(sel))))
+        steps, bad = [], 0
+        for i, p in enumerate(sel, 1):
+            dst = unique(os.path.join(os.path.dirname(p), "%s %0*d%s" % (name, width, i, os.path.splitext(p)[1])))
+            try:
+                rename_file(p, dst)
+            except OSError:
+                bad += 1
+                continue
+            self.win.moved(p, dst)
+            steps.append(("move", p, dst))
+        text = "Переименовано: %d шт. («%s 01»...)" % (len(steps), name) + ("   не вышло: %d" % bad if bad else "")
+        self.win.push(text, steps)
+        self.done(text, undo=bool(steps))
 
     def move(self):
         sel = self.paths()
@@ -1341,7 +1442,7 @@ class LibTab(QWidget):
                 dst = unique(os.path.join(dest, os.path.basename(p)))
                 try:
                     shutil.move(p, dst)
-                except OSError:                  # занят другой программой - остальные переносим
+                except OSError:  # занят другой программой - остальные переносим
                     bad += 1
                     continue
                 self.win.moved(p, dst)
@@ -1350,7 +1451,7 @@ class LibTab(QWidget):
         if bad:
             text += "   не вышло: %d (файл занят)" % bad
         self.win.push(text, steps)
-        self.done(text)
+        self.done(text, undo=bool(steps))
 
     def save_tags(self, text):
         sel = self.paths()
@@ -1372,7 +1473,7 @@ class LibTab(QWidget):
             db.set_tags(rels, common - new, "remove")
             db.set_tags(rels, new - common, "add")
         self.win.say("Метки: %s" % (", ".join(sorted(new)) or "убраны"))
-        if set(db.all_tags()) != before:      # новая или исчезнувшая метка - дерево слева обновить
+        if set(db.all_tags()) != before:  # новая или исчезнувшая метка - дерево слева обновить
             self.tree.blockSignals(True)
             fill_tree(self.tree, planned=False, recent=True)
             self.tree.blockSignals(False)
@@ -1397,8 +1498,10 @@ class LibTab(QWidget):
         sel = self.paths()
         if not sel:
             return
-        lines = ["![{}]({})".format(os.path.splitext(os.path.basename(p))[0], p.replace("\\", "/").replace(" ", "%20"))
-                 for p in sel]
+        lines = [
+            "![{}]({})".format(os.path.splitext(os.path.basename(p))[0], p.replace("\\", "/").replace(" ", "%20"))
+            for p in sel
+        ]
         QApplication.clipboard().setText("\n".join(lines))
         self.win.say("Markdown скопирован: %d шт.  (путь абсолютный - поправьте под свой проект)" % len(sel))
 
@@ -1407,14 +1510,17 @@ class LibTab(QWidget):
         if not sel:
             return
         try:
-            img = QIcon(sel[0]).pixmap(512, 512).toImage() if sel[0].lower().endswith(".svg") \
+            img = (
+                QIcon(sel[0]).pixmap(512, 512).toImage()
+                if sel[0].lower().endswith(".svg")
                 else to_qimage(K.load(sel[0]))
+            )
         except Exception as e:
             self.win.say(f"Не скопировалось: {e}")
             return
         md = QMimeData()
         md.setImageData(img)
-        md.setUrls([QUrl.fromLocalFile(sel[0])])      # проводник и мессенджеры вставят файл, редакторы - картинку
+        md.setUrls([QUrl.fromLocalFile(sel[0])])  # проводник и мессенджеры вставят файл, редакторы - картинку
         QApplication.clipboard().setMimeData(md)
         self.win.say("Картинка скопирована: " + os.path.basename(sel[0]))
 
@@ -1435,8 +1541,11 @@ class LibTab(QWidget):
                 return
             steps, made, bad = res
             self.win.push("Копии (%s): %d шт." % (name, made), steps)
-            self.done("Сделано копий (%s): %d" % (name, made) + ("   не вышло: %d" % bad if bad else "")
-                      + ("   Ctrl+Z - убрать" if made else ""))
+            self.done(
+                "Сделано копий (%s): %d" % (name, made)
+                + ("   не вышло: %d" % bad if bad else "")
+                + ("   Ctrl+Z - убрать" if made else "")
+            )
 
         bg(lambda: copy_files(sel, fmt, lambda v: in_main(progress, v)), finished)
 

@@ -63,6 +63,16 @@ class Cutting(unittest.TestCase):
         self.assertEqual(len(pieces), 2)
         self.assertEqual(boxes[1], (200, 0, 600, 200))
 
+    def test_sheet_kind(self):
+        """Фон целиком, один рисунок на однотонном - вырезать, лист - резать."""
+        rng = np.random.default_rng(1)
+        scene = Image.fromarray(rng.integers(0, 255, (60, 80, 3), dtype=np.uint8), "RGB").resize((800, 600))
+        self.assertEqual(K.sheet_kind(scene), "whole")
+        one = Image.new("RGB", (600, 600), (255, 255, 255))
+        ImageDraw.Draw(one).ellipse((150, 120, 450, 480), fill=(90, 60, 200))
+        self.assertEqual(K.sheet_kind(one), "single")
+        self.assertEqual(K.sheet_kind(sticker_sheet()), "sheet")
+
     def test_tiny_sheet(self):
         self.assertEqual(len(K.cut(Image.new("RGBA", (6, 5), (255, 255, 255, 255)), (4, 3))[0]), 12)
 

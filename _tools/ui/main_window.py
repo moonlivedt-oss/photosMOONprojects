@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 import imaging as K
 from library import db, journal
 from library.tagging import Tagger
+from ui.agents import AgentsDialog
 from ui.animations import (
     Aurora,
     DropOverlay,
@@ -54,6 +55,7 @@ from ui.common import (
 )
 from ui.doctor import DoctorDialog
 from ui.dupes import DupesDialog
+from ui.help import NEW, HelpDialog
 from ui.inbox_tab import InboxTab
 from ui.library_tab import LibTab
 from ui.missing import MissingDialog
@@ -63,53 +65,6 @@ from ui.theme import QSS, ui_files
 from ui.thumbnails import forget_pixmaps, lib_icon, trim_thumbs
 from ui.weight import WeightDialog
 from ui.widgets import fill_tree, forget_counts, key
-
-HELP = """<b>Горячие клавиши</b><table cellspacing=4>
-<tr><td>Ctrl+S</td><td>сохранить отмеченные куски в раздел</td></tr>
-<tr><td>Ctrl+Z / Ctrl+Y</td><td>отменить последнее действие / вернуть отменённое; «История» внизу - отменить несколько сразу</td></tr>
-<tr><td>Рамки на листе</td><td>во входящих: тяните край рамки - поправить кусок, Shift + протяжка - новая рамка;
-«Склеить» / «Разрезать» над кусками; «Правка кусков» - рецепт из редактора к каждому куску</td></tr>
-<tr><td>Метки и заметка</td><td>под цветами справа; поиск находит по ним («#космос»), метки - в дереве слева</td></tr>
-<tr><td>Наборы</td><td>в дереве: каждый набор одной обложкой с его палитрами</td></tr>
-<tr><td>Плитку на раздел</td><td>перетащите плитки на раздел в дереве - перенос (Ctrl+Z вернёт)</td></tr>
-<tr><td>Доктор</td><td>кнопка вверху: пустые, обрезанные, с остатками фона, с каймой, с кусками соседа</td></tr>
-<tr><td>Чего нет</td><td>кнопка вверху: наборы из промптов по палитрам; промпт, имя файла, перекраска из готовой палитры</td></tr>
-<tr><td>Просмотр</td><td>колесо - увеличить, 1 или двойной щелчок - пиксель в пиксель, 0 - целиком</td></tr>
-<tr><td>Ctrl+V</td><td>вставить картинку или файлы из буфера во входящие</td></tr>
-<tr><td>Ctrl+1 / Ctrl+2</td><td>вкладки Входящие / Библиотека</td></tr>
-<tr><td>Ctrl+F</td><td>поиск по библиотеке; «кот -png» - слово с минусом исключает</td></tr>
-<tr><td>Ctrl+M</td><td>поиск по смыслу (кнопка-шар у поиска): «кот в космосе», «уютная ночная улица» - по-русски и по-английски, без слов в имени файла</td></tr>
-<tr><td>Метки во входящих</td><td>под полем «Метки» - подсказки по смыслу кусков (CLIP); щелчок добавляет, метки получат все сохранённые куски. Галка «Ставить подсказанные метки» - то же для «Разобрать все» и автораскладки</td></tr>
-<tr><td>Метки в библиотеке</td><td>под полем меток справа - подсказки для выбранной картинки (или нескольких), щелчок ставит</td></tr>
-<tr><td>Нейросети в правке</td><td>Ctrl+R: «Убрать фон нейросетью» (любой фон) на вкладке «Фон», «x2» / «x4» - чёткое увеличение в «Размере»; во входящих - фон листа «Убрать нейросетью»</td></tr>
-<tr><td>Массовые метки</td><td>правый щелчок по разделу или плиткам - «Поставить подсказанные метки»; по метке в дереве - «Убрать метку у всех»</td></tr>
-<tr><td>Где использовано</td><td>под путём картинки справа - в какие папки проектов она выгружалась (Ctrl+E)</td></tr>
-<tr><td>Поиск по картинке</td><td>бросьте картинку (файл из проводника или плитку) в строку поиска - похожие по смыслу</td></tr>
-<tr><td>Умные папки</td><td>кнопка-закладка у поиска сохраняет поиск (слова, цвет, смысл) в дерево слева - папка сама пополняется</td></tr>
-<tr><td>Esc</td><td>в библиотеке - очистить поиск, выйти из «Похожих»</td></tr>
-<tr><td>Ctrl+A</td><td>в библиотеке - выделить все плитки</td></tr>
-<tr><td>Alt+← / кнопка мыши «назад»</td><td>в библиотеке - к прошлому разделу</td></tr>
-<tr><td>Пробел</td><td>во входящих - отметить / снять выделенные куски</td></tr>
-<tr><td>Щелчок по рамке на листе</td><td>отметить / снять этот кусок</td></tr>
-<tr><td>Двойной щелчок по куску</td><td>переименовать</td></tr>
-<tr><td>F2 / Del / Ctrl+C</td><td>переименовать / в корзину / копировать путь</td></tr>
-<tr><td>Ctrl+Shift+C</td><td>копировать саму картинку</td></tr>
-<tr><td>Ctrl+колесо</td><td>размер плиток в библиотеке</td></tr>
-<tr><td>Пробел</td><td>в библиотеке - просмотр на всё окно (стрелки листают, B - подложка)</td></tr>
-<tr><td>B</td><td>в библиотеке - подложка плиток: шахматка / светлая / тёмная</td></tr>
-<tr><td>Цвета под просмотром</td><td>главные цвета картинки, щелчок копирует код (#rrggbb)</td></tr>
-<tr><td>Ctrl+D</td><td>в избранное / убрать</td></tr>
-<tr><td>Метка в имени</td><td>«Космос [ic tokyo]» (кнопка «Имена» в промптах) - окно само выберет нарезку и папку</td></tr>
-<tr><td>Ctrl+R</td><td>редактировать: поворот, кадрирование, цвет, перекраска в палитру, убрать фон и кайму, кисть,
-обводка, квадрат, тень, свечение, скругление, размер, рецепты;
-несколько выбранных - одна правка на все; оригинал уходит в «_sources», Ctrl+Z возвращает</td></tr>
-<tr><td>Ctrl+K</td><td>сжать и конвертировать: шторка до/после, «самый лёгкий» формат, лимит в КБ, сравнение форматов</td></tr>
-<tr><td>Ctrl+E</td><td>выгрузить выбранное в папку проекта (формат, размер, @2x/@3x, лимит в КБ, svg)</td></tr>
-<tr><td>Ctrl+I</td><td>вес разделов: где тяжелее всего, сколько сэкономлено, сжать тяжёлые</td></tr>
-<tr><td>Меню плитки</td><td>«Сделать копию в формате» - в фоне, по всем ядрам, Ctrl+Z убирает копии</td></tr>
-<tr><td>F9</td><td>живой фон окна: плывёт / застыл (застывший не тратит процессор)</td></tr>
-</table><p>Картинки из библиотеки можно перетаскивать мышью прямо в другие программы.</p>
-<p>Если что-то пошло не так, окно не закрывается, а пишет ошибку в «_tools/_errors.log».</p>"""
 
 
 # ---------------------------------------------------------------- окно
@@ -159,11 +114,15 @@ class Window(QMainWindow):
             b.setToolTip(tip)
             b.clicked.connect(fn)
             ch.addWidget(b)
+        ai = QPushButton(lib_icon("sparkles"), "ИИ-помощники", objectName="ghost")
+        ai.setToolTip("Claude, Cursor и другие помощники: подключить, что им можно, что они сделали")
+        ai.clicked.connect(self.agents)
+        ch.addWidget(ai)
         self.gen_btn = QPushButton(lib_icon("eye"), "", objectName="ghost")
         self.gen_btn.clicked.connect(self.pick_gen)
         ch.addWidget(self.gen_btn)
         helpb = QPushButton(lib_icon("question-mark-bubble"), "", objectName="ghost")
-        helpb.setToolTip("Горячие клавиши (F1)")
+        helpb.setToolTip("Справка: что умеет окно, горячие клавиши, что нового (F1)")
         helpb.clicked.connect(self.show_help)
         ch.addWidget(helpb)
         self.tabs.setCornerWidget(corner)
@@ -233,6 +192,7 @@ class Window(QMainWindow):
         self.tabs.setCurrentIndex(self.cfg.get("tab", 0) if inbox_files() == [] else 0)
         if self.cfg.get("max"):
             self.setWindowState(Qt.WindowState.WindowMaximized)
+        QTimer.singleShot(900, self.greet)
 
     def show_sem_progress(self, prog):
         if prog is None:
@@ -244,9 +204,13 @@ class Window(QMainWindow):
         self.sem_lbl.show()
 
     def say(self, text, undo=False):
-        """undo - в пузыре кнопка «Отменить» (последнее действие из истории)."""
+        """undo - в пузыре кнопка «Отменить»: только что записанное действие (не старше пары секунд -
+        если это действие ничего не записало, чужое не подвернётся)."""
         if self.isVisible():
-            jid = self.history[-1][2] if undo and self.history else None
+            jid, t = getattr(self, "last_push", (None, 0))
+            self.last_push = (None, 0)
+            fresh = undo and jid and time.monotonic() - t < 3 and self.history and self.history[-1][2] == jid
+            jid = jid if fresh else None
             act = ("Отменить", lambda: self.undo(ids={jid})) if jid else None
             self.toast.say(text, 6000 if act else 3200, act)    # пузырь внизу; строка состояния - пока окно не показано
         else:
@@ -322,6 +286,7 @@ class Window(QMainWindow):
             return
         jid = journal.record(journal.WINDOW, text, steps)
         self.jseen = max(self.jseen, jid or 0)
+        self.last_push = (jid, time.monotonic())
         self.history = (self.history + [(text, steps, jid)])[-20:]
         self.drop_redo()                    # новое действие - вернуть отменённое уже нельзя
         self.update_undo()
@@ -551,8 +516,18 @@ class Window(QMainWindow):
         self.aurora.set_live(self.cfg["live_bg"])
         self.say("Живой фон: " + ("плывёт" if self.cfg["live_bg"] else "застыл (F9 - включить)"))
 
-    def show_help(self):
-        QMessageBox.information(self, f"Горячие клавиши - Библиотека картинок {VERSION}", HELP)
+    def show_help(self, topic=None):
+        HelpDialog(self, topic).show()
+
+    def agents(self):
+        AgentsDialog(self).exec()
+
+    def greet(self):
+        """После обновления - «Что нового», при самом первом запуске - «С чего начать»."""
+        seen = self.cfg.get("seen_version")
+        self.cfg["seen_version"] = VERSION
+        if seen != VERSION:
+            self.show_help(NEW if seen or self.cfg.get("size") else "С чего начать")
 
     def open_gallery(self):
         self.gal.stop()
