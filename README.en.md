@@ -1,6 +1,6 @@
 <div align="center">
 
-[Русский](README.md) · **English**
+[Русский](README.md) | **English**
 
 <img src="_docs/screenshots/logo.png" alt="Picture Library logo: an image file with mountains and a sun" width="120">
 
@@ -8,22 +8,22 @@
 
 ### A personal library of icons, stickers and backgrounds with a sorting window: cuts generated sheets, files them, searches by meaning
 
-4x3 sheet cutting with preview · filing by section and palette · semantic search in Russian and English<br>
-tag and folder suggestions · smart folders · neural background removal and x4 upscaling<br>
+4x3 sheet cutting with preview, filing by section and palette, semantic search in Russian and English<br>
+tag and folder suggestions, smart folders, neural background removal and x4 upscaling<br>
 AI assistants (Claude, Cursor) search, view and edit pictures - every change shows up in the window and can be undone
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
-![version](https://img.shields.io/badge/version-2.2.0-cba6f7)
+![version](https://img.shields.io/badge/version-2.3.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/tests-47%20ok-a6e3a1)
+![tests](https://img.shields.io/badge/tests-53%20ok-a6e3a1)
 ![images](https://img.shields.io/badge/pictures-4160-89b4fa)
 ![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
 ![license](https://img.shields.io/badge/code-MIT-green)
 
 <img src="_docs/screenshots/hero.webp" alt="Library window: section tree on the left, sticker tiles in the middle, a baby dragon preview with colors and a tag suggestion on the right" width="880">
 
-<sub>One folder · PyQt6 window · Pillow and numpy core · semantic search on onnxruntime</sub>
+<sub>One folder, PyQt6 window, Pillow and numpy core, semantic search on onnxruntime</sub>
 
 </div>
 
@@ -40,7 +40,7 @@ Then run **`Library.cmd`** - a window opens with two tabs: "Входящие" (I
 The interface is in Russian.
 
 ```bash
-_tools\run-tests.cmd                            # all tests (47 checks, no window)
+_tools\run-tests.cmd                            # all tests (53 checks, no window)
 py -3.14 _tools/cli.py gallery                  # rebuild Gallery.html - the whole library in a browser
 py -3.14 _tools/cli.py cut sheet.png --grid 4x3  # cut a sheet without the window
 ```
@@ -87,6 +87,7 @@ suggested, and everything is filed into the right section and palette.
 | **Cutting** | 4x3 grid (neighbours touching by outline are split), auto search, whole picture; background removal, white outline, padding, size, format; hand-editable boxes |
 | **Tag in the name** | a file `Космос [ic tokyo]` picks the cutting, section and palette itself and takes the 12 piece names from `Prompts.html` |
 | **Semantic search** | crystal-ball button (Ctrl+M): "cat in space", "sad mascot" - no words in file names needed |
+| **Unreal** (Ctrl+3) | PBR textures, HDRI skies, 3D models and IES light profiles by theme; 3D viewer (model, texture on a sphere, 360 panorama); "Download more..." fetches CC0 assets from Poly Haven and ambientCG; drag a tile straight into the Content Browser |
 | **Search by image** | drop a file or a tile onto the search field; "Similar" and "Similar by meaning" in the tile menu |
 | **Tags** | suggestions in the inbox and for the selected picture, optional auto-tagging for batch filing; tags and notes are searchable |
 | **Neural editing** | remove any background (BiRefNet-lite), sharp x2/x4 upscaling (Real-ESRGAN, separate models for art and photos); CLI `nobg`, `upscale`, `cut --bg ai` |
@@ -171,6 +172,7 @@ py -3.14 _tools/cli.py cut sheet.png --grid 4x3 --names a,b,c --outline 8 --bg a
 py -3.14 _tools/cli.py convert folder --to webp --max 1920 [--replace]
 py -3.14 _tools/cli.py dupes [folder]
 py -3.14 _tools/cli.py gallery
+py -3.14 _tools/cli.py unreal get tex "Город" --count 6 --res 2k   # Unreal assets: tex | hdri | model | ies
 py -3.14 _tools/cli.py api                                  # assistant tools, JSON output
 py -3.14 _tools/cli.py api search '{"query": "cozy night street"}'
 ```
