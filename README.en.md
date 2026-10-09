@@ -14,10 +14,10 @@ AI assistants (Claude, Cursor) search, view and edit pictures - every change sho
 an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D viewer
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
-![version](https://img.shields.io/badge/version-2.3.0-cba6f7)
+![version](https://img.shields.io/badge/version-2.4.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/tests-64%20ok-a6e3a1)
+![tests](https://img.shields.io/badge/tests-99%20ok-a6e3a1)
 ![images](https://img.shields.io/badge/pictures-4163-89b4fa)
 ![unreal](https://img.shields.io/badge/Unreal-CC0%20assets-313244)
 ![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
@@ -42,7 +42,7 @@ Then run **`Library.cmd`** - a window opens with three tabs: "Входящие" 
 The interface is in Russian.
 
 ```bash
-_tools\run-tests.cmd                            # all tests (64 checks, no window)
+_tools\run-tests.cmd                            # all tests (99 checks, no window)
 py -3.14 _tools/cli.py gallery                  # rebuild Gallery.html - the whole library in a browser
 py -3.14 _tools/cli.py cut sheet.png --grid 4x3  # cut a sheet without the window
 ```
@@ -145,6 +145,21 @@ Unreal assets.
 
 <div align="center">
 <img src="_docs/screenshots/find.webp" alt="Find anywhere: the Russian word for whale finds whale.webp first" width="620">
+</div>
+
+### Room from a description, Blender and Unreal in one click
+
+"Подборка по описанию" (room from a description): type "a cozy Scandinavian bedroom" and the AI picks items per
+section, floor, walls and light from the downloaded assets (realistic and low-poly are not mixed; "another
+option" on every row). The result opens **in Blender** (models at real scale, PBR materials with the DirectX
+normal flipped, chandeliers on the ceiling, pictures on the wall, saved as .blend) or is **imported straight
+into an Unreal project** without opening the editor (pythonscript commandlet; tested on UE 5.8). A **project
+pack** bundles the files, the import script, CREDITS.md and manifest.json. AI assistants get the same through
+`ue_plan_room`, `ue_blender` (returns a render), `ue_import`, `ue_pack` and more.
+
+<div align="center">
+<img src="_docs/screenshots/scene.webp" alt="Room from a description: nine items by section, floor, walls and sky" width="49%">
+<img src="_docs/screenshots/blender.webp" alt="Blender render of the same room" width="49%">
 </div>
 
 ## Tools and themes
