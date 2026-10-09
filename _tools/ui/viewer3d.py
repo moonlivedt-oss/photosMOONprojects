@@ -5,6 +5,7 @@ HDRI - панорама изнутри. Мышь: тянуть - вращать,
 
 import hashlib
 import os
+from html import escape as esc  # сведения - rich text: имена и метки с сайта не должны стать разметкой
 
 from PIL import Image
 from PyQt6.QtCore import QSize, Qt, QUrl
@@ -622,23 +623,24 @@ class Viewer3D(QDialog):
         elif self.root is not None and self.root.property("sizeText"):
             rows.append(f"Габариты: {self.root.property('sizeText')} (единицы файла)")
         if a.get("description"):
-            rows.append(a["description"])
+            rows.append(esc(a["description"]))
         src = a.get("source", "")
         authors = [x for x in a.get("authors", []) if x != src]
         if authors:
             src += ", " + ", ".join(authors)
+        src = esc(src)
         if a.get("url"):
-            src = f'<a href="{a["url"]}" style="color:{C["acc"]}">{src}</a>'
+            src = f'<a href="{esc(a["url"])}" style="color:{C["acc"]}">{src}</a>'
         rows.append(src)
-        rows.append("Лицензия: CC0" if "CC0" in a.get("license", "") else a.get("license", ""))
+        rows.append("Лицензия: CC0" if "CC0" in a.get("license", "") else esc(a.get("license", "")))
         if a.get("tags"):
-            rows.append("Метки: " + ", ".join(a["tags"][:12]))
+            rows.append("Метки: " + esc(", ".join(a["tags"][:12])))
         # имя файла без пробелов не переносится и раздвигает панель - по одному в строку, длинные с многоточием
         names = [os.path.basename(m) for m in a.get("main", [])]
-        rows.append("Файлы:<br>" + "<br>".join(n if len(n) <= 34 else n[:16] + "..." + n[-15:] for n in names))
+        rows.append("Файлы:<br>" + "<br>".join(esc(n if len(n) <= 34 else n[:16] + "..." + n[-15:]) for n in names))
         how = U.howto(a)
         if how:
-            rows.append(f"<br><b>Как в Unreal.</b> {how}")
+            rows.append(f"<br><b>Как в Unreal.</b> {esc(how)}")
         self.info.setText("<br>".join(r for r in rows if r))
 
     # ------------------------------------------------------------ кнопки
