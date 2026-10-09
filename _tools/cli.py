@@ -6,6 +6,8 @@ py -3.14 cli.py cut sheet.png [more.png ...] [--grid 4x3] [--size 256] [--names 
 py -3.14 cli.py convert FILES/DIRS [--to webp|avif|png|jpg|ico] [--max 1920] [--replace]
 py -3.14 cli.py dupes [DIR]
 py -3.14 cli.py gallery
+py -3.14 cli.py unreal                       # ассеты Unreal: что скачано, темы
+py -3.14 cli.py unreal get tex "Город" --count 6 --res 2k     # tex | hdri | model | ies
 py -3.14 cli.py api                          # операции для ИИ-помощников и скриптов (JSON)
 py -3.14 cli.py api search '{"query": "ночной город"}'
 py -3.14 cli.py api view '{"paths": ["04 Иконки/x.webp"]}' --out preview.png
@@ -198,6 +200,52 @@ def cmd_api(a):
     print(json.dumps(res, ensure_ascii=False, indent=1, default=str))
 
 
+def unreal_previews():
+    """Превью моделям без картинки (Quaternius): рисуются 3D-сценой окна."""
+    from library import unreal as U
+    from ui.render_previews import needs_preview, render_all
+    from ui.viewer3d import studio_probe
+
+    items = U.assets()
+    todo = [x for x in items if needs_preview(x)]
+    if todo:
+        print(f"Рисую превью: {len(todo)}")
+        print("  готово:", render_all(todo, studio_probe(items, {})))
+
+
+def cmd_unreal(a):
+    """Ассеты для Unreal Engine: _Unreal/<вид>/<тема>/<имя>."""
+    from library import unreal as U
+
+    if a.action == "get":
+        if a.kind not in U.KINDS:
+            sys.exit("вид: " + " | ".join(U.KINDS))
+        themes = list(U.THEMES) if a.theme in (None, "все") else [a.theme]
+        for th in themes:
+            if th not in U.THEMES and a.kind != "ies":
+                sys.exit("темы: " + ", ".join(U.THEMES))
+            print(U.KINDS[a.kind][1] + ("" if a.kind == "ies" else f" / {th}") + ":")
+            out = U.get_many(a.kind, th, a.count, a.res)
+            print(f"  скачано: {len(out)}")
+            if a.kind == "ies":
+                break
+        if a.kind == "model":
+            unreal_previews()
+        return
+    if a.action == "previews":
+        unreal_previews()
+        return
+    items = U.assets()
+    print("Папка:", U.ROOT)
+    for kind, (_folder, title, _t) in U.KINDS.items():
+        mine = [x for x in items if x.get("kind") == kind]
+        size = sum(x.get("size", 0) for x in mine)
+        print(f"{title}: {len(mine)} ({size / 2**20:.0f} МБ)")
+        for th in sorted({x.get("theme", "") for x in mine}):
+            print(f"  {th}: {sum(1 for x in mine if x.get('theme') == th)}")
+    print("Темы:", ", ".join(U.THEMES))
+
+
 def main():
     p = argparse.ArgumentParser(description="Инструменты библиотеки картинок")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -240,6 +288,12 @@ def main():
     ap.add_argument("--out", help="куда сохранить картинку-ответ (view, edit preview)")
     ap.add_argument("--who", default="ИИ (командная строка)", help="кто действует - так подписано в журнале")
     ap.add_argument("--help-tool", action="store_true", help="описание и схема параметров операции")
+    ue = sub.add_parser("unreal", help="ассеты для Unreal Engine (CC0): текстуры, HDRI, модели, IES")
+    ue.add_argument("action", nargs="?", default="list", choices=["list", "get", "previews"])
+    ue.add_argument("kind", nargs="?", default="tex", help="tex | hdri | model | ies")
+    ue.add_argument("theme", nargs="?", help="тема или «все»")
+    ue.add_argument("--count", type=int, default=4)
+    ue.add_argument("--res", default="2k", choices=["1k", "2k", "4k"])
     a = p.parse_args()
     {
         "cut": cmd_cut,
@@ -249,6 +303,7 @@ def main():
         "upscale": cmd_upscale,
         "nobg": cmd_nobg,
         "api": cmd_api,
+        "unreal": cmd_unreal,
     }[a.cmd](a)
 
 
