@@ -8,7 +8,7 @@ import time
 from PIL import Image
 from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QMimeData, QRectF, QSize, QStringListModel, Qt, QTimer, QUrl, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QIcon, QPainter, QPainterPath, QPixmap
+from PyQt6.QtGui import QBrush, QColor, QCursor, QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -149,6 +149,10 @@ class Preview(QWidget):
         self.chips.setSpacing(5)
         self.pal_lbl = QLabel("ЦВЕТА", objectName="faint")
         self.colors = QHBoxLayout()  # главные цвета картинки: щелчок копирует HEX
+        self.ver_lbl = QLabel("ВЕРСИИ", objectName="faint")
+        self.ver_lbl.setToolTip("Прошлые версии после правки и сжатия: сравнить или вернуть")
+        self.vers = QHBoxLayout()  # прошлые версии из _sources: щелчок - сравнить или вернуть
+        self.vers.setSpacing(6)
         self.colors.setSpacing(6)
         self.tag_lbl = QLabel("МЕТКИ И ЗАМЕТКА", objectName="faint")
         self.tags = QLineEdit(placeholderText="метки через запятую: космос, для сайта")
@@ -230,6 +234,8 @@ class Preview(QWidget):
         v.addSpacing(2)
         v.addWidget(self.pal_lbl)
         v.addLayout(self.colors)
+        v.addWidget(self.ver_lbl)
+        v.addLayout(self.vers)
         v.addWidget(self.tag_lbl)
         v.addWidget(self.tags)
         v.addWidget(self.hints)
@@ -336,6 +342,7 @@ class Preview(QWidget):
         on = bool(paths) and os.path.relpath(paths[0], LIB) in fav
         self.fav_btn.setToolTip("Убрать из избранного  (Ctrl+D)" if on else "В избранное  (Ctrl+D)")
         self.show_colors(paths[0] if len(paths) == 1 else None)
+        self.show_versions(paths[0] if len(paths) == 1 else None)
         mode = None if mode == "chk" else mode  # прозрачное - прямо на свечении, без шахматки
         if not paths:
             self.pgen = getattr(self, "pgen", 0) + 1  # недогруженная прошлая картинка не всплывёт
@@ -402,6 +409,31 @@ class Preview(QWidget):
             self.pic.set_pixmap(remember(key, pm) if key else pm)
 
         bg(lambda: tile_image(path, 512, mode), done)
+
+    def show_versions(self, path):
+        """Прошлые версии картинки (правка, сжатие) - маленькими превью; нет версий - строки нет."""
+        from library import versions
+
+        self.clear_row(self.vers)
+        vs = versions.versions(path)[:6] if path else []
+        self.ver_lbl.setVisible(bool(vs))
+        for vinfo in vs:
+            b = QPushButton(objectName="tool")
+            b.setIcon(QIcon(thumb(vinfo["path"], 64)))
+            b.setIconSize(QSize(34, 34))
+            b.setToolTip(f"{vinfo['kind']} {vinfo['date']}, {human(vinfo['size'])} - щелчок: сравнить или вернуть")
+            b.clicked.connect(lambda _c=False, vp=vinfo["path"], cur=path: self.version_menu(cur, vp))
+            self.vers.addWidget(b)
+        self.vers.addStretch(1)
+
+    def version_menu(self, cur, ver):
+        m = QMenu(self)
+        m.addAction(lib_icon("magnifying-glass"), "Сравнить с текущей", lambda: self.tab.compare([ver, cur]))
+        m.addAction(
+            lib_icon("arrow_counterclockwise"), "Вернуть эту версию", lambda: self.tab.restore_version(cur, ver)
+        )
+        m.addAction(lib_icon("folder"), "Показать в проводнике", lambda: reveal(ver))
+        m.exec(QCursor.pos())
 
     def show_colors(self, path):
         """Палитра картинки (как в Eagle): считается в фоне, щелчок по цвету копирует его код.
@@ -1050,6 +1082,20 @@ class LibTab(QWidget):
         targets = self.paths() if targets is None else targets
         self.pal_dlg = PaletteDialog(self.win, targets, source)
         self.pal_dlg.show()
+
+    def restore_version(self, cur, ver):
+        """Вернуть прошлую версию: текущая сама станет версией, Ctrl+Z отменит."""
+        from library import versions
+
+        try:
+            new, steps = versions.restore(cur, ver)
+        except Exception as e:
+            self.win.say(f"Не вышло: {e}")
+            return
+        self.win.push(f"Возвращена версия: {os.path.basename(new)}", steps)
+        forget_counts()
+        self.show_files()
+        self.win.say("Возвращена прошлая версия - текущая сохранена в истории", undo=True)
 
     def compare(self, paths=None):
         from ui.tools_dialogs import CompareDialog
