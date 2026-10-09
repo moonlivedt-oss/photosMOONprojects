@@ -85,6 +85,10 @@ class UnrealTab(QWidget):
         self.sem_btn.setVisible(self.sem is not None)
         if self.sem is not None and self.sem_btn.isChecked():
             self.q.setPlaceholderText("Поиск по смыслу: деревянный стул, ржавый металл, закат...")
+        scene = QPushButton(lib_icon("sparkles"), "Подборка по описанию...", objectName="ghost")
+        scene.setToolTip("ИИ соберёт комнату из скачанного: «уютная спальня в скандинавском стиле»")
+        scene.clicked.connect(self.scene)
+        self.scene_btn = scene
         cat = QPushButton(lib_icon("globe"), "Каталог...", objectName="ghost")
         cat.setToolTip("Весь каталог Poly Haven с картинками: отметить нужное и скачать")
         cat.clicked.connect(self.catalog)
@@ -163,6 +167,7 @@ class UnrealTab(QWidget):
         bar.addWidget(self.sem_btn)
         bar.addWidget(self.slider)
         bar.addWidget(doc)
+        bar.addWidget(scene)
         bar.addWidget(cat)
         bar.addWidget(get)
         bar.addWidget(folder)
@@ -917,6 +922,16 @@ class UnrealTab(QWidget):
             self.refresh()
 
         bg(work, done)
+
+    def scene(self):
+        from ui.scene_dialog import SceneDialog
+
+        d = getattr(self, "scene_dlg", None)
+        if d is None:
+            d = self.scene_dlg = SceneDialog(self)
+        d.show()
+        d.raise_()
+        d.q.setFocus()
 
     def catalog(self):
         d = getattr(self, "cat_dlg", None)

@@ -41,6 +41,12 @@ def commands(win):
         ("Выгрузить выбранные в проект", "экспорт export", "upload-arrow", lib.export),
         ("Редактировать выбранную", "правка редактор", "paint-brush", lib.edit),
         ("Скачать ассеты Unreal", "poly haven ambientcg загрузить", "download", lambda: (tab(2), ue.download())),
+        (
+            "Подборка по описанию",
+            "ии комната собрать спальня кухня интерьер сцена",
+            "sparkles",
+            lambda: (tab(2), ue.scene()),
+        ),
         ("Каталог Poly Haven", "каталог ассеты", "globe", lambda: (tab(2), ue.catalog())),
     ]
 
