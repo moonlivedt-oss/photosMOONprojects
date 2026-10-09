@@ -9,6 +9,17 @@ import imaging as K
 from library import db
 from library.common import CLOSING, LIB
 
+VERSION = 4  # 2 - поворот по EXIF, 3 - размер и прозрачность, 4 - прозрачность палитровых PNG
+
+
+def has_alpha(im):
+    """Есть ли прозрачные пиксели. У палитровых PNG (значки Kenney) прозрачность - в info, а не каналом."""
+    if im.mode in ("P", "LA", "PA", "L", "RGB") and "transparency" in im.info or im.mode in ("LA", "PA"):
+        im = im.convert("RGBA")
+    if "A" not in im.getbands():
+        return 0
+    return int(im.getchannel("A").getextrema()[0] < 250)
+
 
 def build_sigs(old, lib=LIB):
     """Отпечатки всех картинок библиотеки (в фоне), неизменённые берутся из кэша."""
@@ -24,19 +35,32 @@ def build_sigs(old, lib=LIB):
         except OSError:
             continue
         o = old.get(rel)
-        if o and o[0] == mt and len(o) > 4:  # 5-е поле - версия: отпечатки с поворотом по EXIF
+        if o and o[0] == mt and len(o) > 4 and (o[4] or 0) >= VERSION:  # версия 3 - с размером и прозрачностью
             new[rel] = o
             continue
         try:
             with Image.open(f) as im:
+                w, h = im.size  # настоящий размер - до уменьшения draft
                 im.draft("RGB", (96, 96))
                 im = K.upright(im)
+                if (w > h) != (im.width > im.height):  # EXIF повернул картинку
+                    w, h = h, w
                 ratio = im.width / im.height
                 _r, v = K.signature(im)
                 col = K.colors(im)
+                alpha = has_alpha(im)
         except Exception:
             continue
-        new[rel] = [mt, round(ratio, 4), np.clip(np.rint(v), 0, 255).astype(np.uint8).ravel(), col, 2]
+        new[rel] = [
+            mt,
+            round(ratio, 4),
+            np.clip(np.rint(v), 0, 255).astype(np.uint8).ravel(),
+            col,
+            VERSION,
+            w,
+            h,
+            alpha,
+        ]
     return new
 
 
@@ -59,6 +83,11 @@ class SigIndex:
         self.ratio = np.array([v[1] for _k, v in items], dtype=float)
         self.vec = np.stack([np.asarray(v[2], dtype=float) for _k, v in items]) if items else np.zeros((0, 432))
         self.col = {k: (v[3] if len(v) > 3 else "") for k, v in items}
+        self.meta = {k: tuple(v[5:8]) for k, v in items if len(v) > 7 and v[5]}  # (ширина, высота, прозрачность)
+
+    def meta_of(self, path):
+        """(ширина, высота, есть ли прозрачность) или None - ещё не посчитано."""
+        return self.meta.get(os.path.relpath(path, self.lib))
 
     def has_color(self, path, code):
         return code in self.col.get(os.path.relpath(path, self.lib), "")

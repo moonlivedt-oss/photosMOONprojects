@@ -89,6 +89,45 @@ from ui.widgets import (
     select_path,
 )
 
+FILTERS = (
+    (
+        "orient",
+        "Ориентация",
+        (("any", "Любая"), ("land", "Горизонтальные"), ("port", "Вертикальные"), ("square", "Квадратные")),
+    ),
+    ("alpha", "Прозрачность", (("any", "Любая"), ("yes", "С прозрачным фоном"), ("no", "Без прозрачности"))),
+    (
+        "size",
+        "Размер",
+        (("any", "Любой"), ("small", "Маленькие, до 128"), ("mid", "Средние"), ("big", "Большие, от 1024")),
+    ),
+    ("fmt", "Формат", (("any", "Любой"), ("png", "PNG"), ("webp", "WEBP"), ("jpg", "JPG"), ("svg", "SVG"))),
+)
+FILTER_DEFAULT = {k: "any" for k, _t, _o in FILTERS}
+
+
+def passes(path, f, meta):
+    """Подходит ли картинка под фильтры. meta = (ширина, высота, прозрачность) или None - ещё не посчитано:
+    такую не прячем по размеру и прозрачности (иначе свежие картинки пропадали бы до пересчёта)."""
+    ext = os.path.splitext(path)[1].lower().lstrip(".")
+    if f["fmt"] != "any" and {"jpeg": "jpg"}.get(ext, ext) != f["fmt"]:
+        return False
+    if meta is None or not meta[0]:
+        return True
+    w, h, alpha = meta
+    if f["orient"] == "land" and not w > h * 1.05:
+        return False
+    if f["orient"] == "port" and not h > w * 1.05:
+        return False
+    if f["orient"] == "square" and (w > h * 1.05 or h > w * 1.05):
+        return False
+    if f["alpha"] != "any" and bool(alpha) != (f["alpha"] == "yes"):
+        return False
+    side = max(w, h)
+    if f["size"] == "small" and side > 128 or f["size"] == "big" and side < 1024:
+        return False
+    return not (f["size"] == "mid" and not 128 < side < 1024)
+
 
 class Preview(QWidget):
     """Правая панель: крупный просмотр выбранной картинки (со свечением её цвета), сведения,
@@ -644,6 +683,14 @@ class LibTab(QWidget):
         self.color.setToolTip("Показать только картинки, где заметен этот цвет")
         self.color.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.color.currentIndexChanged.connect(self.show_files)
+        # фильтры: ориентация, прозрачность, размер, формат (размер и прозрачность - из отпечатков)
+        self.filt = dict(FILTER_DEFAULT, **self.cfg.get("lib_filters", {}))
+        self.filt_btn = QPushButton(lib_icon("menuList"), "Фильтры", objectName="ghost")
+        self.filt_btn.setToolTip("Ориентация, прозрачность, размер, формат")
+        self.filt_menu = QMenu(self)
+        self.filt_btn.setMenu(self.filt_menu)
+        self.filt_menu.aboutToShow.connect(self.fill_filters)
+        self.show_filter_count()
         self.sort = QComboBox()
         for t, v in (("По имени", "name"), ("Сначала новые", "new"), ("Сначала тяжёлые", "size")):
             self.sort.addItem(t, v)
@@ -677,6 +724,7 @@ class LibTab(QWidget):
         bar.addWidget(self.sem)
         bar.addWidget(self.save_q)
         bar.addWidget(self.color)
+        bar.addWidget(self.filt_btn)
         bar.addWidget(self.sort)
         bar.addWidget(self.back)
         bar.addWidget(self.slider)
@@ -905,6 +953,33 @@ class LibTab(QWidget):
         it = self.tree.currentItem()
         if it and it.data(0, ROLE):
             self.cfg["lib_section"] = it.data(0, ROLE)
+
+    def fill_filters(self):
+        m = self.filt_menu
+        m.clear()
+        for i, (fk, title, opts) in enumerate(FILTERS):
+            if i:
+                m.addSeparator()
+            m.addAction(title.upper()).setEnabled(False)  # addSection в этом стиле заголовок не рисует
+            for val, text in opts:
+                a = m.addAction(text, lambda k=fk, v=val: self.set_filter(k, v))
+                a.setCheckable(True)
+                a.setChecked(self.filt[fk] == val)
+        m.addSeparator()
+        m.addAction(lib_icon("cross"), "Сбросить фильтры", lambda: self.set_filter(None, None))
+
+    def set_filter(self, key, val):
+        if key is None:
+            self.filt = dict(FILTER_DEFAULT)
+        else:
+            self.filt[key] = val
+        self.cfg["lib_filters"] = {k: v for k, v in self.filt.items() if v != FILTER_DEFAULT[k]}
+        self.show_filter_count()
+        self.show_files()
+
+    def show_filter_count(self):
+        n = sum(1 for k, v in self.filt.items() if v != FILTER_DEFAULT[k])
+        self.filt_btn.setText(f"Фильтры: {n}" if n else "Фильтры")
 
     def sync_quick(self, it, _prev=None):
         role = it.data(0, ROLE) if it else None
@@ -1201,6 +1276,8 @@ class LibTab(QWidget):
                 files, sem, root = self.win.sem.search(" ".join(words)), "fallback", RECENT  # по именам пусто
         if code:
             files = [p for p in files if self.win.sigs.has_color(p, code)]
+        if any(self.filt[k] != v for k, v in FILTER_DEFAULT.items()):
+            files = [p for p in files if passes(p, self.filt, self.win.sigs.meta_of(p))]
         how = self.sort.currentData()
         self.cfg["sort"] = how
         if how == "new" and root not in (RECENT, HEAVY):

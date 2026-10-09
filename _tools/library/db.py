@@ -48,6 +48,12 @@ def _open():
                 CREATE TABLE IF NOT EXISTS journal(id INTEGER PRIMARY KEY AUTOINCREMENT, t REAL, who TEXT,
                                                    text TEXT, steps TEXT, undone INT DEFAULT 0);
             """)
+        # 2.4: размер в пикселях и прозрачность - для фильтров библиотеки (старые строки пересчитаются)
+        have = {r[1] for r in c.execute("PRAGMA table_info(sigs)")}
+        for col in ("w", "h", "alpha"):
+            if col not in have:
+                c.execute(f"ALTER TABLE sigs ADD COLUMN {col} INT")
+        c.commit()
     except sqlite3.DatabaseError:
         c.close()
         raise
@@ -63,16 +69,16 @@ def close():
 
 
 def load_sigs():
-    """{rel: [mt, ratio, vec (uint8, 432), цвета, версия]}"""
+    """{rel: [mt, ratio, vec (uint8, 432), цвета, версия, ширина, высота, прозрачность]}"""
     with _lock:
-        rows = conn().execute("SELECT rel, mt, ratio, vec, col, ver FROM sigs").fetchall()
-    return {r[0]: [r[1], r[2], np.frombuffer(r[3], np.uint8), r[4] or "", r[5]] for r in rows}
+        rows = conn().execute("SELECT rel, mt, ratio, vec, col, ver, w, h, alpha FROM sigs").fetchall()
+    return {r[0]: [r[1], r[2], np.frombuffer(r[3], np.uint8), r[4] or "", r[5], r[6], r[7], r[8]] for r in rows}
 
 
 def save_sigs(new, old):
     """Записать только разницу между old и new."""
     up = [
-        (rel, v[0], v[1], np.asarray(v[2], np.uint8).tobytes(), v[3], v[4])
+        (rel, v[0], v[1], np.asarray(v[2], np.uint8).tobytes(), v[3], v[4], *(list(v[5:8]) + [None] * 3)[:3])
         for rel, v in new.items()
         if rel not in old or old[rel][0] != v[0] or old[rel][4] != v[4]
     ]
@@ -82,7 +88,10 @@ def save_sigs(new, old):
     with _lock:
         c = conn()
         with c:
-            c.executemany("INSERT OR REPLACE INTO sigs VALUES (?,?,?,?,?,?)", up)
+            c.executemany(
+                "INSERT OR REPLACE INTO sigs (rel, mt, ratio, vec, col, ver, w, h, alpha) VALUES (?,?,?,?,?,?,?,?,?)",
+                up,
+            )
             c.executemany("DELETE FROM sigs WHERE rel=?", gone)
 
 
