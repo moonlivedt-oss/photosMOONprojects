@@ -14,6 +14,7 @@ import os
 import shutil
 import time
 
+import library.common as C
 from library import db
 from library.common import PARK, unique
 
@@ -59,6 +60,28 @@ def entries(limit=30, since=0, who=None, undone=None):
     args.append(limit)
     with db._lock:
         return [_row(r) for r in db.conn().execute(q, args)]
+
+
+def touched(steps, results=False):
+    """Какие картинки трогает действие: множество путей (normcase). results - только то, что
+    получилось в итоге (новые файлы, куда перенесено, чьи метки): исходный путь переноса освобождается."""
+    out = set()
+    for s in steps:
+        if s[0] == "new":
+            out.add(os.path.normcase(s[1]))
+        elif s[0] == "move":
+            out.add(os.path.normcase(s[2]))
+            if not results:
+                out.add(os.path.normcase(s[1]))
+        elif s[0] in ("tags", "note", "fav"):
+            out.add(os.path.normcase(os.path.join(C.LIB, s[1])))
+    return out
+
+
+def touching_later(e, limit=300):
+    """Не отменённые действия после e, что трогали те же картинки - их отмена должна идти раньше."""
+    mine = touched(e["steps"], results=True)
+    return [x for x in reversed(entries(limit, since=e["id"], undone=False)) if touched(x["steps"]) & mine]
 
 
 def get(jid):

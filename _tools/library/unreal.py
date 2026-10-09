@@ -189,7 +189,41 @@ THEMES = {
     # Kenney: простые low-poly модели одним архивом - для черновой расстановки комнат
     "Дом - Kenney low-poly": {"kenney": ["furniture-kit"]},
     # Quaternius: low-poly с цветными материалами, тоже CC0; папки FBX на Google Drive
-    "Дом - Quaternius low-poly": {"quaternius": ["ultimate-home-interior", "furniture"]},
+    "Дом - Quaternius low-poly": {"quaternius": ["ultimate-home-interior", "furniture", "ultimatefurniture"]},
+    # другие наборы Kenney (CC0) - для уровней и прототипов; цвета в общей текстуре colormap.png
+    "Лес и природа - Kenney low-poly": {"kenney": ["nature-kit", "survival-kit"], "categories": ["nature"]},
+    "Город - Kenney low-poly": {
+        "kenney": ["city-kit-suburban", "city-kit-commercial", "city-kit-roads", "car-kit"],
+        "categories": ["buildings", "street"],
+    },
+    "Средневековье - Kenney low-poly": {
+        "kenney": ["castle-kit", "fantasy-town-kit", "graveyard-kit", "mini-dungeon"],
+        "categories": ["medieval", "fantasy"],
+    },
+    "Космос - Kenney low-poly": {"kenney": ["space-kit", "space-station-kit"], "categories": ["sci-fi", "space"]},
+    "Еда - Kenney low-poly": {"kenney": ["food-kit"], "categories": ["food"]},
+    # другие наборы Quaternius (CC0): папки FBX и OBJ находятся сами по странице набора (quaternius_folders)
+    "Лес и природа - Quaternius low-poly": {
+        "quaternius": ["ultimatenature", "simplenature", "survival"],
+        "categories": ["nature"],
+    },
+    "Город - Quaternius low-poly": {
+        "quaternius": ["cars", "buildings", "modularstreets", "publictransport"],
+        "categories": ["buildings", "street"],
+    },
+    "Средневековье - Quaternius low-poly": {
+        "quaternius": ["medievalvillage", "modularmedievalbuildings", "medievaldungeon", "modulardungeon", "piratekit"],
+        "categories": ["medieval", "fantasy"],
+    },
+    "Космос - Quaternius low-poly": {
+        "quaternius": ["ultimatespacekit", "ultimatemodularscifi", "spaceships"],
+        "categories": ["sci-fi", "space"],
+    },
+    "Еда - Quaternius low-poly": {"quaternius": ["ultimatefood", "junkfood"], "categories": ["food"]},
+    "Животные - Quaternius low-poly": {
+        "quaternius": ["ultimateanimatedanimals", "farmanimal"],
+        "categories": ["animals", "rigged"],
+    },
 }
 
 # куда в Unreal и как - подсказка в окне и в asset.json
@@ -302,9 +336,13 @@ def candidates(kind, theme, have=()):
     want = THEMES[theme].get(kind) or set()
     out = []
     if kind == "model" and THEMES[theme].get("quaternius"):
-        return [c for pack in THEMES[theme]["quaternius"] for c in quaternius_candidates(pack) if c["id"] not in have]
+        cats = THEMES[theme].get("categories") or ["furniture"]
+        return [
+            c for pack in THEMES[theme]["quaternius"] for c in quaternius_candidates(pack, cats) if c["id"] not in have
+        ]
     if kind == "model" and THEMES[theme].get("kenney"):
-        return [c for pack in THEMES[theme]["kenney"] for c in kenney_candidates(pack) if c["id"] not in have]
+        cats = THEMES[theme].get("categories") or ["furniture"]
+        return [c for pack in THEMES[theme]["kenney"] for c in kenney_candidates(pack, cats) if c["id"] not in have]
     if want:
         for aid, info in catalog(kind).items():
             if aid in have:
@@ -356,13 +394,13 @@ def kenney_zip(pack):
 
 
 def pretty(name):
-    """bedDouble -> Bed double; Bathroom_Mirror1 -> Bathroom mirror 1."""
+    """bedDouble -> Bed double; Bathroom_Mirror1 -> Bathroom mirror 1; bridge-draw -> Bridge draw."""
     name = re.sub(r"(?<=[A-Za-z])(?=[0-9])", " ", name)
-    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name).replace("_", " ").split()
+    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name).replace("_", " ").replace("-", " ").split()
     return " ".join(words).capitalize()
 
 
-def kenney_candidates(pack):
+def kenney_candidates(pack, categories=("furniture",)):
     with zipfile.ZipFile(kenney_zip(pack)) as zf:
         names = zf.namelist()
     fbx = sorted(n for n in names if n.startswith("Models/FBX format/") and n.lower().endswith(".fbx"))
@@ -378,6 +416,7 @@ def kenney_candidates(pack):
                 "pack": pack,
                 "member": n,
                 "base": base,
+                "categories": list(categories),
                 "score": 0,
             }
         )
@@ -385,25 +424,44 @@ def kenney_candidates(pack):
 
 
 def fetch_kenney(cand, dst):
+    """FBX набора + общая текстура цветов (у новых наборов FBX ссылается на Textures/colormap.png -
+    без неё модель белая) + превью (Isometric у старых наборов, Previews у новых)."""
+    extra = []
     with zipfile.ZipFile(kenney_zip(cand["pack"])) as zf:
         names = set(zf.namelist())
         fn = cand["base"] + ".fbx"
         with zf.open(cand["member"]) as src, open(os.path.join(dst, fn), "wb") as out:
             shutil.copyfileobj(src, out)
-        for side in ("SW", "SE", "NW", "NE"):
-            iso = f"Isometric/{cand['base']}_{side}.png"
-            if iso in names:
-                save_preview(zf.read(iso), dst)
+        tex_dir = os.path.dirname(cand["member"]) + "/Textures/"
+        for n in sorted(names):
+            if n.startswith(tex_dir) and n.lower().endswith((".png", ".jpg")) and "/" not in n[len(tex_dir) :]:
+                rel = "Textures/" + os.path.basename(n)
+                os.makedirs(os.path.join(dst, "Textures"), exist_ok=True)
+                with zf.open(n) as src, open(os.path.join(dst, *rel.split("/")), "wb") as out:
+                    shutil.copyfileobj(src, out)
+                extra.append(rel)
+        shots = [f"Isometric/{cand['base']}_{side}.png" for side in ("SW", "SE", "NW", "NE")]
+        for shot in shots + [f"Previews/{cand['base']}.png"]:
+            if shot in names:
+                data = zf.read(shot)
+                if max(Image.open(io.BytesIO(data)).size) >= 200:  # Previews у новых наборов - 64x64:
+                    save_preview(data, dst)  # такое превью нарисует 3D-сцена окна (cli unreal previews)
                 break
-    return {
+    kit = cand["pack"].replace("-kit", "").replace("-", " ")
+    meta = {
         "source": "Kenney",
         "url": f"https://kenney.nl/assets/{cand['pack']}",
         "authors": ["Kenney"],
-        "tags": ["low-poly", "kenney"],
-        "categories": ["furniture"],
+        "tags": ["low-poly", "kenney", kit],
+        "categories": cand.get("categories") or ["furniture"],
         "main": [fn],
-        "description": "Простая low-poly модель с цветами в вершинах, без текстур - для черновой расстановки.",
+        "description": "Простая low-poly модель"
+        + (" с цветами в общей текстуре colormap.png" if extra else " с цветами в вершинах, без текстур")
+        + " - для прототипов и черновой расстановки.",
     }
+    if extra:
+        meta["extra"] = extra  # не импортируются отдельно, но едут рядом с FBX
+    return meta
 
 
 # ---------------------------------------------------------------- Quaternius (папки на Google Drive)
@@ -421,10 +479,68 @@ QUATERNIUS_OBJ = {  # папки OBJ: в их .mtl настоящие цвета
 _mtl_index = {}
 
 
+QFOLDERS = os.path.join(os.path.dirname(CACHE), "_unreal_quaternius.json")  # набор -> файлы FBX и .mtl
+SKIP_DIRS = ("blend", "gltf", "textures", "obj")  # при поиске FBX - не туда
+
+
+def drive_entries(folder_id):
+    """Открытая папка Google Drive: [(имя, id, это папка)]."""
+    page = get(f"https://drive.google.com/embeddedfolderview?id={folder_id}").decode("utf-8", "replace")
+    return [
+        (html.unescape(t), i, k == "drive/folders")
+        for k, i, t in re.findall(
+            r'<a href="https://drive\.google\.com/(file/d|drive/folders)/([^/?"]+)[^"]*"[^>]*>.*?'
+            r'<div class="flip-entry-title">([^<]+)</div>',
+            page,
+            re.S,
+        )
+    ]
+
+
+def _walk_drive(folder_id, want, skip, depth=3):
+    """Файлы с окончанием want во вложенных папках (кроме skip): [(имя, id)]."""
+    out = []
+    for name, fid, is_dir in drive_entries(folder_id):
+        if is_dir:
+            if depth and not name.lower().startswith(skip):
+                out += _walk_drive(fid, want, skip, depth - 1)
+        elif name.lower().endswith(want):
+            out.append((name, fid))
+    return out
+
+
+def quaternius_folders(pack):
+    """Файлы набора Quaternius по его странице: {"page", "fbx": [(имя, id)], "mtl": {имя: id}}.
+    Ищется один раз и запоминается в _unreal_quaternius.json (у Google Drive лимит запросов)."""
+    try:
+        with open(QFOLDERS, encoding="utf-8") as fh:
+            known = json.load(fh)
+    except (OSError, ValueError):
+        known = {}
+    if pack in known:
+        return known[pack]
+    page_url = f"https://quaternius.com/packs/{pack}.html"
+    page = get(page_url).decode("utf-8", "replace")
+    roots = list(dict.fromkeys(re.findall(r"drive\.google\.com/drive/folders/([\w-]+)", page)))
+    if not roots:
+        raise OSError(f"у набора Quaternius «{pack}» нет папки на Google Drive (он на itch.io)")
+    fbx, mtl = [], {}
+    for root in roots:
+        fbx += _walk_drive(root, ".fbx", SKIP_DIRS)
+        mtl.update({n[:-4]: i for n, i in _walk_drive(root, ".mtl", ("blend", "gltf", "textures", "fbx"))})
+    info = {"page": page_url, "fbx": fbx, "mtl": mtl}
+    known[pack] = info
+    K.write_atomic(QFOLDERS, json.dumps(known, ensure_ascii=False), "utf-8")
+    return info
+
+
 def quaternius_mtl(pack, base):
     """Текст .mtl модели набора (или '')."""
     if pack not in _mtl_index:
-        _mtl_index[pack] = {n[:-4]: fid for n, fid in drive_folder(QUATERNIUS_OBJ[pack]) if n.endswith(".mtl")}
+        if pack in QUATERNIUS_OBJ:
+            _mtl_index[pack] = {n[:-4]: fid for n, fid in drive_folder(QUATERNIUS_OBJ[pack]) if n.endswith(".mtl")}
+        else:
+            _mtl_index[pack] = quaternius_folders(pack)["mtl"]
     fid = _mtl_index[pack].get(base)
     if not fid:
         return ""
@@ -446,10 +562,14 @@ def drive_folder(folder_id):
     return out
 
 
-def quaternius_candidates(pack):
-    folder, _page = QUATERNIUS[pack]
+def quaternius_page(pack):
+    return QUATERNIUS[pack][1] if pack in QUATERNIUS else f"https://quaternius.com/packs/{pack}.html"
+
+
+def quaternius_candidates(pack, categories=("furniture",)):
+    files = drive_folder(QUATERNIUS[pack][0]) if pack in QUATERNIUS else quaternius_folders(pack)["fbx"]
     out = []
-    for name, fid in drive_folder(folder):
+    for name, fid in files:
         if not name.lower().endswith(".fbx"):
             continue
         base = os.path.splitext(name)[0]
@@ -462,6 +582,7 @@ def quaternius_candidates(pack):
                 "pack": pack,
                 "file_id": fid,
                 "base": base,
+                "categories": list(categories),
                 "score": 0,
             }
         )
@@ -487,10 +608,10 @@ def fetch_quaternius(cand, dst, progress=None, stop=None):
         pass
     return {
         "source": "Quaternius",
-        "url": QUATERNIUS[cand["pack"]][1],
+        "url": quaternius_page(cand["pack"]),
         "authors": ["Quaternius"],
-        "tags": ["low-poly", "quaternius"],
-        "categories": ["furniture"],
+        "tags": ["low-poly", "quaternius", cand["pack"]],
+        "categories": cand.get("categories") or ["furniture"],
         "main": [fn],
         "description": "Low-poly модель с цветными материалами, без текстур. Превью нарисовано библиотекой.",
     }
@@ -792,6 +913,16 @@ def home_section(a):
             if words & keys:
                 return sec
     return HOME_OTHER
+
+
+def has_kind(theme, kind):
+    """Есть ли у темы ассеты этого вида (у наборов Kenney и Quaternius - только модели)."""
+    spec = THEMES.get(theme, {})
+    if kind == "ies":
+        return True
+    if kind == "model" and (spec.get("kenney") or spec.get("quaternius")):
+        return True
+    return bool(spec.get(kind) or (kind == "tex" and spec.get("acg")))
 
 
 def guess_theme(kind, info):

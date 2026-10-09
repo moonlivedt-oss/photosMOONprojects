@@ -248,5 +248,87 @@ class TestFiles(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestKenneyKits(unittest.TestCase):
+    """Новые наборы Kenney: общая текстура Textures/colormap.png, мелкие превью не берутся, своя категория."""
+
+    def setUp(self):
+        import zipfile
+
+        from PIL import Image
+
+        self.tmp = tempfile.mkdtemp()
+        self.packs = mock.patch.object(U, "PACKS", self.tmp)
+        self.packs.start()
+        buf = os.path.join(self.tmp, "p.png")
+        Image.new("RGB", (64, 64), "red").save(buf)
+        with zipfile.ZipFile(os.path.join(self.tmp, "castle-kit.zip"), "w") as zf:
+            zf.writestr("Models/FBX format/tower-square.fbx", b"Kaydara FBX Binary")
+            zf.writestr("Models/FBX format/Textures/colormap.png", b"png")
+            zf.write(buf, "Previews/tower-square.png")
+
+    def tearDown(self):
+        self.packs.stop()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_fetch_with_colormap(self):
+        th = "Средневековье - Kenney low-poly"
+        self.assertIn("castle-kit", U.THEMES[th]["kenney"])
+        self.assertTrue(U.has_kind(th, "model"))
+        self.assertFalse(U.has_kind(th, "tex"))
+        cands = U.kenney_candidates("castle-kit", ["medieval"])
+        self.assertEqual([c["name"] for c in cands], ["Tower square"])
+        dst = os.path.join(self.tmp, "out")
+        os.makedirs(dst)
+        meta = U.fetch_kenney(cands[0], dst)
+        self.assertEqual(meta["extra"], ["Textures/colormap.png"])
+        self.assertEqual(meta["categories"], ["medieval"])
+        self.assertTrue(os.path.exists(os.path.join(dst, "Textures", "colormap.png")))
+        self.assertFalse(os.path.exists(os.path.join(dst, "preview.webp")))  # 64x64 - нарисует 3D-сцена
+
+    def test_import_copies_colormap(self):
+        from library import unreal_import
+
+        src = os.path.join(self.tmp, "asset")
+        os.makedirs(os.path.join(src, "Textures"))
+        open(os.path.join(src, "tower.fbx"), "w").close()
+        open(os.path.join(src, "Textures", "colormap.png"), "w").close()
+        a = {"name": "Tower", "kind": "model", "dir": src, "main": ["tower.fbx"], "extra": ["Textures/colormap.png"]}
+        unreal_import.plan([a], os.path.join(self.tmp, "dst"))
+        self.assertTrue(os.path.exists(os.path.join(self.tmp, "dst", "Tower", "Textures", "colormap.png")))
+
+
+class TestQuaterniusFolders(unittest.TestCase):
+    """Папки набора Quaternius находятся по странице: FBX - в любой вложенной папке, кроме Blends/OBJ/glTF."""
+
+    TREE = {
+        "root": [("Buildings", "b", True), ("Blends", "x", True), ("License.txt", "l", False)],
+        "b": [("FBX", "bf", True), ("OBJ", "bo", True)],
+        "bf": [("House_1.fbx", "h1", False), ("Notes.txt", "n", False)],
+        "bo": [("House_1.obj", "o1", False), ("House_1.mtl", "m1", False)],
+        "x": [("House_1.fbx", "WRONG", False)],
+    }
+
+    def test_walk_and_cache(self):
+        tmp = tempfile.mkdtemp()
+        page = b'<a href="https://drive.google.com/drive/folders/root?usp=sharing">Download</a>'
+        try:
+            with (
+                mock.patch.object(U, "QFOLDERS", os.path.join(tmp, "q.json")),
+                mock.patch.object(U, "get", return_value=page),
+                mock.patch.object(U, "drive_entries", side_effect=lambda f: self.TREE.get(f, [])) as de,
+            ):
+                info = U.quaternius_folders("medievalvillage")
+                self.assertEqual([list(x) for x in info["fbx"]], [["House_1.fbx", "h1"]])  # копия из Blends не взята
+                self.assertEqual(info["mtl"], {"House_1": "m1"})
+                calls = de.call_count
+                again = U.quaternius_folders("medievalvillage")  # из кэша, без Google Drive
+                self.assertEqual(de.call_count, calls)
+                self.assertEqual([list(x) for x in again["fbx"]], [["House_1.fbx", "h1"]])
+                cands = U.quaternius_candidates("medievalvillage", ["medieval"])
+                self.assertEqual([(c["name"], c["categories"]) for c in cands], [("House 1", ["medieval"])])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

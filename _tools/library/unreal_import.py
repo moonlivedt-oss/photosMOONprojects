@@ -41,6 +41,12 @@ def plan(assets, dst):
             out = os.path.join(folder, os.path.basename(src))
             shutil.copy2(src, out)
             files.append(out)
+        for x in a.get("extra", []):  # общая текстура Kenney: FBX ищет её по своему пути (Textures/...)
+            src = os.path.join(a["dir"], *x.split("/"))
+            if os.path.exists(src):
+                out = os.path.join(folder, *x.split("/"))
+                os.makedirs(os.path.dirname(out), exist_ok=True)
+                shutil.copy2(src, out)
         if a.get("kind") == "model":  # текстуры модели - рядом, FBX ищет их по пути
             tex = os.path.join(a["dir"], "textures")
             if os.path.isdir(tex):

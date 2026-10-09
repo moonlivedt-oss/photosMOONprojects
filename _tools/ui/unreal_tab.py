@@ -1146,7 +1146,7 @@ class GetDialog(QDialog):
             self.avail.setText("12 профилей: узкий луч, кольца, уличный фонарь, полосы... Повторно - перезапишутся.")
             return
         themes = list(U.THEMES) if self.theme.currentData() == "все" else [self.theme.currentData()]
-        themes = [t for t in themes if U.THEMES[t].get(k)]
+        themes = [t for t in themes if U.has_kind(t, k)]
         n = self.count.value() * len(themes)
         mb = U.estimate(k, self.res.currentData()) * n
         if not themes:
@@ -1159,7 +1159,7 @@ class GetDialog(QDialog):
         k, res, count = self.kind.currentData(), self.res.currentData(), self.count.value()
         self.cfg["ue_count"], self.cfg["ue_res"] = count, res
         themes = list(U.THEMES) if self.theme.currentData() == "все" else [self.theme.currentData()]
-        themes = [t for t in themes if k == "ies" or U.THEMES[t].get(k)]
+        themes = [t for t in themes if U.has_kind(t, k)]
         if k == "ies":
             themes = themes[:1]
         self.busy = True

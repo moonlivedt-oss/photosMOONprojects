@@ -1166,11 +1166,12 @@ def history(limit=20, mine=False):
 @tool(
     "undo",
     "Отменить действие: без id - последнее своё (не отменённое). Файлы возвращаются на места, "
-    "новые убираются в _sources/_deleted, метки - как были.",
-    {"id": {"type": "integer"}},
+    "новые убираются в _sources/_deleted, метки - как были. Если после этого действия те же картинки "
+    "ещё менялись, сначала отмените более новые (или force=true).",
+    {"id": {"type": "integer"}, "force": {"type": "boolean", "default": False}},
     write=True,
 )
-def undo(id=None):  # noqa: A002
+def undo(id=None, force=False):  # noqa: A002
     if id is None:
         mine = journal.entries(1, who=AGENT["who"], undone=False)
         if not mine:
@@ -1182,6 +1183,14 @@ def undo(id=None):  # noqa: A002
             raise ApiError(f"Нет действия {id} (history() покажет список).")
         if e["undone"]:
             raise ApiError(f"Действие {id} уже отменено.")
+    if not force:
+        later = journal.touching_later(e)
+        if later:
+            lst = "; ".join(f"{x['id']} «{x['text']}» ({x['who']})" for x in later[:5])
+            raise ApiError(
+                f"После «{e['text']}» те же картинки ещё менялись: {lst}. Отмените сначала их "
+                "(undo по id, от новых к старым) или повторите с force=true."
+            )
     park = os.path.join(C.DELETED, time.strftime("%Y-%m-%d"), "отменено")
     done, bad = journal.undo_steps(e["steps"], C.LIB, park)
     if bad and not done:  # не вышло ничего - действие остаётся неотменённым, можно повторить

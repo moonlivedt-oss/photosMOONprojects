@@ -27,6 +27,12 @@ def versions(path):
     sub, name = os.path.split(rel)
     stem = os.path.splitext(name)[0]
     same = re.compile(re.escape(stem) + r"( \d+)?$", re.IGNORECASE)  # keep_path добавляет « 2» при повторе
+    # «rocket 2» рядом в библиотеке - отдельная картинка, а не повтор «rocket»: её версии не наши
+    try:
+        siblings = {os.path.splitext(f)[0].lower() for f in os.listdir(os.path.dirname(path))}
+    except OSError:
+        siblings = set()
+    others = {s for s in siblings if s != stem.lower() and same.match(s)}
     out = []
     for prefix, kind in KINDS:
         for d in glob.glob(os.path.join(C.SOURCES, glob.escape(prefix) + "*")):
@@ -35,7 +41,8 @@ def versions(path):
                 continue
             for f in os.listdir(folder):
                 p = os.path.join(folder, f)
-                if os.path.isfile(p) and f.lower().endswith(K.EXT) and same.match(os.path.splitext(f)[0]):
+                fs = os.path.splitext(f)[0]
+                if os.path.isfile(p) and f.lower().endswith(K.EXT) and same.match(fs) and fs.lower() not in others:
                     t = os.path.getmtime(p)
                     out.append(
                         {

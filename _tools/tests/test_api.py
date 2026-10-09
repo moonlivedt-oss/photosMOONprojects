@@ -337,6 +337,27 @@ class Api(unittest.TestCase):
         self.assertFalse(hints["tag"]["destructiveHint"])
         self.assertFalse(hints["export"]["readOnlyHint"])
 
+    def test_undo_older_action_waits_for_newer(self):
+        r = f"{SEC}/red-planet.png"
+        first = api.call("tag", {"paths": [r], "add": ["планета"]})
+        api.call("tag", {"paths": [r], "add": ["красная"]})
+        with self.assertRaises(api.ApiError) as e:
+            api.call("undo", {"id": first["journal_id"]})
+        self.assertIn("ещё менялись", str(e.exception))
+        api.call("undo", {"id": first["journal_id"], "force": True})
+        self.assertTrue(journal.get(first["journal_id"])["undone"])
+
+    def test_numbered_sibling_is_not_a_version(self):
+        from library import versions
+
+        dot((1, 2, 3, 255)).save(self.path(f"{SEC}/red-planet 2.png"))  # другая картинка с номером
+        for name in ("red-planet.png", "red-planet 2.png"):
+            p = self.path(f"_sources/edit 2026-01-01/{SEC}/{name}")
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            dot((10, 10, 200, 255)).save(p)
+        got = [os.path.basename(v["path"]) for v in versions.versions(self.path(f"{SEC}/red-planet.png"))]
+        self.assertEqual(got, ["red-planet.png"])
+
 
 if __name__ == "__main__":
     unittest.main()

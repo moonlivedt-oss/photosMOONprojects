@@ -23,6 +23,7 @@ _duplicates/
 # ассеты Unreal: скачиваются из окна (вкладка Unreal) или cli.py unreal get; тяжёлые, лицензия CC0
 _Unreal/
 _tools/_unreal_cache.json
+_tools/_unreal_quaternius.json
 _tools/_unreal_packs/
 _tools/_unreal_clip.npz
 _tools/_unreal_colors.json
