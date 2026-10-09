@@ -54,7 +54,7 @@ class AssetSem:
         self.lock = threading.Lock()
         self.data = {}  # ключ -> (вектор превью, вектор текста)
         self.queries = {}
-        self.bias = None
+        self.generic = None  # векторы «похожести на всё» (GENERIC) - один раз на модель
         self.load()
 
     def load(self):
@@ -103,7 +103,6 @@ class AssetSem:
                 progress(min(i + batch, len(todo)), len(todo))
         if todo:
             self.save()
-            self.bias = None
         return len(todo)
 
     def rank(self, query, items):
@@ -119,14 +118,16 @@ class AssetSem:
             q = self.queries[query] = clip.embed_text(query)
         img = np.stack([v[0] for _a, v in have]).astype(np.float32)
         txt = np.stack([v[1] for _a, v in have]).astype(np.float32)
-        if self.bias is None or len(self.bias[0]) != len(img):
-            g = np.stack([clip.embed_text(w) for w in GENERIC])
-            self.bias = ((img @ g.T).mean(1), (txt @ g.T).mean(1))
+        if self.generic is None:
+            self.generic = np.stack([clip.embed_text(w) for w in GENERIC])
+        # поправка - у каждого ассета своя: считается для этого списка (раздел, поиск), а не берётся от другого
+        g = self.generic
+        bias = ((img @ g.T).mean(1), (txt @ g.T).mean(1))
 
         def z(x):  # картинка и текст - в одной шкале
             return (x - x.mean()) / (x.std() + 1e-6)
 
-        s = z(img @ q - self.bias[0]) + TEXT_WEIGHT * z(txt @ q - self.bias[1])
+        s = z(img @ q - bias[0]) + TEXT_WEIGHT * z(txt @ q - bias[1])
         order = np.argsort(-s)
         best = s[order[0]]
         return [(have[i][0], float(s[i])) for i in order if s[i] >= best - GAP]
