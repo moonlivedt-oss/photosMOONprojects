@@ -13,6 +13,7 @@ from PyQt6.QtGui import (
     QColor,
     QFont,
     QIcon,
+    QIconEngine,
     QImage,
     QLinearGradient,
     QPainter,
@@ -20,11 +21,11 @@ from PyQt6.QtGui import (
     QPen,
     QPixmap,
 )
-from PyQt6.QtWidgets import QStyle, QStyledItemDelegate
+from PyQt6.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOption
 
 import imaging as K
 from ui.common import DUPE, EXT, HERE, LIB, PIX, ROLE, STAR, SUB, TINT
-from ui.theme import C
+from ui.theme import CURRENT, C
 
 
 # ---------------------------------------------------------------- картинки -> Qt
@@ -206,12 +207,75 @@ def lib_pix(name, side=48):
         for p in K.images_in(os.path.join(LIB, "04 Иконки")):  # иконки лежат по подпапкам
             _icons.setdefault(os.path.splitext(os.path.basename(p))[0], p)
     p = _icons.get(name)
-    return thumb(p, side) if p else QPixmap()
+    if not p:
+        return QPixmap()
+    pm = thumb(p, side)
+    if CURRENT["theme"] == "light" and is_white(p):  # белые значки Kenney на светлом фоне не видны
+        key = (p, side, C["text"])
+        if key not in _tinted:
+            _tinted[key] = tinted(pm, C["text"])
+        return _tinted[key]
+    return pm
+
+
+_white, _tinted = {}, {}
+
+
+def is_white(path):
+    """Значок почти целиком белый (одноцветные значки Kenney) - в светлой теме его надо перекрасить."""
+    if path not in _white:
+        try:
+            a = np.asarray(K.load(path).convert("RGBA").resize((32, 32))).astype(np.float32) / 255
+            px = a[..., :3][a[..., 3] > 0.5]
+            _white[path] = bool(len(px)) and float((px @ np.float32([0.299, 0.587, 0.114])).mean()) > 0.9
+        except Exception:
+            _white[path] = False
+    return _white[path]
+
+
+def tinted(pm, color):
+    """Тот же значок цветом color: форма и прозрачность остаются."""
+    out = QPixmap(pm)
+    p = QPainter(out)
+    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    p.fillRect(out.rect(), QColor(color))
+    p.end()
+    return out
+
+
+class LibIconEngine(QIconEngine):
+    """Значок библиотеки, который берёт картинку в момент отрисовки: при смене темы на лету белые
+    значки перекрашиваются без пересоздания кнопок."""
+
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+
+    def pixmap(self, size, mode, state):
+        side = max(16, size.width(), size.height())
+        pm = lib_pix(self.name, 48 if side <= 48 else side)
+        if pm.isNull():
+            return QPixmap()
+        pm = pm.scaled(size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        if mode == QIcon.Mode.Disabled:
+            opt = QStyleOption()
+            pm = QApplication.style().generatedIconPixmap(mode, pm, opt)
+        return pm
+
+    def paint(self, painter, rect, mode, state):
+        pm = self.pixmap(rect.size(), mode, state)
+        x = rect.x() + (rect.width() - pm.width()) // 2
+        y = rect.y() + (rect.height() - pm.height()) // 2
+        painter.drawPixmap(x, y, pm)
+
+    def clone(self):
+        return LibIconEngine(self.name)
 
 
 def lib_icon(name):
-    pm = lib_pix(name)
-    return QIcon(pm) if not pm.isNull() else QIcon()
+    if lib_pix(name).isNull():
+        return QIcon()
+    return QIcon(LibIconEngine(name))
 
 
 # ---------------------------------------------------------------- плитки библиотеки
