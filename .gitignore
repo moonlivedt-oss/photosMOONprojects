@@ -26,3 +26,6 @@ _tools/_unreal_cache.json
 _tools/_unreal_packs/
 _tools/_unreal_clip.npz
 _tools/_unreal_colors.json
+
+# стрелки стилей: окно пишет их само цветом текущей темы
+_tools/_ui/
