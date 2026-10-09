@@ -113,12 +113,17 @@ class SceneDialog(QDialog):
         self.room_btn.clicked.connect(self.room)
         self.imp_btn = QPushButton(lib_icon("export"), "Импорт в Unreal...")
         self.imp_btn.clicked.connect(lambda: self.tab.import_assets(self.picked()))
+        self.blend_btn = QPushButton(lib_icon("dice_3D"), "В Blender")
+        self.blend_btn.setToolTip(
+            "Собрать комнату в Blender: модели в масштабе, пол, стены, свет HDRI; сохранить .blend"
+        )
+        self.blend_btn.clicked.connect(self.blender)
         self.pack_btn = QPushButton(lib_icon("zip-archive"), "Пакет...")
         self.pack_btn.setToolTip("Файлы, скрипт импорта, авторы и лицензии - одной папкой или zip")
         self.pack_btn.clicked.connect(lambda: self.tab.pack_assets(self.picked(), self.q.text().strip()[:60]))
         foot = QHBoxLayout()
         foot.addStretch(1)
-        for b in (self.save_btn, self.room_btn, self.imp_btn, self.pack_btn):
+        for b in (self.save_btn, self.room_btn, self.blend_btn, self.imp_btn, self.pack_btn):
             b.setEnabled(False)
             foot.addWidget(b)
         v = QVBoxLayout(self)
@@ -174,7 +179,7 @@ class SceneDialog(QDialog):
         )
         if not p["slots"]:
             self.info.setText("Для этой комнаты нет скачанных моделей - «Скачать ещё...», темы «Дом - ...»")
-        for b in (self.save_btn, self.room_btn, self.imp_btn, self.pack_btn):
+        for b in (self.save_btn, self.room_btn, self.blend_btn, self.imp_btn, self.pack_btn):
             b.setEnabled(bool(self.rows))
 
     def picked(self):
@@ -184,6 +189,20 @@ class SceneDialog(QDialog):
         name = self.q.text().strip()[:60] or "Подборка"
         self.tab.add_to_set(name, self.picked())
         self.tab.nav.pick_kind("::sets")
+
+    def blender(self):
+        """Пол, стены и небо - из своих строк плана, остальное - вещи комнаты."""
+        by = {r.label: r.cur() for r in self.rows}
+        special = {"Пол", "Стены", "Небо HDRI"}
+        models = [r.cur() for r in self.rows if r.label not in special and r.cur()]
+        self.tab.open_blender(
+            models,
+            self.q.text().strip()[:40] or "Комната",
+            room=True,
+            floor=by.get("Пол"),
+            wall=by.get("Стены"),
+            hdri=by.get("Небо HDRI"),
+        )
 
     def room(self):
         self.tab.room(self.picked(), self.q.text().strip()[:40] or "Комната")

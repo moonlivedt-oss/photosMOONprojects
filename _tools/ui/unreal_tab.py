@@ -736,6 +736,10 @@ class UnrealTab(QWidget):
                 lambda: self.remove_from_set(self.nav.theme[len(SET) :], sel),
             )
         m.addAction(lib_icon("export"), "Импорт в Unreal (скрипт с материалами)...", self.import_ue)
+        bl = m.addMenu(lib_icon("dice_3D"), "Открыть в Blender")
+        bl.addAction("Рядом в ряд", lambda: self.open_blender(sel, sel[0].get("name", "Сцена")))
+        if any(x.get("kind") == "model" for x in sel):
+            bl.addAction("Комнатой: пол, стены, свет", lambda: self.open_blender(sel, "Комната", room=True))
         m.addAction(
             lib_icon("zip-archive"), "Пакет для проекта (файлы, авторы, скрипт)...", lambda: self.pack_assets(sel)
         )
@@ -792,6 +796,28 @@ class UnrealTab(QWidget):
             self.mini.shown = None
             self.describe()
         self.win.say(f"3D-просмотр освещается небом «{a.get('name', '')}»")
+
+    def open_blender(self, assets, title="Сцена", room=False, floor=None, wall=None, hdri=None):
+        """Собрать сцену в Blender (модели, PBR-материалы, HDRI, комната) и открыть её. Скрипт и .blend -
+        в _Unreal/_scenes/<название>; дальше сцену можно править руками или через Blender MCP."""
+        from library import blender_scene as B
+        from library.unreal_import import asset_name
+
+        exe = B.find_blender(self.cfg)
+        if not exe:
+            exe, _ = QFileDialog.getOpenFileName(self, "Где Blender? (blender.exe)", "C:/", "blender.exe (blender.exe)")
+            if not exe:
+                return
+            self.cfg["blender"] = exe
+        folder = os.path.join(U.ROOT, "_scenes", asset_name(title))
+        try:
+            script, blend = B.write_script(assets, folder, title, room, floor, wall, hdri)
+            B.run(exe, script)
+        except Exception as e:
+            log_error("blender: %r" % e)
+            self.win.say(f"Blender не запустился: {e}")
+            return
+        self.win.say(f"Blender собирает сцену «{title}» - файл будет: {os.path.basename(blend)}")
 
     def pack_assets(self, assets, title=None):
         """Пакет для проекта: файлы, import_to_unreal.py, CREDITS.md и manifest.json одной папкой (или zip)."""
