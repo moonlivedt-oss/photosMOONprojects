@@ -1065,12 +1065,18 @@ class LibTab(QWidget):
             )
             if ask != QMessageBox.StandardButton.Yes:
                 return
+            steps = []
             for rel, tags in plan.items():
+                before = db.tags_of(rel)
                 db.set_tags([rel], tags, "add")
+                steps.append(["tags", rel, before, db.tags_of(rel)])
+            self.win.push("Подсказанные метки: %d картинок" % len(plan), steps)  # Ctrl+Z снимет все разом
             fill_tree(self.tree, planned=False, recent=True)
             self.describe()
             self.win.say(
-                "Метки поставлены: %d картинок. Лишнюю метку убирает правый щелчок по ней в дереве" % len(plan)
+                "Метки поставлены: %d картинок. Ctrl+Z снимет все разом, лишнюю метку - правый щелчок в дереве"
+                % len(plan),
+                undo=True,
             )
 
         bg(work, done)
