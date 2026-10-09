@@ -234,7 +234,7 @@ class Nav(QWidget):
             c.set_stats(len(lst), sum(a.get("size", 0) for a in lst))
         for k in (FAV, NEW, SETS):  # пустые особые карточки не показываются
             self.cards[k].setVisible(bool(self.of_kind(k)) or (k == SETS and bool(self.sets())))
-        if self.kind not in self.cards or not self.cards[self.kind].isVisible():
+        if self.kind not in self.cards or self.cards[self.kind].isHidden():  # isVisible ложно, пока вкладка скрыта
             self.kind = ALL
         self.cards[self.kind].setChecked(True)
         self.fill_themes()
