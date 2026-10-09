@@ -69,6 +69,8 @@ def write_atomic(path, data, encoding=None):
     tmp = "%s.tmp%d-%d" % (path, os.getpid(), threading.get_ident())  # у каждого потока свой
     with open(tmp, "w" if encoding else "wb", **({"encoding": encoding} if encoding else {})) as fh:
         fh.write(data)
+        fh.flush()
+        os.fsync(fh.fileno())  # на диске целиком до подмены: отключение питания не оставит пустышку
     os.replace(tmp, path)
 
 

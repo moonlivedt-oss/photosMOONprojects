@@ -10,7 +10,7 @@ from collections import Counter
 
 import numpy as np
 
-from library.common import HERE
+from library.common import HERE, log_error
 
 DB = os.path.join(HERE, "library.db")
 _lock = threading.RLock()
@@ -21,9 +21,22 @@ def conn():
     global _conn
     with _lock:
         if _conn is None:
-            _conn = sqlite3.connect(DB, check_same_thread=False, timeout=10)
-            _conn.execute("PRAGMA journal_mode=WAL")
-            _conn.executescript("""
+            try:
+                _conn = _open()
+            except sqlite3.DatabaseError as e:  # «file is not a database», «malformed» - не падать, а чинить
+                from library import safety
+
+                log_error(f"база не открылась: {e!r} - беру последнюю целую копию")
+                safety.recover_db()
+                _conn = _open()
+        return _conn
+
+
+def _open():
+    c = sqlite3.connect(DB, check_same_thread=False, timeout=10)
+    try:
+        c.execute("PRAGMA journal_mode=WAL")
+        c.executescript("""
                 CREATE TABLE IF NOT EXISTS sigs(rel TEXT PRIMARY KEY, mt REAL, ratio REAL, vec BLOB, col TEXT, ver INT);
                 CREATE TABLE IF NOT EXISTS tags(rel TEXT, tag TEXT, PRIMARY KEY(rel, tag));
                 CREATE TABLE IF NOT EXISTS notes(rel TEXT PRIMARY KEY, text TEXT);
@@ -35,7 +48,10 @@ def conn():
                 CREATE TABLE IF NOT EXISTS journal(id INTEGER PRIMARY KEY AUTOINCREMENT, t REAL, who TEXT,
                                                    text TEXT, steps TEXT, undone INT DEFAULT 0);
             """)
-        return _conn
+    except sqlite3.DatabaseError:
+        c.close()
+        raise
+    return c
 
 
 def close():

@@ -25,10 +25,23 @@ LOG = os.path.join(HERE, "_errors.log")
 
 
 def load_cfg():
+    """Настройки. Файла нет - пустые; файл повреждён - НЕ пустые (иначе окно записало бы их поверх и
+    подборки, заметки, папки проектов пропали бы): повреждённый отодвигается, берётся последняя копия."""
     try:
         with open(CFG, encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:
+            data = json.load(fh)
+        if isinstance(data, dict):
+            return data
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError):
+        pass
+    try:
+        from library import safety
+
+        return safety.recover_cfg()
+    except Exception as e:
+        log_error(f"настройки не восстановились: {e!r}")
         return {}
 
 
