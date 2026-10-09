@@ -473,7 +473,7 @@ class ThemeDialog(QDialog):
         v.addLayout(row2)
         v.addWidget(
             QLabel(
-                "Меняется сразу. Часть мелочей (значки в списках) обновится после перезапуска окна.",
+                "Меняется сразу, вместе со значками и плитками.",
                 objectName="dim",
                 wordWrap=True,
             )

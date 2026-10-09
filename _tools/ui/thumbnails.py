@@ -206,8 +206,17 @@ def forget_pixmaps():
     _thumbs.clear()
 
 
+MASCOTS = os.path.join(LIB, "03 Маскоты", "Из проектов")  # маскот пустых экранов: «mascot:Сон»
+
+
 def lib_pix(name, side=48):
-    """Значок из "04 Иконки" библиотеки по имени файла без расширения."""
+    """Значок из "04 Иконки" библиотеки по имени файла без расширения; «mascot:Имя» - маскот."""
+    if name.startswith("mascot:"):
+        for ext in (".webp", ".png"):
+            p = os.path.join(MASCOTS, name[7:] + ext)
+            if os.path.exists(p):
+                return thumb(p, side)
+        return QPixmap()
     global _icons
     if _icons is None:
         _icons = {}
@@ -250,8 +259,67 @@ def tinted(pm, color):
     return out
 
 
+# Значки кнопок, меню и дерева - одним стилем: одноцветные значки Kenney там, где есть подходящий,
+# остальное (папки, вкладки) - силуэтом той же картинки; всё цветом текста темы. Карточки и плитки - цветные.
+CHROME = {
+    "bookmark": "flag",
+    "camera": "card_add",
+    "checklist": "notepad_write",
+    "clipboard": "notepad",
+    "color-palette": "toolFill",
+    "cross-circle": "cross",
+    "crystal-ball-stand": "target",
+    "drawing_pen": "toolPencil",
+    "eye": "look_b",
+    "first-aid-kit": "information",
+    "globe": "share1",
+    "house": "home",
+    "image-file": "card",
+    "magnifier-text-lines": "zoom",
+    "magnifying-glass": "zoom",
+    "Лупа": "zoom",
+    "paint-brush": "toolBrush",
+    "plug-socket": "share2",
+    "plus-circle": "plus",
+    "question-mark-bubble": "question",
+    "quill-pen": "toolPencil",
+    "toolbox": "wrench",
+    "trash-bin": "trashcan",
+    "upload-arrow": "upload",
+    "download-arrow": "download",
+    "zip-archive": "smaller",
+    "game-cartridge": "gamepad",
+}
+_chrome = {}
+
+
+def chrome_pix(name, side=48):
+    """Значок для кнопки: одноцветный, цветом текста темы. Яркость картинки -> непрозрачность:
+    белое становится цветом, тёмная обводка наклеек - прозрачной (выходит силуэт)."""
+    lib_pix(CHROME.get(name, name), side)  # заполняет _icons
+    path = _icons.get(CHROME.get(name, name))
+    if not path:
+        return QPixmap()
+    color = QColor(C["text"]) if CURRENT["theme"] == "dark" else QColor(C["dim"])  # в светлой - мягче
+    key = (path, side, color.name())
+    if key not in _chrome:
+        try:
+            im = raw_thumb(path, side) if side <= 256 else K.load(path).convert("RGBA")
+            im = im.convert("RGBA")
+            im.thumbnail((side, side), Image.LANCZOS)
+            a = np.asarray(im).astype(np.float32) / 255
+            lum = a[..., :3] @ np.float32([0.299, 0.587, 0.114])
+            out = np.zeros_like(a)
+            out[..., :3] = np.float32(color.getRgb()[:3]) / 255
+            out[..., 3] = a[..., 3] * np.clip((lum - 0.12) / 0.6, 0, 1)
+            _chrome[key] = to_pix(Image.fromarray((out * 255).astype(np.uint8), "RGBA"))
+        except Exception:
+            _chrome[key] = QPixmap()
+    return _chrome[key]
+
+
 class LibIconEngine(QIconEngine):
-    """Значок библиотеки, который берёт картинку в момент отрисовки: при смене темы на лету белые
+    """Значок библиотеки, который берёт картинку в момент отрисовки: при смене темы на лету
     значки перекрашиваются без пересоздания кнопок."""
 
     def __init__(self, name):
@@ -260,7 +328,7 @@ class LibIconEngine(QIconEngine):
 
     def pixmap(self, size, mode, state):
         side = max(16, size.width(), size.height())
-        pm = lib_pix(self.name, 48 if side <= 48 else side)
+        pm = chrome_pix(self.name, 48 if side <= 48 else side)
         if pm.isNull():
             return QPixmap()
         pm = pm.scaled(size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
@@ -280,7 +348,7 @@ class LibIconEngine(QIconEngine):
 
 
 def lib_icon(name):
-    if lib_pix(name).isNull():
+    if chrome_pix(name).isNull():
         return QIcon()
     return QIcon(LibIconEngine(name))
 
