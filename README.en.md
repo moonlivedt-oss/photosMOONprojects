@@ -163,8 +163,9 @@ Claude, Cursor and other assistants use the library as a tool: "find stickers wi
 "remove the background from these three and put copies into 02 Наклейки/Котики", "cut the sheet in the inbox",
 "export the space icons to D:/site/assets as 128 px webp".
 
-**Connect** with the "ИИ-помощники" button at the top of the window: Claude Desktop and Cursor in one click,
-a ready command or config block for Claude Code and others. In this folder Claude Code finds the server via
+**Connect** with the "ИИ-помощники" button at the top of the window: Claude Desktop, Cursor, VS Code (Copilot),
+Windsurf, Cline, Roo Code, LM Studio and Gemini CLI in one click (the server is added to their config, the old
+file is kept as `.bak`); a ready command for Claude Code and Codex CLI, a config block for the rest. In this folder Claude Code finds the server via
 `.mcp.json`. Without MCP the same operations are available from the shell: `py -3.14 _tools/cli.py api`.
 
 | What | Tools |
@@ -184,7 +185,7 @@ replaced originals go to `_sources/edit <date>`. Assistants can be limited to se
 Guidance for assistants: [AGENTS.md](AGENTS.md).
 
 <div align="center">
-<img src="_docs/screenshots/agents.webp" alt="AI assistants window: permissions, connecting Claude Desktop, Cursor and Claude Code, list of assistant actions" width="560">
+<img src="_docs/screenshots/agents.webp" alt="AI assistants window: permissions, eight assistants with a Connect button in two columns, commands for Claude Code and Codex CLI, list of assistant actions" width="640">
 </div>
 
 ---

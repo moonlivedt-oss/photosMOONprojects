@@ -13,7 +13,7 @@
 
 | Вход | Как |
 |---|---|
-| **MCP** (Claude Code, Claude Desktop, Cursor, VS Code) | сервер `_tools/mcp_server.py`; в этой папке он уже прописан в `.mcp.json` |
+| **MCP** (Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Cline, Gemini CLI, Codex...) | сервер `_tools/mcp_server.py`; в этой папке он уже прописан в `.mcp.json` |
 | **Командная строка** | `py -3.14 _tools/cli.py api` - список; `py -3.14 _tools/cli.py api search '{"query": "ночной город"}'` |
 
 Картинка в ответе (`view`, `edit` с `mode=preview`, `cut_sheet` с `preview=true`) приходит изображением по MCP
