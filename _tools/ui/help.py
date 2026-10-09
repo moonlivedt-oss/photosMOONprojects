@@ -252,8 +252,8 @@ TOPICS = [
             ),
             (
                 "Как подключить",
-                "Кнопка «ИИ-помощники» вверху: Claude Desktop и Cursor - одной кнопкой, для Claude "
-                "Code и остальных - скопировать команду или настройки. В папке библиотеки Claude Code находит сервер "
+                "Кнопка «ИИ-помощники» вверху: Claude Desktop, Cursor, VS Code, Windsurf, Cline, Roo Code, LM Studio, "
+                "Gemini CLI - одной кнопкой, для Claude Code и Codex CLI - команда, для остальных - блок настроек. В папке библиотеки Claude Code находит сервер "
                 "сам (.mcp.json).",
                 "",
             ),
