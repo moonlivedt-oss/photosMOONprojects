@@ -138,6 +138,15 @@ texture settings and an `M_<name>` material).
 <br><sub>Room draft from a collection: real-scale furniture, floor and walls from downloaded textures, HDRI light</sub>
 </div>
 
+## Find anywhere (Ctrl+P)
+
+One line for the whole window: commands, folders, pictures (by name, or by meaning when no name matches) and
+Unreal assets.
+
+<div align="center">
+<img src="_docs/screenshots/find.webp" alt="Find anywhere: the Russian word for whale finds whale.webp first" width="620">
+</div>
+
 ## Tools and themes
 
 The "Инструменты" (Tools) menu: duplicates, doctor, missing sets, folder weights, **palette from a picture** (and
