@@ -91,6 +91,11 @@ SVG = {
     'stroke-linecap="round" stroke-linejoin="round"/>',
     "right": '<path d="M4.5 2.5l3.5 3.5-3.5 3.5" fill="none" stroke="$faint" stroke-width="1.6" '
     'stroke-linecap="round" stroke-linejoin="round"/>',
+    # на пределе (повтор x1) стрелка бледная, но видна - иначе кажется, что её нет
+    "up_off": '<path d="M2.5 8l3.5-3.5 3.5 3.5" fill="none" stroke="$faint" stroke-width="1.6" '
+    'stroke-linecap="round" stroke-linejoin="round"/>',
+    "down_off": '<path d="M2.5 4l3.5 3.5 3.5-3.5" fill="none" stroke="$faint" stroke-width="1.6" '
+    'stroke-linecap="round" stroke-linejoin="round"/>',
     "check": '<path d="M2.6 6.3l2.3 2.3 4.5-5" fill="none" stroke="$ink" stroke-width="1.9" '
     'stroke-linecap="round" stroke-linejoin="round"/>',
 }
@@ -128,7 +133,8 @@ QSpinBox::down-button{subcontrol-position:bottom right;border-bottom-right-radiu
 QSpinBox::up-button:hover,QSpinBox::down-button:hover{background:$line2}
 QSpinBox::up-arrow{image:url(@UI/up.svg);width:12px;height:12px}
 QSpinBox::down-arrow{image:url(@UI/down.svg);width:12px;height:12px}
-QSpinBox::up-arrow:disabled,QSpinBox::up-arrow:off,QSpinBox::down-arrow:disabled,QSpinBox::down-arrow:off{image:none}
+QSpinBox::up-arrow:disabled,QSpinBox::up-arrow:off{image:url(@UI/up_off.svg)}
+QSpinBox::down-arrow:disabled,QSpinBox::down-arrow:off{image:url(@UI/down_off.svg)}
 
 /* кнопки */
 QPushButton{background:$bg2;border:1px solid $line;border-radius:10px;padding:7px 14px}
