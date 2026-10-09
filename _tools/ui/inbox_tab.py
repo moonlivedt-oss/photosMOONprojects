@@ -493,7 +493,7 @@ class InboxTab(QWidget):
         self.where_btn = QPushButton(lib_icon("sparkles"), "", objectName="chip")  # «похоже на» - куда положить
         self.where_btn.clicked.connect(self.take_where)
         self.where_btn.hide()
-        self.where = None
+        self.where, self.user_dest, self.where_auto = None, False, False
         newdir = QPushButton(lib_icon("folder"), "Новая папка...")
         newdir.clicked.connect(lambda: new_folder(self, self.tree))
         self.auto = QCheckBox("Помеченные раскладывать сразу")
@@ -578,7 +578,7 @@ class InboxTab(QWidget):
         f = QFrame(objectName="drop")
         v = QVBoxLayout(f)
         v.addStretch(1)
-        ic = Floaty("download-arrow")
+        ic = Floaty("mascot:Сон", 150)  # входящих нет - маскот спит
         t = QLabel("Входящих нет", objectName="title", alignment=Qt.AlignmentFlag.AlignCenter)
         s = QLabel(
             f"Перетащите листы в окно, вставьте картинку из буфера (Ctrl+V)\nили положите файлы в папку «{K.INBOX}»",
@@ -815,6 +815,7 @@ class InboxTab(QWidget):
             return
         self.path = path
         self.route, self.manual = (route(path) if path else None), False
+        self.user_dest = self.where_auto = False  # новый лист - раздел снова можно подобрать по сходству
         self.manual_boxes = None  # рамки руками - только у того листа, где их правили
         self.boxes_lbl.setVisible(False)
         self.show_route()
@@ -898,6 +899,7 @@ class InboxTab(QWidget):
         self.update_save()
 
     def tree_clicked(self, *_):
+        self.user_dest = True  # раздел выбран руками - подсказка «по сходству» его больше не меняет
         if self.route:
             self.manual = True  # раздел выбран руками - метка больше не решает
             self.show_route()
@@ -992,19 +994,32 @@ class InboxTab(QWidget):
         tags, where = res
         self.tag_box.set_tags(tags, set(self.tag_list()))
         self.where = os.path.join(LIB, where[0]) if where and not self.route else None
+        # раздел ещё не выбран руками - сразу берём подсказанный: подсказка не спорит с выбранным
+        if self.where and not getattr(self, "user_dest", False) and os.path.isdir(self.where):
+            self.where_auto = select_path(self.tree, self.where)
         self.show_where()
 
     def show_where(self):
         """Кнопка «Похоже на: раздел» - где в библиотеке лежат самые похожие картинки. Щелчок выбирает раздел."""
         w = self.where
         here = self.dest_path()
-        show = bool(w and os.path.isdir(w) and os.path.normcase(w) != os.path.normcase(here or ""))
-        if show:
-            self.where_btn.setText("Похоже на: " + os.path.relpath(w, LIB).replace(os.sep, " / "))
+        ok = bool(w and os.path.isdir(w))
+        same = ok and os.path.normcase(w) == os.path.normcase(here or "")
+        rel = os.path.relpath(w, LIB).replace(os.sep, " / ") if ok else ""
+        if ok and not same:
+            self.where_btn.setText("Похоже на: " + rel)
             self.where_btn.setToolTip("Там лежат самые похожие по смыслу картинки. Щелчок - выбрать этот раздел")
-        self.where_btn.setVisible(show)
+            self.where_btn.setEnabled(True)
+        elif same and getattr(self, "where_auto", False):
+            self.where_btn.setText("Раздел подобран по сходству")
+            self.where_btn.setToolTip(
+                f"{rel}: там лежат самые похожие по смыслу картинки. Можно выбрать другой в дереве"
+            )
+            self.where_btn.setEnabled(False)
+        self.where_btn.setVisible(ok and (not same or getattr(self, "where_auto", False)))
 
     def take_where(self):
+        self.user_dest = True
         if self.where and select_path(self.tree, self.where):
             self.where_btn.hide()
 

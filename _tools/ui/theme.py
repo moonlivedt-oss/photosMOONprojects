@@ -118,8 +118,8 @@ QListWidget,QTreeWidget{background:$bg1;border:1px solid $line;border-radius:14p
 QWidget#panel{background:$bg1;border:1px solid $line;border-radius:14px}
 QScrollArea{background:transparent;border:0}
 QScrollArea>QWidget>QWidget{background:transparent}
-QGroupBox{background:$bg1;border:1px solid $line;border-radius:14px;margin-top:14px;padding:12px 8px 8px 8px}
-QGroupBox::title{subcontrol-origin:margin;left:14px;top:2px;color:$faint;font-size:8pt;font-weight:700;letter-spacing:1px}
+QGroupBox{background:$bg1;border:1px solid $line;border-radius:14px;margin-top:22px;padding:10px 8px 8px 8px}
+QGroupBox::title{subcontrol-origin:margin;subcontrol-position:top left;left:6px;top:0px;color:$faint;font-size:8pt;font-weight:700;letter-spacing:1px}
 QFrame#drop{border:2px dashed $line2;border-radius:18px;background:$bg1}
 
 /* поля ввода */
