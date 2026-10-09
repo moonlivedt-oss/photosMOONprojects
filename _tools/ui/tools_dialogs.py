@@ -68,7 +68,7 @@ class PaletteDialog(QDialog):
     def __init__(self, win, targets, source=None):
         super().__init__(win, Qt.WindowType.Window)
         self.win, self.targets = win, [p for p in targets if p != source]
-        self.colors, self.src = [], None
+        self.colors, self.src, self.small = [], None, {}
         self.setWindowTitle("Палитра из картинки")
         self.setWindowIcon(lib_icon("color-palette"))
         self.resize(980, 680)
@@ -162,9 +162,11 @@ class PaletteDialog(QDialog):
         k = self.strength.value() / 100
         for p in self.targets[:24]:
             try:
-                im = K.load(p)
-                im.thumbnail((300, 300))
-                out = K.recolor(im, self.colors, k)
+                if p not in self.small:  # ползунок силы двигают часто - с диска читается один раз
+                    im = K.load(p)
+                    im.thumbnail((300, 300))
+                    self.small[p] = im
+                out = K.recolor(self.small[p], self.colors, k)
             except Exception:
                 continue
             it = QListWidgetItem(QIcon(to_pix(out)), os.path.basename(p))
@@ -187,24 +189,35 @@ class PaletteDialog(QDialog):
 
     def save_all(self):
         cols, k, paths = list(self.colors), self.strength.value() / 100, list(self.targets)
+        self.save.setEnabled(False)  # второй щелчок, пока идёт сохранение, наделал бы копий « 2»
 
         def work():
-            out = []
-            for p in paths:
-                im = K.load(p)
-                base, ext = os.path.splitext(p)
-                dst = unique(f"{base} - палитра{ext}")
-                K.save(K.recolor(im, cols, k), dst, K.fmt_of(p))
-                out.append(dst)
-            return out
+            out, errs = [], []
+            for p in paths:  # ошибка на одной картинке не теряет уже сохранённые (их отменит Ctrl+Z)
+                try:
+                    im = K.load(p)
+                    base, ext = os.path.splitext(p)
+                    dst = unique(f"{base} - палитра{ext}")
+                    K.save(K.recolor(im, cols, k), dst, K.fmt_of(p))
+                    out.append(dst)
+                except Exception as e:
+                    errs.append(f"{os.path.basename(p)}: {e}")
+            return out, errs
 
         def done(res):
             if isinstance(res, Exception):
                 self.info.setText(f"Не вышло: {res}")
+                self.update_info()
                 return
-            self.win.push(f"Перекраска в палитру: {len(res)}", [("new", p) for p in res])
-            self.win.lib.changed.emit()
-            self.win.say(f"Перекрашено копиями: {len(res)}", undo=True)
+            saved, errs = res
+            if saved:
+                self.win.push(f"Перекраска в палитру: {len(saved)}", [("new", p) for p in saved])
+                self.win.lib.changed.emit()
+                self.win.say(f"Перекрашено копиями: {len(saved)}", undo=True)
+            if errs:
+                self.info.setText("Не вышло: " + "; ".join(errs[:3]))
+                self.update_info()
+                return
             self.accept()
 
         bg(work, done)

@@ -298,8 +298,11 @@ class CatalogDialog(QDialog):
                     log_error("unreal catalog: %r" % e)
             return got
 
-        def done(res_):
+        def done(res):
             self.busy = False
+            if isinstance(res, Exception):  # сбой вне отдельного ассета (каталог, папка) - в итог и журнал
+                errs.append(str(res))
+                log_error("unreal catalog: %r" % res)
             self.tab.set_progress(None)
             self.have |= set(got)
             self.bar.setValue(1000)

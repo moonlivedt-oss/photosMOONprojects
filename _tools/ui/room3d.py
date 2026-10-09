@@ -105,7 +105,7 @@ class RoomDialog(QDialog):
         self.light = QComboBox()
         self.light.addItem(lib_icon("sun"), "Простой свет", "")
         for a in sorted(
-            (x for x in tab.items if x.get("kind") == "hdri"),
+            (x for x in tab.items if x.get("kind") == "hdri" and x.get("main")),
             key=lambda x: (x.get("theme") != "Интерьер", x.get("name", "")),
         ):
             self.light.addItem(a.get("name", ""), os.path.join(a["dir"], a["main"][0]))
