@@ -135,6 +135,10 @@ class Window(QMainWindow):
         tools.setMenu(tm)
         tools.setToolTip("Дубли, доктор, чего нет, вес разделов, папка генератора")
         ch.addWidget(tools)
+        find = QPushButton(lib_icon("magnifying-glass"), "Найти везде  Ctrl+P", objectName="ghost")
+        find.setToolTip("Команды, разделы, картинки и ассеты Unreal - одной строкой")
+        find.clicked.connect(self.palette)
+        ch.insertWidget(0, find)
         ai = QPushButton(lib_icon("sparkles"), "ИИ-помощники", objectName="ghost")
         ai.setToolTip("Claude, Cursor и другие помощники: подключить, что им можно, что они сделали")
         ai.clicked.connect(self.agents)
@@ -209,6 +213,7 @@ class Window(QMainWindow):
             ("Ctrl+1", lambda: self.tabs.setCurrentIndex(0)),
             ("Ctrl+2", lambda: self.tabs.setCurrentIndex(1)),
             ("Ctrl+3", lambda: self.tabs.setCurrentIndex(2)),
+            ("Ctrl+P", self.palette),
             ("F9", self.toggle_live),
             ("Ctrl+I", self.show_weight),
         ):
@@ -494,6 +499,13 @@ class Window(QMainWindow):
         self.take([u.toLocalFile() for u in e.mimeData().urls()])
 
     # --- папка генератора: новые картинки сами копируются во входящие
+    def palette(self):
+        from ui.command_palette import CommandPalette
+
+        p = CommandPalette(self)
+        p.show()
+        p.q.setFocus()
+
     def theme_dialog(self):
         from ui.tools_dialogs import ThemeDialog
 
