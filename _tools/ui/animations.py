@@ -204,7 +204,7 @@ class TabBar(QTabBar):
 
     def __init__(self):
         super().__init__()
-        self.pill, self.hover_tab, self.glow = QRectF(), -1, 0.0
+        self.pill, self.glow = QRectF(), 0.0
         self.move_anim = None
         self.setMouseTracking(True)
         self.setDrawBase(False)

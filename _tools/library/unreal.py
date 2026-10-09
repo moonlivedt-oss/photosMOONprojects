@@ -432,25 +432,6 @@ def quaternius_mtl(pack, base):
     return get(url).decode("utf-8", "replace")
 
 
-def quaternius_colors(a):
-    """Вписать цвета из .mtl в FBX уже скачанного ассета Quaternius. -> сколько материалов перекрашено."""
-    from library import fbx_colors
-
-    for pack in QUATERNIUS:
-        prefix = f"quaternius-{pack}-"
-        if a.get("id", "").startswith(prefix):
-            base = a["id"][len(prefix) :]
-            mtl = quaternius_mtl(pack, base)
-            if not mtl:
-                return 0
-            with open(os.path.join(a["dir"], base + ".mtl"), "w", encoding="utf-8") as fh:
-                fh.write(mtl)
-            n = fbx_colors.colorize(os.path.join(a["dir"], a["main"][0]), mtl)
-            # серые .mtl (набор Furniture) - цвет по имени материала: Wood, Sheets, DarkBrown...
-            return n or fbx_colors.colorize_by_name(os.path.join(a["dir"], a["main"][0]))
-    return 0
-
-
 def drive_folder(folder_id):
     """Файлы открытой папки Google Drive без входа: [(имя, id файла)]."""
     page = get(f"https://drive.google.com/embeddedfolderview?id={folder_id}").decode("utf-8", "replace")

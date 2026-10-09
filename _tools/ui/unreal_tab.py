@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 
 import imaging as K
 from library import unreal as U
+from library.unreal_extra import added
 from ui.common import ROLE, THUMB, bg, human, in_main, log_error, reveal
 from ui.thumbnails import lib_icon, swatch, thumb
 from ui.unreal_catalog import CatalogDialog
@@ -378,7 +379,7 @@ class UnrealTab(QWidget):
         if how == "name":
             return sorted(out, key=lambda a: a.get("name", "").lower())
         if how == "new":
-            return sorted(out, key=lambda a: -self.added(a))
+            return sorted(out, key=lambda a: -added(a))
         if how in ("light", "heavy"):
             return sorted(out, key=lambda a: a.get("size", 0), reverse=how == "heavy")
         return sorted(
@@ -496,13 +497,8 @@ class UnrealTab(QWidget):
         self.list.load_tiles(todo, THUMB, None)
         self.describe()
 
-    def added(self, a):
-        try:
-            return os.path.getmtime(os.path.join(a["dir"], "asset.json"))
-        except OSError:
-            return 0
+        # ------------------------------------------------------------ избранное
 
-    # ------------------------------------------------------------ избранное
     def favs(self):
         return set(self.cfg.get("ue_fav", []))
 

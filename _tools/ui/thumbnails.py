@@ -59,26 +59,6 @@ def tile(im, side, mode=None):
     return to_pix(bg_)
 
 
-def badge(pm, text, color="#e8a948"):
-    """Плашка с надписью в правом верхнем углу плитки."""
-    pm = QPixmap(pm)
-    p = QPainter(pm)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    f = p.font()
-    f.setPointSizeF(7.5)
-    f.setBold(True)
-    p.setFont(f)
-    w = p.fontMetrics().horizontalAdvance(text) + 10
-    r = QRectF(pm.width() - w - 4, 4, w, 16)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(color))
-    p.drawRoundedRect(r, 4, 4)
-    p.setPen(QColor("#15151c"))
-    p.drawText(r, Qt.AlignmentFlag.AlignCenter, text)
-    p.end()
-    return pm
-
-
 def swatch(color, side=14):
     pm = QPixmap(side, side)
     pm.fill(QColor(0, 0, 0, 0))
@@ -242,7 +222,7 @@ class TileDelegate(QStyledItemDelegate):
     Размер плитки не зависит от того, загрузилась ли картинка: Qt меряет все плитки по первой,
     и пустая первая (ещё грузится в фоне) раньше сплющивала все картинки в полоску."""
 
-    PAD, CAP = 9, 40  # поля внутри карточки, высота подписи
+    PAD = 9  # поля внутри карточки
 
     def __init__(self, view):
         super().__init__(view)

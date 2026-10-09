@@ -237,9 +237,6 @@ def stylesheet():
     return build_qss().replace("@UI", ui_files())
 
 
-QSS = build_qss()
-
-
 def ui_files():
     """Пишет svg-стрелки для стилей (один раз) и возвращает путь к ним в виде для QSS."""
     os.makedirs(UI, exist_ok=True)

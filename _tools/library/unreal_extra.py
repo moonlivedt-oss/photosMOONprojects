@@ -12,7 +12,6 @@ import imaging as K
 from library.unreal import CACHE, KINDS, ROOT, assets
 
 COLORS_STORE = os.path.join(os.path.dirname(CACHE), "_unreal_colors.json")
-NEW_DAYS = 3
 _lock = threading.Lock()
 
 
@@ -63,10 +62,6 @@ def added(a):
         return os.path.getmtime(os.path.join(a["dir"], "asset.json"))
     except OSError:
         return 0
-
-
-def is_new(a, days=NEW_DAYS):
-    return time.time() - added(a) < days * 86400
 
 
 # ---------------------------------------------------------------- проверка

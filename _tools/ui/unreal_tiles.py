@@ -285,7 +285,7 @@ class CardList(LibList):
         w = max(1, self.viewport().width() - 8)  # впритык Qt переносит последний столбец на новую строку
         cols = max(1, w // (self.base + 28))
         cell = w // cols
-        self.setGridSize(QSize(cell, cell + 46))
+        self.setGridSize(QSize(cell, cell + AssetDelegate.CAP))
 
     def tick(self):
         super().tick()

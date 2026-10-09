@@ -250,7 +250,8 @@ GUTTER = (255, 0, 255)  # пурпурные промежутки между к�
 def _gutter(im):
     """Маска пикселей цвета промежутка (#ff00ff с допуском на сжатие)."""
     a = np.asarray(im.convert("RGB")).astype(np.int16)
-    return (a[..., 0] > 190) & (a[..., 1] < 90) & (a[..., 2] > 190)
+    hi = [c > 127 for c in GUTTER]  # яркие каналы цвета промежутка - выше 190, тёмные - ниже 90
+    return np.logical_and.reduce([a[..., i] > 190 if hi[i] else a[..., i] < 90 for i in range(3)])
 
 
 def _split(g, lum, n, axis):
