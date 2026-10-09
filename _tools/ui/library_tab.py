@@ -738,6 +738,7 @@ class LibTab(QWidget):
         self.slider.setToolTip("Размер плиток (Ctrl+колесо)")
         self.slider.valueChanged.connect(self.resize_tiles)
         self.list = LibList(self.side)
+        self.list.quick_action = self.quick_tile
         self.list.zoom.connect(lambda d: self.slider.setValue(self.side + 16 * d))
         self.list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.list.setDragEnabled(True)
@@ -1598,6 +1599,18 @@ class LibTab(QWidget):
         self.q.blockSignals(False)
         self.show_files()
         self.list.scrollToTop()
+
+    def quick_tile(self, row, name):
+        """Кружок на плитке: «просмотр» - на всё окно, «избранное» - звезда этой картинке."""
+        it = self.list.item(row)
+        if it is None or not it.data(ROLE) or self.sets_view:  # в «Наборах» плитки - папки
+            return
+        self.list.clearSelection()
+        self.list.setCurrentRow(row)
+        if name == "look":
+            self.look()
+        elif name == "fav":
+            self.toggle_fav()
 
     def toggle_fav(self):
         sel = [os.path.relpath(p, LIB) for p in self.paths()]

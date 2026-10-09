@@ -208,29 +208,25 @@ class UnrealTab(QWidget):
         self.note = QLineEdit(placeholderText="Заметка: где использую, что поменять...")
         self.note.setToolTip("Своя заметка к ассету - по ней тоже ищется")
         self.note.editingFinished.connect(self.save_note)
-        how_lbl = QLabel("КАК В UNREAL", objectName="faint")
-        self.how = QLabel(wordWrap=True)
+        # «Как в Unreal» и список файлов - свёрнуты: длинный текст не нужен на каждый щелчок
+        self.how_btn = QPushButton(lib_icon("question-mark-bubble"), "Как подключить в Unreal", objectName="flat")
+        self.how_btn.setCheckable(True)
+        self.how_btn.setChecked(bool(self.cfg.get("ue_how_open", False)))
+        self.how = QLabel(wordWrap=True, objectName="dim")
         self.how.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        g = QGridLayout()
+        self.how.setVisible(self.how_btn.isChecked())
+        self.how_btn.toggled.connect(lambda on: (self.how.setVisible(on), self.cfg.__setitem__("ue_how_open", on)))
+        self.chips = QHBoxLayout()  # вид, разрешение, вес, полигоны - плашками
+        self.chips.setSpacing(5)
         self.btns = []
-        for i, (text, icon, fn, tip) in enumerate(
-            (
-                ("Показать файлы", "folder", self.open_dir, "Папка ассета в проводнике"),
-                ("Копировать пути", "clipboard", self.copy_paths, "Пути главных файлов - для окна импорта Unreal"),
-                ("Страница", "globe", self.open_page, "Страница ассета на сайте источника"),
-                (
-                    "Импорт в Unreal...",
-                    "export",
-                    self.import_ue,
-                    "Скопировать в проект и написать скрипт импорта: настройки текстур и готовый материал",
-                ),
-            )
-        ):
-            b = QPushButton(lib_icon(icon), text)
+
+        def tool(tip, icon, fn):
+            b = QPushButton(lib_icon(icon), "", objectName="tool")
             b.setToolTip(tip)
             b.clicked.connect(fn)
-            g.addWidget(b, i // 2, i % 2)
             self.btns.append(b)
+            return b
+
         self.star = QPushButton(lib_icon("star"), "", objectName="tool", checkable=True)
         self.star.setToolTip("В избранное (Ctrl+D)")
         self.star.clicked.connect(self.toggle_fav)
@@ -239,6 +235,30 @@ class UnrealTab(QWidget):
             "Модель - вращать и приближать, текстура - на шаре со светом, HDRI - панорама 360 (двойной щелчок)"
         )
         self.look.clicked.connect(lambda: self.current() and self.view3d(self.current()[0]))
+        imp = QPushButton(lib_icon("export"), "В Unreal...")
+        imp.setToolTip("Импорт прямо в проект (Unreal сам, без редактора) или файлы со скриптом")
+        imp.clicked.connect(self.import_ue)
+        self.btns.append(imp)
+        icons = QHBoxLayout()
+        icons.setSpacing(4)
+        for b in (
+            tool("Показать файлы", "folder", self.open_dir),
+            tool("Копировать пути - для окна импорта Unreal", "clipboard", self.copy_paths),
+            tool("Страница ассета на сайте источника", "globe", self.open_page),
+            tool(
+                "Открыть в Blender",
+                "dice",
+                lambda: self.current() and self.open_blender(self.current(), self.current()[0].get("name", "Сцена")),
+            ),
+            tool("Пакет для проекта: файлы, авторы, скрипт", "zip-archive", lambda: self.pack_assets(self.current())),
+            tool(
+                "Похожие по виду",
+                "crystal-ball-stand",
+                lambda: len(self.current()) == 1 and self.show_similar(self.current()[0]),
+            ),
+        ):
+            icons.addWidget(b)
+        icons.addStretch(1)
         hint = QLabel("Плитку можно перетащить прямо в Content Browser", objectName="faint", wordWrap=True)
         sv.addWidget(self.pic, 1)
         if self.mini is not None:
@@ -248,13 +268,17 @@ class UnrealTab(QWidget):
         nh.addWidget(self.live, 0, Qt.AlignmentFlag.AlignTop)
         nh.addWidget(self.star, 0, Qt.AlignmentFlag.AlignTop)
         sv.addLayout(nh)
+        sv.addLayout(self.chips)
         sv.addWidget(self.meta)
-        sv.addWidget(self.files)
         sv.addWidget(self.note)
-        sv.addWidget(how_lbl)
+        main = QHBoxLayout()
+        main.addWidget(self.look, 1)
+        main.addWidget(imp)
+        sv.addLayout(main)
+        sv.addLayout(icons)
+        sv.addWidget(self.how_btn)
         sv.addWidget(self.how)
-        sv.addWidget(self.look)
-        sv.addLayout(g)
+        sv.addWidget(self.files)
         sv.addWidget(hint)
 
         split = QSplitter()
@@ -629,12 +653,13 @@ class UnrealTab(QWidget):
         on = bool(cur) and all(a.get("id") in self.favs() for a in cur)
         self.star.setToolTip("Убрать из избранного (Ctrl+D)" if on else "В избранное (Ctrl+D)")
         self.star.setChecked(on)
+        self.set_chips([])
         if not cur:
             self.pic.set_pixmap(None)
             self.name.setText("")
             self.meta.setText(
                 "Ассеты для Unreal Engine: PBR-текстуры, небо HDRI, модели, профили света.\n"
-                "Источники - Poly Haven и ambientCG, лицензия CC0: можно в любые проекты."
+                "Источники - Poly Haven, ambientCG, Kenney, Quaternius; лицензия CC0: можно в любые проекты."
             )
             self.files.setText("")
             self.how.setText("")
@@ -642,36 +667,49 @@ class UnrealTab(QWidget):
         if len(cur) > 1:
             self.pic.set_pixmap(None)
             self.name.setText(f"Выбрано: {len(cur)}")
-            self.meta.setText(human(sum(a.get("size", 0) for a in cur)))
+            self.set_chips([human(sum(a.get("size", 0) for a in cur))])
+            self.meta.setText("Перетащите все разом в Content Browser или «В Unreal...».")
             self.files.setText("")
-            self.how.setText("Перетащите все разом в Content Browser.")
+            self.how.setText("")
             return
         a = cur[0]
         prev = os.path.join(a["dir"], "preview.webp")
         self.pic.set_pixmap(thumb(prev, 512) if os.path.exists(prev) else QPixmap())
         self.name.setText(a.get("name", ""))
-        lines = [f"{U.KINDS.get(a.get('kind'), ('', '?'))[1]} / {a.get('theme', '')}"]
+        chips = [SHORT.get(a.get("kind"), "?")]
         if a.get("res"):
-            lines.append(f"Разрешение {a['res'].upper()}, {human(a.get('size', 0))}")
+            chips.append(a["res"].upper())
+        chips.append(human(a.get("size", 0)))
         if a.get("polycount"):
-            lines.append(f"Полигонов: {a['polycount']:,}".replace(",", " "))
+            chips.append(f"{a['polycount'] // 1000 or 1}k полиг.")
         if a.get("dimensions_mm"):
-            lines.append("Размер: " + " x ".join(f"{x / 10:g}" for x in a["dimensions_mm"]) + " см")
+            chips.append(" x ".join(f"{x / 10:g}" for x in a["dimensions_mm"]) + " см")
+        self.set_chips(chips)
+        lines = [theme_label(a.get("theme", "")) + (f", {a['section']}" if a.get("section") else "")]
         if a.get("description"):
             lines.append(a["description"])
         src = a.get("source", "")
         authors = [x for x in a.get("authors", []) if x != src]
         if authors:
             src += ", " + ", ".join(authors)
-        lines.append(src)
+        lines.append(src + ", CC0" if "CC0" in a.get("license", "") else src)
         if a.get("tags"):
-            lines.append("Метки: " + ", ".join(a["tags"][:10]))
+            lines.append("Метки: " + ", ".join(a["tags"][:8]))
         used = self.cfg.get("ue_used", {}).get(a.get("id"), [])
         if used:  # куда ассет уже уходил: копия, импорт, пакет
             lines.append("Использовано в: " + "; ".join(os.path.basename(x.rstrip("/\\")) or x for x in used[-3:]))
         self.meta.setText("\n".join(lines))
-        self.files.setText("Файлы: " + ", ".join(a.get("main", [])))
-        self.how.setText(U.howto(a))
+        self.files.setText("")
+        self.how.setText(U.howto(a) + "\n\nФайлы: " + ", ".join(a.get("main", [])))
+
+    def set_chips(self, items):
+        while self.chips.count():
+            w = self.chips.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        for text in items:
+            self.chips.addWidget(QLabel(text, objectName="chip"))
+        self.chips.addStretch(1)
 
     def open_dir(self):
         for a in self.current()[:5]:
@@ -856,7 +894,19 @@ class UnrealTab(QWidget):
         self.import_assets(self.current())
 
     def import_assets(self, cur):
-        """Копия файлов в проект + import_to_unreal.py: настройки текстур и материалы делает сам Unreal."""
+        """Импорт в Unreal: прямо в проект (Unreal сам, без редактора) или файлы со скриптом в папку."""
+        from ui.unreal_import_dialog import ImportDialog
+
+        if cur:
+            ImportDialog(self, list(cur)).exec()
+
+    def run_direct_import(self, assets, project):
+        from ui.unreal_import_dialog import run_direct_import
+
+        run_direct_import(self, assets, project)
+
+    def prepare_import(self, cur):
+        """Копия файлов в выбранную папку + import_to_unreal.py: настройки текстур и материалы - в Unreal."""
         from library import unreal_import
 
         if not cur:

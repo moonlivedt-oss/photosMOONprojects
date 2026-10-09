@@ -293,14 +293,17 @@ CHROME = {
 _chrome = {}
 
 
-def chrome_pix(name, side=48):
+def chrome_pix(name, side=48, color=None):
     """Значок для кнопки: одноцветный, цветом текста темы. Яркость картинки -> непрозрачность:
     белое становится цветом, тёмная обводка наклеек - прозрачной (выходит силуэт)."""
     lib_pix(CHROME.get(name, name), side)  # заполняет _icons
     path = _icons.get(CHROME.get(name, name))
     if not path:
         return QPixmap()
-    color = QColor(C["text"]) if CURRENT["theme"] == "dark" else QColor(C["dim"])  # в светлой - мягче
+    if color is not None:
+        color = QColor(color)
+    else:
+        color = QColor(C["text"]) if CURRENT["theme"] == "dark" else QColor(C["dim"])  # в светлой - мягче
     key = (path, side, color.name())
     if key not in _chrome:
         try:
@@ -354,6 +357,9 @@ def lib_icon(name):
 
 
 # ---------------------------------------------------------------- плитки библиотеки
+QUICK_ICONS = {"look": "eye", "fav": "star"}  # быстрые действия на плитке при наведении
+
+
 class TileDelegate(QStyledItemDelegate):
     """Рисует плитку-карточку: картинка в своих пропорциях, имя и подпись (папка, формат).
     Наведение (view.hover_amount) поднимает карточку: тень, подсветка, картинка чуть приближается;
@@ -362,6 +368,19 @@ class TileDelegate(QStyledItemDelegate):
     и пустая первая (ещё грузится в фоне) раньше сплющивала все картинки в полоску."""
 
     PAD = 9  # поля внутри карточки
+
+    @classmethod
+    def action_rects(cls, rect):
+        """Кружки быстрых действий в правом нижнем углу картинки: [(имя, QRectF)] - и для рисования,
+        и для щелчка (LibList.mousePressEvent)."""
+        r = QRectF(rect).adjusted(5, 5, -5, -5)
+        side = r.width() - 2 * cls.PAD
+        box = QRectF(r.x() + cls.PAD, r.y() + cls.PAD, side, side)
+        out, x = [], box.right() - 6 - 28
+        for name in ("fav", "look"):
+            out.append((name, QRectF(x, box.bottom() - 6 - 28, 28, 28)))
+            x -= 32
+        return out
 
     def __init__(self, view):
         super().__init__(view)
@@ -448,6 +467,17 @@ class TileDelegate(QStyledItemDelegate):
                 self.view.shimmer = True
                 if not self.view.anim.isActive():
                     self.view.anim.start()
+
+        if h > 0.05 and getattr(self.view, "quick_action", None):  # быстрые действия при наведении
+            p.setOpacity(min(1.0, h * 1.4))
+            for name, c in self.action_rects(option.rect):
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(QColor(13, 13, 19, 215))
+                p.drawEllipse(c)
+                ic = chrome_pix(QUICK_ICONS[name], 44, "#eceaf6")
+                if not ic.isNull():
+                    p.drawPixmap(c.adjusted(6, 6, -6, -6), ic, QRectF(ic.rect()))
+            p.setOpacity(1)
 
         if index.data(STAR):  # в избранном - звезда на тёмном кружке
             c = QRectF(box.x() + 5, box.y() + 5, 24, 24)

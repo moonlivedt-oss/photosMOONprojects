@@ -597,6 +597,22 @@ class LibList(QListWidget):
         idx = self.indexAt(e.position().toPoint())
         self.set_hover(idx.row() if idx.isValid() else -1)
 
+    def mousePressEvent(self, e):
+        """Щелчок по кружку быстрого действия на плитке (просмотр, избранное) - действие, а не выделение."""
+        act = getattr(self, "quick_action", None)
+        if act and e.button() == Qt.MouseButton.LeftButton:
+            pos = e.position()
+            idx = self.indexAt(pos.toPoint())
+            if idx.isValid():
+                from ui.thumbnails import TileDelegate
+
+                for name, rr in TileDelegate.action_rects(self.visualRect(idx)):
+                    if rr.adjusted(-2, -2, 2, 2).contains(pos):
+                        act(idx.row(), name)
+                        e.accept()
+                        return
+        super().mousePressEvent(e)
+
     def leaveEvent(self, e):
         super().leaveEvent(e)
         self.set_hover(-1)
