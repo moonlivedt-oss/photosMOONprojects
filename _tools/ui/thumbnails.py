@@ -336,7 +336,7 @@ class TileDelegate(QStyledItemDelegate):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(13, 13, 19, 210))
             p.drawRoundedRect(pill, 9, 9)
-            p.setPen(acc if h > 0.05 else QColor(C["text"]))
+            p.setPen(acc if h > 0.05 else QColor("#eceaf6"))  # плашка всегда тёмная - текст светлый в любой теме
             p.drawText(pill, Qt.AlignmentFlag.AlignCenter, label)
             p.setOpacity(1)
 

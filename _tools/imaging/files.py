@@ -13,7 +13,7 @@ INBOX = "00 Входящие"  # неразобранное: в галерею �
 def images_in(root):
     out = []
     for d, dirs, files in os.walk(root):
-        dirs[:] = sorted(x for x in dirs if not x.startswith("_") and x != INBOX)
+        dirs[:] = sorted(x for x in dirs if not x.startswith(("_", ".")) and x != INBOX)
         for f in sorted(files):
             if f.lower().endswith(EXT) and not f.startswith("_"):
                 out.append(os.path.join(d, f))

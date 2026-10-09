@@ -145,7 +145,7 @@ def folder_path(folder, create=False):
     """Папка внутри библиотеки (не служебная, не входящие)."""
     p = absolute(folder, must_exist=not create)
     r = rel(p)
-    if r == "." or any(part.startswith("_") for part in r.split("/")) or r.split("/")[0] == K.INBOX:
+    if r == "." or any(part.startswith(("_", ".")) for part in r.split("/")) or r.split("/")[0] == K.INBOX:
         raise ApiError(f"«{folder}» - служебная папка или корень. Нужен раздел, например «04 Иконки/Космос».")
     if create:
         os.makedirs(p, exist_ok=True)
@@ -236,7 +236,7 @@ def overview():
         p = os.path.join(C.LIB, name)
         if not os.path.isdir(p) or name.startswith((".", "_")) or name == K.INBOX:
             continue
-        subs = sorted(d for d in os.listdir(p) if os.path.isdir(os.path.join(p, d)) and not d.startswith("_"))
+        subs = sorted(d for d in os.listdir(p) if os.path.isdir(os.path.join(p, d)) and not d.startswith(("_", ".")))
         secs.append(
             dict(path=name, images=len(K.images_in(p)), subfolders=subs[:40], more_subfolders=max(0, len(subs) - 40))
         )

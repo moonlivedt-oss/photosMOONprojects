@@ -66,7 +66,7 @@ def folder_counts():
         return _counts[1]
     counts = {}
     for d, dirs, files in os.walk(LIB):
-        dirs[:] = [x for x in dirs if not x.startswith("_") and x != K.INBOX]
+        dirs[:] = [x for x in dirs if not x.startswith(("_", ".")) and x != K.INBOX]
         n = sum(1 for f in files if f.lower().endswith(K.EXT) and not f.startswith("_"))
         while n and len(d) >= len(LIB):
             counts[d] = counts.get(d, 0) + n
@@ -166,7 +166,7 @@ def fill_tree(tree, planned=True, recent=False):
         if depth < 3:
             for d in sorted(os.listdir(path)):
                 sub = os.path.join(path, d)
-                if os.path.isdir(sub) and not d.startswith("_"):
+                if os.path.isdir(sub) and not d.startswith(("_", ".")):  # служебные и скрытые (.ruff_cache)
                     add(it, sub, depth + 1)
         return it
 
