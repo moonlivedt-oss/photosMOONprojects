@@ -1,4 +1,5 @@
 """Кодирование, размер, качество «на глаз» и сжатие файлов."""
+
 import io
 import os
 import tempfile
@@ -10,9 +11,7 @@ from imaging.files import ORIENT, fmt_of
 
 
 def has_alpha(im):
-    return (
-        im.mode in ("RGBA", "LA", "PA") and np.asarray(im.getchannel("A")).min() < 255
-    )
+    return im.mode in ("RGBA", "LA", "PA") and np.asarray(im.getchannel("A")).min() < 255
 
 
 # подложка для форматов без прозрачности (jpg): имя, подпись, цвет
@@ -29,7 +28,7 @@ def matte_rgb(m):
         if m == name:
             return rgb
     if isinstance(m, str) and m.startswith("#") and len(m) == 7:
-        return tuple(int(m[i:i + 2], 16) for i in (1, 3, 5))
+        return tuple(int(m[i : i + 2], 16) for i in (1, 3, 5))
     return 255, 255, 255
 
 
@@ -72,15 +71,17 @@ def encode(im, fmt, quality=90, lossless=False, speed=None, sharp=False, matte="
             bg.paste(im, (0, 0), im)
             im = bg
         im.convert("RGB").save(
-            buf, "JPEG", quality=quality, optimize=True, progressive=True,
+            buf,
+            "JPEG",
+            quality=quality,
+            optimize=True,
+            progressive=True,
             subsampling=0 if sharp else 2,
         )
     elif fmt == "ico":
         side = max(im.size)
         sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-        sq.paste(
-            im, ((side - im.width) // 2, (side - im.height) // 2), im.convert("RGBA")
-        )
+        sq.paste(im, ((side - im.width) // 2, (side - im.height) // 2), im.convert("RGBA"))
         sizes = [(s, s) for s in (16, 24, 32, 48, 64, 128, 256) if s <= max(side, 16)]
         sq.save(buf, "ICO", sizes=sizes)
     else:
@@ -119,9 +120,7 @@ def resize(im, size, fit="fit", height=0):
         if fit == "square":
             side = max(im.size)
             sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-            sq.paste(
-                im.convert("RGBA"), ((side - im.width) // 2, (side - im.height) // 2)
-            )
+            sq.paste(im.convert("RGBA"), ((side - im.width) // 2, (side - im.height) // 2))
             return sq
         return im
     w, h = (size, height) if height else (size, size)
@@ -136,9 +135,7 @@ def resize(im, size, fit="fit", height=0):
     if im.width <= w and im.height <= h:
         return im
     k = min(w / im.width, h / im.height)
-    return im.resize(
-        (max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS
-    )
+    return im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
 
 
 def _box(x, k=8):
@@ -182,9 +179,7 @@ def _ssim_y(x, y):
     c1, c2 = (0.01 * 255) ** 2, (0.03 * 255) ** 2
     mx, my = _box(x), _box(y)
     vx, vy, cxy = _box(x * x) - mx * mx, _box(y * y) - my * my, _box(x * y) - mx * my
-    m = ((2 * mx * my + c1) * (2 * cxy + c2)) / (
-        (mx * mx + my * my + c1) * (vx + vy + c2)
-    )
+    m = ((2 * mx * my + c1) * (2 * cxy + c2)) / ((mx * mx + my * my + c1) * (vx + vy + c2))
     return float(m.mean())
 
 
@@ -200,7 +195,7 @@ def auto_quality(im, fmt, target=0.99, sharp=False, matte="white"):
     if fmt not in ("webp", "avif", "jpg", "jpeg", "png"):
         return 90
     fast = {"webp": 3, "avif": 9}.get(fmt)
-    ref = flat(im, matte) if fmt in ("jpg", "jpeg") else im     # jpg сравниваем с картинкой на той же подложке
+    ref = flat(im, matte) if fmt in ("jpg", "jpeg") else im  # jpg сравниваем с картинкой на той же подложке
     lo, hi = 30, 95
     if fmt == "png":
         lo, hi = 20, 100  # для png "качество" - число цветов палитры
@@ -219,7 +214,7 @@ KINDS = [
     ("photo", "Фото, фон, иллюстрация"),
     ("art", "Иконка, наклейка, рисунок"),
 ]
-BEST = "best"                                   # формат «самый лёгкий»: пробуем несколько, берём меньший
+BEST = "best"  # формат «самый лёгкий»: пробуем несколько, берём меньший
 
 
 def flat(im, matte="white"):
@@ -261,7 +256,7 @@ def _one(im, fmt, o, sharp):
         return encode(im, fmt, q, fmt == "png" and q >= 100, sharp=sharp, matte=matte), dict(fmt=fmt, q=q)
     q = auto_quality(im, fmt, target, sharp, matte)
     data, info = encode(im, fmt, q, sharp=sharp, matte=matte), dict(fmt=fmt, q=q)
-    if sharp and fmt == "webp":                 # рисунку webp без потерь часто легче и точнее
+    if sharp and fmt == "webp":  # рисунку webp без потерь часто легче и точнее
         ll = encode(im, "webp", 100, True)
         if len(ll) <= len(data):
             data, info = ll, dict(fmt=fmt, q=100, lossless=True)
@@ -282,7 +277,7 @@ def _fit_budget(im, fmt, o, sharp, kb):
     """Влезть в kb: сначала понижаем качество, не хватает - уменьшаем размер."""
     limit, matte, cur = kb * 1024, o.get("matte", "white"), im
     for _k in range(8):
-        lo, hi = (16, 100) if fmt == "png" else (35, 95)     # ниже - каша; лучше уменьшить размер
+        lo, hi = (16, 100) if fmt == "png" else (35, 95)  # ниже - каша; лучше уменьшить размер
         got = None
         while lo <= hi:
             mid = (lo + hi) // 2
@@ -330,6 +325,7 @@ def to_svg(im):
     """Контуры: рисунок -> svg (vtracer). Годится для плоских значков и наклеек, у фото выйдет каша.
     Без vtracer - ImportError (ставится: py -3.14 -m pip install vtracer)."""
     import vtracer
+
     im = im.convert("RGBA")
     if max(im.size) > 1024:
         im = im.copy()
@@ -339,7 +335,7 @@ def to_svg(im):
     with tempfile.TemporaryDirectory() as d:
         src, dst = os.path.join(d, "in.png"), os.path.join(d, "out.svg")
         im.save(src, "PNG")
-        vtracer.convert_image_to_svg_py(src, dst)     # параметры по умолчанию: цвет, сплайны, слои
+        vtracer.convert_image_to_svg_py(src, dst)  # параметры по умолчанию: цвет, сплайны, слои
         with open(dst, "rb") as fh:
             return fh.read()
 
@@ -349,22 +345,18 @@ def clean(path):
     Возвращает байты, если вышло меньше, иначе None."""
     f = fmt_of(path)
     with Image.open(path) as src:
-        if getattr(src, "is_animated", False):     # пересохранение оставило бы один кадр
+        if getattr(src, "is_animated", False):  # пересохранение оставило бы один кадр
             return None
         src.load()
         buf = io.BytesIO()
-        keep = {}                               # из метаданных оставляем только поворот, иначе картинка ляжет набок
+        keep = {}  # из метаданных оставляем только поворот, иначе картинка ляжет набок
         o = src.getexif().get(ORIENT, 1)
         if o != 1:
             ex = Image.Exif()
             ex[ORIENT] = o
             keep = {"exif": ex.tobytes()}
         if f == "png":
-            im = (
-                src
-                if src.mode in ("RGB", "RGBA", "P", "L", "LA")
-                else src.convert("RGBA")
-            )
+            im = src if src.mode in ("RGB", "RGBA", "P", "L", "LA") else src.convert("RGBA")
             im.save(buf, "PNG", optimize=True, compress_level=9, **keep)
         elif f == "jpg":
             src.save(buf, "JPEG", quality="keep", optimize=True, progressive=True, **keep)

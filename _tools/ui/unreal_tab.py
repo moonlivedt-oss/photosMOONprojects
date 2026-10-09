@@ -111,8 +111,12 @@ class UnrealTab(QWidget):
         self.slider.setToolTip("Размер плиток (Ctrl+колесо)")
         self.slider.valueChanged.connect(self.resize_tiles)
         self.poly = QComboBox()
-        for t, v in (("Полигоны: любые", 0), ("до 5k - игра, много копий", 5000), ("до 20k", 20000),
-                     ("до 100k", 100000)):
+        for t, v in (
+            ("Полигоны: любые", 0),
+            ("до 5k - игра, много копий", 5000),
+            ("до 20k", 20000),
+            ("до 100k", 100000),
+        ):
             self.poly.addItem(lib_icon("dice_3D"), t, v)
         self.poly.setToolTip("Только лёгкие модели: чем меньше полигонов, тем быстрее сцена в Unreal")
         self.poly.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
@@ -128,7 +132,7 @@ class UnrealTab(QWidget):
         doc = QPushButton(lib_icon("first-aid-kit"), "", objectName="tool")
         doc.setToolTip("Проверить ассеты: битые FBX, пропавшие файлы, недокачанные папки")
         doc.clicked.connect(self.check_assets)
-        self.like, self.problems = None, None   # особые списки: «похожие на», «проблемные»
+        self.like, self.problems = None, None  # особые списки: «похожие на», «проблемные»
         self.title = QLabel(objectName="big")
         self.info = QLabel(objectName="dim")
         self.room_btn = QPushButton(lib_icon("house"), "Комната", objectName="flat")
@@ -206,8 +210,12 @@ class UnrealTab(QWidget):
                 ("Показать файлы", "folder", self.open_dir, "Папка ассета в проводнике"),
                 ("Копировать пути", "clipboard", self.copy_paths, "Пути главных файлов - для окна импорта Unreal"),
                 ("Страница", "globe", self.open_page, "Страница ассета на сайте источника"),
-                ("Импорт в Unreal...", "export", self.import_ue,
-                 "Скопировать в проект и написать скрипт импорта: настройки текстур и готовый материал"),
+                (
+                    "Импорт в Unreal...",
+                    "export",
+                    self.import_ue,
+                    "Скопировать в проект и написать скрипт импорта: настройки текстур и готовый материал",
+                ),
             )
         ):
             b = QPushButton(lib_icon(icon), text)
@@ -439,9 +447,13 @@ class UnrealTab(QWidget):
         lst = self.chosen()
         in_set = self.nav.kind == SETS and self.like is None and self.problems is None
         self.room_btn.setVisible(in_set and any(a.get("kind") == "model" for a in lst))
-        self.title.setText(self.nav.title() if self.like is None and self.problems is None else
-                           f"Похожие на «{self.like.get('name', '')}»" if self.like is not None else
-                           f"Проблемные ассеты: {len(lst)}")
+        self.title.setText(
+            self.nav.title()
+            if self.like is None and self.problems is None
+            else f"Похожие на «{self.like.get('name', '')}»"
+            if self.like is not None
+            else f"Проблемные ассеты: {len(lst)}"
+        )
         self.title.setStyleSheet(f"color: {kind_color(self.nav.kind)}")
         size = sum(a.get("size", 0) for a in lst)
         self.info.setText(f"{len(lst)} шт., {human(size)}")
@@ -666,8 +678,11 @@ class UnrealTab(QWidget):
         sets.addSeparator()
         sets.addAction(lib_icon("plus"), "Новая подборка...", lambda: self.add_to_set(None, sel))
         if self.nav.kind == SETS and self.nav.theme and self.nav.theme.startswith(SET):
-            m.addAction(lib_icon("minus"), "Убрать из этой подборки",
-                        lambda: self.remove_from_set(self.nav.theme[len(SET):], sel))
+            m.addAction(
+                lib_icon("minus"),
+                "Убрать из этой подборки",
+                lambda: self.remove_from_set(self.nav.theme[len(SET) :], sel),
+            )
         m.addAction(lib_icon("export"), "Импорт в Unreal (скрипт с материалами)...", self.import_ue)
         if any(x.get("kind") == "model" for x in sel):
             m.addAction(lib_icon("house"), "Собрать комнату из выбранного", lambda: self.room(sel, "Выбранное"))
@@ -717,7 +732,7 @@ class UnrealTab(QWidget):
         path = os.path.join(a["dir"], a["main"][0])
         self.cfg["ue_env"] = path
         if self.viewer is not None:
-            self.viewer.env.clear()                 # список неба перечитается с новым выбором
+            self.viewer.env.clear()  # список неба перечитается с новым выбором
         if self.mini is not None:
             self.mini.shown = None
             self.describe()
@@ -734,7 +749,8 @@ class UnrealTab(QWidget):
             return
         start = self.cfg.get("ue_import_dir", self.cfg.get("ue_project", ""))
         dst = QFileDialog.getExistingDirectory(
-            self, "Куда положить файлы для импорта (лучше папка рядом с проектом, не внутри Content)", start)
+            self, "Куда положить файлы для импорта (лучше папка рядом с проектом, не внутри Content)", start
+        )
         if not dst:
             return
         self.cfg["ue_import_dir"] = dst
@@ -748,11 +764,13 @@ class UnrealTab(QWidget):
             from PyQt6.QtWidgets import QMessageBox
 
             QMessageBox.information(
-                self, "Импорт в Unreal",
+                self,
+                "Импорт в Unreal",
                 f"Файлы скопированы, скрипт: {res}\n\nВ Unreal: Tools -> Execute Python Script и выбрать этот файл.\n"
                 f"Или в Output Log (режим Cmd) вставить команду - она уже в буфере обмена:\n{cmd}\n\n"
                 "Ассеты появятся в Content/Library, у текстур - готовый материал M_<имя>. "
-                "Нужен включённый плагин Python Editor Script Plugin.")
+                "Нужен включённый плагин Python Editor Script Plugin.",
+            )
 
         bg(lambda: unreal_import.export(cur, dst), done)
 
@@ -784,7 +802,7 @@ class UnrealTab(QWidget):
 
     def room_from_set(self):
         theme = self.nav.theme or ""
-        name = theme[len(SET):] if theme.startswith(SET) else "Подборка"
+        name = theme[len(SET) :] if theme.startswith(SET) else "Подборка"
         self.room(self.nav.chosen(), name)
 
     def trash(self):

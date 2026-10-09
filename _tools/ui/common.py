@@ -1,4 +1,5 @@
 """Общее для окна: роли плиток, фоновые задачи в Qt. Пути, настройки и файлы - в library.common (без Qt)."""
+
 import os
 import subprocess
 
@@ -32,26 +33,26 @@ from library.common import (  # noqa: F401 - окно берёт их отсюд
     unique,
 )
 
-UI = os.path.join(HERE, "_ui")              # стрелки и галочка для стилей
-ROLE = Qt.ItemDataRole.UserRole                    # путь файла у плитки
-PIX = Qt.ItemDataRole.UserRole + 1                 # миниатюра (QPixmap) - её рисует TileDelegate
-SUB = Qt.ItemDataRole.UserRole + 2                 # вторая строка подписи плитки
-STAR = Qt.ItemDataRole.UserRole + 3                # в избранном
-EXT = Qt.ItemDataRole.UserRole + 4                 # формат (плашка при наведении)
-DUPE = Qt.ItemDataRole.UserRole + 5                # кусок уже есть в библиотеке (путь похожего)
-TINT = Qt.ItemDataRole.UserRole + 6                # цвет-метка плитки (вид ассета Unreal)
-RECENT = "::recent"                                 # виртуальные разделы вкладки библиотеки
+UI = os.path.join(HERE, "_ui")  # стрелки и галочка для стилей
+ROLE = Qt.ItemDataRole.UserRole  # путь файла у плитки
+PIX = Qt.ItemDataRole.UserRole + 1  # миниатюра (QPixmap) - её рисует TileDelegate
+SUB = Qt.ItemDataRole.UserRole + 2  # вторая строка подписи плитки
+STAR = Qt.ItemDataRole.UserRole + 3  # в избранном
+EXT = Qt.ItemDataRole.UserRole + 4  # формат (плашка при наведении)
+DUPE = Qt.ItemDataRole.UserRole + 5  # кусок уже есть в библиотеке (путь похожего)
+TINT = Qt.ItemDataRole.UserRole + 6  # цвет-метка плитки (вид ассета Unreal)
+RECENT = "::recent"  # виртуальные разделы вкладки библиотеки
 FAV = "::fav"
 HEAVY = "::heavy"
-SETS = "::sets"                                     # наборы: папки с подпапками палитр
-SMART = "::smart:"                                  # + имя умной папки (сохранённого поиска)
-TAG = "::tag:"                                      # + имя метки
-HEAVY_KB = 500                                      # тяжелее этого - кандидат на сжатие
-THUMB = 256                                         # плитки библиотеки рисуются один раз, ползунок их только масштабирует
+SETS = "::sets"  # наборы: папки с подпапками палитр
+SMART = "::smart:"  # + имя умной папки (сохранённого поиска)
+TAG = "::tag:"  # + имя метки
+HEAVY_KB = 500  # тяжелее этого - кандидат на сжатие
+THUMB = 256  # плитки библиотеки рисуются один раз, ползунок их только масштабирует
 
 
 class Relay(QObject):
-    done = pyqtSignal(object, object)       # (что вызвать, результат) - уже в главном потоке
+    done = pyqtSignal(object, object)  # (что вызвать, результат) - уже в главном потоке
 
 
 _relay = None
@@ -70,7 +71,7 @@ def in_main(cb, value):
     """Из фонового потока: вызвать cb(value) в главном (ход работы, подписи)."""
     try:
         relay().done.emit(cb, value)
-    except RuntimeError:                    # окно уже закрыто, а фоновая задача ещё доделывалась
+    except RuntimeError:  # окно уже закрыто, а фоновая задача ещё доделывалась
         pass
 
 
@@ -118,7 +119,7 @@ def to_trash(paths):
     -> (сколько ушло, шаги для истории)."""
     steps, n = [], 0
     for p in paths:
-        ok, where = QFile.moveToTrash(p)        # where - путь в корзине, по нему файл вернётся
+        ok, where = QFile.moveToTrash(p)  # where - путь в корзине, по нему файл вернётся
         if not ok:
             continue
         n += 1
@@ -126,6 +127,6 @@ def to_trash(paths):
             steps.append(["move", p, where])
         try:
             steps += journal.forget_steps(os.path.relpath(p, LIB))
-        except ValueError:                      # не из библиотеки (другой диск)
+        except ValueError:  # не из библиотеки (другой диск)
             pass
     return n, steps

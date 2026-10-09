@@ -80,12 +80,14 @@ class Cutting(unittest.TestCase):
         rng = np.random.default_rng(2)
         for x, y in ((6, 8), (512, 5), (4, 356), (509, 352)):
             pic = Image.fromarray(rng.integers(0, 255, (330, 480, 3), dtype=np.uint8), "RGB").convert("RGBA")
-            pic.paste((10, 10, 20, 255), (0, 0, 480, 60))           # ровная тёмная полоса неба сверху
+            pic.paste((10, 10, 20, 255), (0, 0, 480, 60))  # ровная тёмная полоса неба сверху
             sheet.paste(pic, (x, y))
         self.assertEqual(K.sheet_kind(sheet), "cells")
         pieces, boxes = K.cells(sheet, 2, 2)
         self.assertEqual(boxes[0], (6, 8, 486, 338))
-        self.assertTrue(all(abs(p.width - 480) <= 4 and abs(p.height - 330) <= 4 for p in pieces), [p.size for p in pieces])
+        self.assertTrue(
+            all(abs(p.width - 480) <= 4 and abs(p.height - 330) <= 4 for p in pieces), [p.size for p in pieces]
+        )
 
     def test_tiny_sheet(self):
         self.assertEqual(len(K.cut(Image.new("RGBA", (6, 5), (255, 255, 255, 255)), (4, 3))[0]), 12)
@@ -231,8 +233,13 @@ class Sorting(unittest.TestCase):
 
         r = route(os.path.join(K.LIB, "00 Входящие", "Космос [ic tokyo].png"))
         self.assertIsNotNone(r)
-        r2 = route(os.path.join(K.LIB, "00 Входящие", "Тёмные 1 - Лофи-комната, Подводные руины, Космос, "
-                                                      "Киберпанк-переулок [ds default].png"))
+        r2 = route(
+            os.path.join(
+                K.LIB,
+                "00 Входящие",
+                "Тёмные 1 - Лофи-комната, Подводные руины, Космос, Киберпанк-переулок [ds default].png",
+            )
+        )
         self.assertEqual((r2["o"]["mode"], len(r2["names"])), ("cells", 4))
         self.assertTrue(r["dest"].startswith(os.path.join(K.LIB, "04 Иконки", "Космос")))
 

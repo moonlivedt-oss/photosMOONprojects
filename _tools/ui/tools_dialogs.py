@@ -272,7 +272,6 @@ class CompareDialog(QDialog):
         else:
             self.view.set_images(to_pix(self.ia), to_pix(self.ib.resize(self.ia.size, Image.Resampling.LANCZOS)))
 
-
     def swap(self):
         self.pa, self.pb = self.pb, self.pa
         self.load()

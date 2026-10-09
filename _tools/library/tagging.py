@@ -133,7 +133,7 @@ FLOOR = 0.6  # z-оценка: насколько метка подходит с
 SHARE = 0.5  # и не слабее половины лучшей - иначе к точным меткам липнут случайные
 NEIGHBORS = 12
 NEAR = 0.8  # соседи ближе этого (косинус) делятся своими метками
-FOLDER_NEIGHBORS, FOLDER_NEAR, FOLDER_SHARE = 8, 0.72, 0.5     # «куда положить»: соседи, близость, доля голосов
+FOLDER_NEIGHBORS, FOLDER_NEAR, FOLDER_SHARE = 8, 0.72, 0.5  # «куда положить»: соседи, близость, доля голосов
 
 
 class Tagger:
@@ -143,7 +143,7 @@ class Tagger:
         self.sem = sem
         self.words, self.vecs = [], np.zeros((0, clip.DIM), np.float32)
         self.bias = self.sd = None
-        self.lock = threading.Lock()         # зовут из разных фоновых потоков
+        self.lock = threading.Lock()  # зовут из разных фоновых потоков
 
     def _vocab(self):
         try:

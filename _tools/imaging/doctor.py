@@ -1,4 +1,5 @@
 """Доктор библиотеки: битые, пустые, обрезанные, с остатками фона и каймой."""
+
 import os
 
 import numpy as np
@@ -9,10 +10,16 @@ from imaging.editing import _lum
 from imaging.files import LIB, upright
 
 ART = ("02 Наклейки", "03 Маскоты", "04 Иконки", "11 Аватары", "12 Медали и достижения")
-IMPORTED = ("Kenney", "Hero Patterns")         # чужие наборы: рисунок во всю клетку - так задумано
-PROBLEMS = [("broken", "Не открывается"), ("empty", "Пустая или почти прозрачная"), ("small", "Слишком мелкая"),
-            ("bg", "Фон не убран"), ("edge", "Рисунок обрезан краем"), ("neighbor", "Кусок соседа у края"),
-            ("fringe", "Светлая кайма")]
+IMPORTED = ("Kenney", "Hero Patterns")  # чужие наборы: рисунок во всю клетку - так задумано
+PROBLEMS = [
+    ("broken", "Не открывается"),
+    ("empty", "Пустая или почти прозрачная"),
+    ("small", "Слишком мелкая"),
+    ("bg", "Фон не убран"),
+    ("edge", "Рисунок обрезан краем"),
+    ("neighbor", "Кусок соседа у края"),
+    ("fringe", "Светлая кайма"),
+]
 
 
 def doctor_check(path, art=None):
@@ -30,7 +37,7 @@ def doctor_check(path, art=None):
         im.thumbnail((192, 192))
     except Exception:
         return ["broken"]
-    if imported:                                # детали интерфейса из чужих наборов мелкие и полупустые нарочно
+    if imported:  # детали интерфейса из чужих наборов мелкие и полупустые нарочно
         return []
     out = []
     if max(size) < 64 and not path.lower().endswith(".ico"):
@@ -62,7 +69,7 @@ def doctor_check(path, art=None):
     ring = (a >= 230) & near
     if semi.sum() > 40 and ring.sum() > 20:
         ls, lr = _lum(rgb[semi]).mean(), _lum(rgb[ring]).mean()
-        thin = semi.sum() < 1.2 * ring.sum()        # кайма - узкая полоска; широкий ореол - это задуманное свечение
+        thin = semi.sum() < 1.2 * ring.sum()  # кайма - узкая полоска; широкий ореол - это задуманное свечение
         if thin and ls > 150 and lr < 150 and ls > lr + 70:
             out.append("fringe")
     return out

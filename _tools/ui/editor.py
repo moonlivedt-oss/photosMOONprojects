@@ -11,6 +11,7 @@
 Ctrl+0 - целиком, Ctrl+1 - пиксель в пиксель, B - подложка, «Шторка» - было/стало рядом.
 Шаги видны списком: галка выключает шаг, Del убирает, стрелки двигают выше/ниже.
 У кнопок цвета правая кнопка мыши - пипетка: взять цвет с картинки."""
+
 import os
 
 import numpy as np
@@ -51,26 +52,58 @@ from ui.theme import C
 from ui.thumbnails import lib_icon, to_qimage
 from ui.widgets import flat, key
 
-PROXY = 1200                                # сторона копии для живого предпросмотра
-BACKDROPS = [("шахматка", None), ("тёмная", "#16161d"), ("светлая", "#e8e8ee"), ("белая", "#ffffff"),
-             ("чёрная", "#000000")]
-RATIOS = [("Свободно", None), ("1:1", 1.0), ("4:3", 4 / 3), ("3:2", 1.5), ("16:9", 16 / 9),
-          ("3:4", 3 / 4), ("9:16", 9 / 16)]
-NAMES = {"rotate": "поворот", "flip": "отражение", "crop": "обрезка", "trim": "поля срезаны",
-         "nobg": "фон убран", "outline": "обводка", "square": "квадрат", "resize": "размер",
-         "recolor": "перекраска", "defringe": "кайма убрана", "brush": "кисть", "shadow": "тень",
-         "glow": "свечение", "round": "скругление", "center": "квадрат по центру",
-         "angle": "наклон", "fill": "заливка фона", "pad": "поля", "nobg_ai": "фон убран нейросетью",
-         "upscale": "увеличение нейросетью"}
-ADJ_TIPS = {"shadows": "Плюс - вытянуть тёмные места, минус - сделать глубже",
-            "highlights": "Плюс - ярче светлое, минус - вернуть пересвеченное",
-            "sharp": "Плюс - резче, минус - размыть",
-            "opacity": "Насколько прозрачнее сделать всю картинку"}
+PROXY = 1200  # сторона копии для живого предпросмотра
+BACKDROPS = [
+    ("шахматка", None),
+    ("тёмная", "#16161d"),
+    ("светлая", "#e8e8ee"),
+    ("белая", "#ffffff"),
+    ("чёрная", "#000000"),
+]
+RATIOS = [
+    ("Свободно", None),
+    ("1:1", 1.0),
+    ("4:3", 4 / 3),
+    ("3:2", 1.5),
+    ("16:9", 16 / 9),
+    ("3:4", 3 / 4),
+    ("9:16", 9 / 16),
+]
+NAMES = {
+    "rotate": "поворот",
+    "flip": "отражение",
+    "crop": "обрезка",
+    "trim": "поля срезаны",
+    "nobg": "фон убран",
+    "outline": "обводка",
+    "square": "квадрат",
+    "resize": "размер",
+    "recolor": "перекраска",
+    "defringe": "кайма убрана",
+    "brush": "кисть",
+    "shadow": "тень",
+    "glow": "свечение",
+    "round": "скругление",
+    "center": "квадрат по центру",
+    "angle": "наклон",
+    "fill": "заливка фона",
+    "pad": "поля",
+    "nobg_ai": "фон убран нейросетью",
+    "upscale": "увеличение нейросетью",
+}
+ADJ_TIPS = {
+    "shadows": "Плюс - вытянуть тёмные места, минус - сделать глубже",
+    "highlights": "Плюс - ярче светлое, минус - вернуть пересвеченное",
+    "sharp": "Плюс - резче, минус - размыть",
+    "opacity": "Насколько прозрачнее сделать всю картинку",
+}
 
 # Рецепты из коробки: имя, шаги. Размеры в пикселях - для кусков 256 px (так режутся листы).
 RECIPES = [
-    ("Наклейка: убрать фон, кайма, обводка, квадрат",
-     [dict(op="nobg", tol=38), dict(op="defringe", px=1), dict(op="outline", px=8), dict(op="square", pad=0.06)]),
+    (
+        "Наклейка: убрать фон, кайма, обводка, квадрат",
+        [dict(op="nobg", tol=38), dict(op="defringe", px=1), dict(op="outline", px=8), dict(op="square", pad=0.06)],
+    ),
     ("Иконка: срезать поля и в квадрат", [dict(op="trim"), dict(op="square", pad=0.06)]),
     ("Чистый край: убрать кайму", [dict(op="defringe", px=1)]),
     ("Карточка: скругление и тень", [dict(op="round", rad=0.08), dict(op="shadow", dx=4, dy=6, blur=8, a=0.45)]),
@@ -81,14 +114,21 @@ RECIPES = [
 def step_text(o):
     """Шаг словами, с главным числом: «обводка 8 px», «поворот 90°»."""
     k, n = o["op"], NAMES.get(o["op"], o["op"])
-    extra = {"rotate": lambda: "%d°" % o["deg"], "angle": lambda: "%+d°" % o["deg"],
-             "outline": lambda: "%d px" % o["px"], "resize": lambda: "%d px" % o["size"],
-             "nobg": lambda: "допуск %d" % o.get("tol", 38), "recolor": lambda: o.get("pal", ""),
-             "fill": lambda: o.get("color", ""), "pad": lambda: "%d%%" % round(o.get("k", 0.1) * 100),
-             "square": lambda: "поля %d%%" % round(o.get("pad", 0.06) * 100),
-             "round": lambda: "%d%%" % round(o["rad"] * 100), "brush": lambda: "стереть" if o["mode"] == "erase" else "вернуть",
-             "flip": lambda: "по горизонтали" if o["dir"] == "h" else "по вертикали",
-             "upscale": lambda: "x%d" % o.get("x", 4)}.get(k)
+    extra = {
+        "rotate": lambda: "%d°" % o["deg"],
+        "angle": lambda: "%+d°" % o["deg"],
+        "outline": lambda: "%d px" % o["px"],
+        "resize": lambda: "%d px" % o["size"],
+        "nobg": lambda: "допуск %d" % o.get("tol", 38),
+        "recolor": lambda: o.get("pal", ""),
+        "fill": lambda: o.get("color", ""),
+        "pad": lambda: "%d%%" % round(o.get("k", 0.1) * 100),
+        "square": lambda: "поля %d%%" % round(o.get("pad", 0.06) * 100),
+        "round": lambda: "%d%%" % round(o["rad"] * 100),
+        "brush": lambda: "стереть" if o["mode"] == "erase" else "вернуть",
+        "flip": lambda: "по горизонтали" if o["dir"] == "h" else "по вертикали",
+        "upscale": lambda: "x%d" % o.get("x", 4),
+    }.get(k)
     try:
         return n + (" " + extra() if extra and extra() else "")
     except (KeyError, TypeError):
@@ -111,6 +151,7 @@ def recipe_by_name(cfg, name):
 
 class ColorButton(QPushButton):
     """Кнопка-образец цвета: щелчок - выбрать цвет."""
+
     def __init__(self, color, title, dlg=None):
         super().__init__()
         self.color, self.title, self.dlg = color, title, dlg
@@ -162,7 +203,9 @@ class ZeroSlider(QSlider):
         opt = QStyleOptionSlider()
         self.initStyleOption(opt)
         st = self.style()
-        handle = QRectF(st.subControlRect(QStyle.ComplexControl.CC_Slider, opt, QStyle.SubControl.SC_SliderHandle, self))
+        handle = QRectF(
+            st.subControlRect(QStyle.ComplexControl.CC_Slider, opt, QStyle.SubControl.SC_SliderHandle, self)
+        )
         half = handle.width() / 2
         x0, x1 = half, self.width() - half
         y = self.height() / 2
@@ -177,7 +220,7 @@ class ZeroSlider(QSlider):
         p.drawRoundedRect(QRectF(x0, y - 2, x1 - x0, 4), 2, 2)
         zero = max(self.minimum(), min(self.maximum(), 0))
         zx, vx = at(zero), handle.center().x()
-        if self.minimum() < 0:                  # метка нуля
+        if self.minimum() < 0:  # метка нуля
             p.setBrush(QColor(C["faint"]))
             p.drawRoundedRect(QRectF(zx - 1, y - 6, 2, 12), 1, 1)
         if abs(vx - zx) > 0.5:
@@ -188,7 +231,7 @@ class ZeroSlider(QSlider):
             p.drawRoundedRect(QRectF(min(zx, vx), y - 2, abs(vx - zx), 4), 2, 2)
         on = self.value() != zero
         rad = 7.5 if (self.hover or self.isSliderDown()) else 6.5
-        if self.isSliderDown():                 # мягкий ореол под пальцем
+        if self.isSliderDown():  # мягкий ореол под пальцем
             p.setBrush(QColor(168, 151, 255, 60))
             p.drawEllipse(QPointF(vx, y), rad + 5, rad + 5)
         p.setBrush(QColor("#ffffff"))
@@ -244,6 +287,7 @@ def swatch_icon(colors, w=40, h=14):
 class Canvas(QWidget):
     """Картинка на шахматке. Колесо - увеличение под курсором, правая/средняя кнопка - двигать,
     двойной щелчок - снова целиком. Режимы: кадрирование (рамка: новая, двигать, уголки) и кисть."""
+
     HANDLE = 9
 
     def __init__(self, dlg):
@@ -254,11 +298,11 @@ class Canvas(QWidget):
         self.zoom, self.off, self.pan = 1.0, QPointF(0, 0), None
         self.busy = False
         self.backdrop, self.split, self.split_drag = 0, None, False
-        self.img, self.picking = None, None   # QImage результата (для пипетки и цвета под курсором)
+        self.img, self.picking = None, None  # QImage результата (для пипетки и цвета под курсором)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.setMinimumSize(420, 360)
         self.setMouseTracking(True)
-        self.glow = None                    # главный цвет картинки - мягкое свечение за ней
+        self.glow = None  # главный цвет картинки - мягкое свечение за ней
         chk = QPixmap(20, 20)
         chk.fill(QColor("#1c1c26"))
         p = QPainter(chk)
@@ -298,14 +342,15 @@ class Canvas(QWidget):
         x, y = self.to_norm(pos, clamp=False)
         if not (0 <= x < 1 and 0 <= y < 1):
             return None
-        return self.img.pixelColor(min(self.img.width() - 1, int(x * self.img.width())),
-                                   min(self.img.height() - 1, int(y * self.img.height())))
+        return self.img.pixelColor(
+            min(self.img.width() - 1, int(x * self.img.width())), min(self.img.height() - 1, int(y * self.img.height()))
+        )
 
     def keyPressEvent(self, e):
         arrows = {Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0), Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1)}
         if self.cropping and self.crop and self.pm and e.key() in arrows:
             dx, dy = arrows[e.key()]
-            k = 10 if e.modifiers() & Qt.KeyboardModifier.ShiftModifier else 1     # Shift - по 10 пикселей
+            k = 10 if e.modifiers() & Qt.KeyboardModifier.ShiftModifier else 1  # Shift - по 10 пикселей
             x0, y0, x1, y1 = self.crop
             dx = min(1 - x1, max(-x0, dx * k / self.pm.width()))
             dy = min(1 - y1, max(-y0, dy * k / self.pm.height()))
@@ -320,7 +365,7 @@ class Canvas(QWidget):
             return
         new = max(1.0, min(16.0, self.zoom * (1.25 if e.angleDelta().y() > 0 else 0.8)))
         c = e.position() - QPointF(self.width() / 2, self.height() / 2)
-        self.off = c - (c - self.off) * (new / self.zoom)       # точка под курсором остаётся на месте
+        self.off = c - (c - self.off) * (new / self.zoom)  # точка под курсором остаётся на месте
         if new == 1.0:
             self.off = QPointF(0, 0)
         self.zoom = new
@@ -330,8 +375,9 @@ class Canvas(QWidget):
     # --- кадрирование
     def crop_rect(self):
         r, c = self.image_rect(), self.crop
-        return QRectF(r.x() + c[0] * r.width(), r.y() + c[1] * r.height(),
-                      (c[2] - c[0]) * r.width(), (c[3] - c[1]) * r.height())
+        return QRectF(
+            r.x() + c[0] * r.width(), r.y() + c[1] * r.height(), (c[2] - c[0]) * r.width(), (c[3] - c[1]) * r.height()
+        )
 
     def to_norm(self, pos, clamp=True):
         r = self.image_rect()
@@ -342,7 +388,12 @@ class Canvas(QWidget):
         if not self.crop:
             return None
         cr = self.crop_rect()
-        for name, pt in (("tl", cr.topLeft()), ("tr", cr.topRight()), ("bl", cr.bottomLeft()), ("br", cr.bottomRight())):
+        for name, pt in (
+            ("tl", cr.topLeft()),
+            ("tr", cr.topRight()),
+            ("bl", cr.bottomLeft()),
+            ("br", cr.bottomRight()),
+        ):
             if abs(pos.x() - pt.x()) <= self.HANDLE + 3 and abs(pos.y() - pt.y()) <= self.HANDLE + 3:
                 return name
         return None
@@ -358,7 +409,7 @@ class Canvas(QWidget):
         h = w * W / (H * self.ratio)
         lim_y = (1 - ay) if sy > 0 else ay
         lim_x = (1 - ax) if sx > 0 else ax
-        if h > lim_y:                           # упёрлись в край - от высоты
+        if h > lim_y:  # упёрлись в край - от высоты
             h = lim_y
             w = h * H * self.ratio / W
         if w > lim_x:
@@ -448,10 +499,15 @@ class Canvas(QWidget):
             return
         if not self.drag:
             c = self.corner_at(pos)
-            self.setCursor(Qt.CursorShape.SizeFDiagCursor if c in ("tl", "br") else
-                           Qt.CursorShape.SizeBDiagCursor if c in ("tr", "bl") else
-                           Qt.CursorShape.SizeAllCursor if self.crop and self.crop_rect().contains(pos) else
-                           Qt.CursorShape.CrossCursor)
+            self.setCursor(
+                Qt.CursorShape.SizeFDiagCursor
+                if c in ("tl", "br")
+                else Qt.CursorShape.SizeBDiagCursor
+                if c in ("tr", "bl")
+                else Qt.CursorShape.SizeAllCursor
+                if self.crop and self.crop_rect().contains(pos)
+                else Qt.CursorShape.CrossCursor
+            )
             return
         if self.drag[0] == "move":
             (sx, sy), (x0, y0, x1, y1) = self.drag[1], self.drag[2]
@@ -480,7 +536,7 @@ class Canvas(QWidget):
             self.stroke = []
             return
         if self.drag and self.crop and (self.crop[2] - self.crop[0] < 0.01 or self.crop[3] - self.crop[1] < 0.01):
-            self.reset_crop()                   # щелчок без протяжки - рамка на всю картинку
+            self.reset_crop()  # щелчок без протяжки - рамка на всю картинку
         self.drag = None
 
     def leaveEvent(self, _e):
@@ -499,7 +555,7 @@ class Canvas(QWidget):
     def paintEvent(self, _e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, self.zoom < 3)   # крупно - пиксели чёткие
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, self.zoom < 3)  # крупно - пиксели чёткие
         panel = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         clip = QPainterPath()
         clip.addRoundedRect(panel, 14, 14)
@@ -514,7 +570,7 @@ class Canvas(QWidget):
             p.end()
             return
         r = self.image_rect(pm)
-        if self.glow is not None:               # свечение главного цвета, как в просмотре библиотеки
+        if self.glow is not None:  # свечение главного цвета, как в просмотре библиотеки
             g = QRadialGradient(r.center(), max(r.width(), r.height()) * 0.95)
             c = QColor(self.glow)
             for t, al in ((0, 130), (0.55, 60), (1, 0)):
@@ -545,7 +601,7 @@ class Canvas(QWidget):
             pen.setCapStyle(Qt.PenCapStyle.RoundCap)
             pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
             p.setPen(pen)
-            for d in (-1, 1):                   # стрелки «тяни в стороны»
+            for d in (-1, 1):  # стрелки «тяни в стороны»
                 p.drawPolyline([mid + QPointF(d * 2, -4), mid + QPointF(d * 6, 0), mid + QPointF(d * 2, 4)])
             self.tag(p, "Было  |  Стало")
         else:
@@ -564,7 +620,9 @@ class Canvas(QWidget):
                 pen.setCapStyle(Qt.PenCapStyle.RoundCap)
                 pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
                 p.setPen(pen)
-                path = QPainterPath(QPointF(r.x() + self.stroke[0][0] * r.width(), r.y() + self.stroke[0][1] * r.height()))
+                path = QPainterPath(
+                    QPointF(r.x() + self.stroke[0][0] * r.width(), r.y() + self.stroke[0][1] * r.height())
+                )
                 for x, y in self.stroke[1:]:
                     path.lineTo(r.x() + x * r.width(), r.y() + y * r.height())
                 p.drawPath(path)
@@ -583,12 +641,14 @@ class Canvas(QWidget):
     def paint_crop(self, p, r):
         cr = self.crop_rect()
         shade = QColor(0, 0, 0, 150)
-        for part in (QRectF(r.left(), r.top(), r.width(), cr.top() - r.top()),
-                     QRectF(r.left(), cr.bottom(), r.width(), r.bottom() - cr.bottom()),
-                     QRectF(r.left(), cr.top(), cr.left() - r.left(), cr.height()),
-                     QRectF(cr.right(), cr.top(), r.right() - cr.right(), cr.height())):
+        for part in (
+            QRectF(r.left(), r.top(), r.width(), cr.top() - r.top()),
+            QRectF(r.left(), cr.bottom(), r.width(), r.bottom() - cr.bottom()),
+            QRectF(r.left(), cr.top(), cr.left() - r.left(), cr.height()),
+            QRectF(cr.right(), cr.top(), r.right() - cr.right(), cr.height()),
+        ):
             p.fillRect(part, shade)
-        p.setPen(QPen(QColor(255, 255, 255, 70), 1))       # третьи - для композиции
+        p.setPen(QPen(QColor(255, 255, 255, 70), 1))  # третьи - для композиции
         for i in (1, 2):
             x = cr.left() + cr.width() * i / 3
             y = cr.top() + cr.height() * i / 3
@@ -628,20 +688,25 @@ class EditDialog(QDialog):
         self.resize(1240, 800)
         self.ops, self.adj = [dict(o) for o in (ops or [])], {k: 0 for k, _t in K.ADJ}
         self.undo_stack, self.redo_stack = [], []
-        self.base = None                    # уменьшенная копия текущего файла (PIL)
+        self.base = None  # уменьшенная копия текущего файла (PIL)
         self.scale, self.full, self.cur = 1.0, (1, 1), (1, 1)
         self.gen, self.saving, self.idx = 0, False, 0
 
         self.canvas = Canvas(self)
         self.file_lbl = QLabel()
         self.file_lbl.setTextFormat(Qt.TextFormat.RichText)
-        prev, nxt = flat("<", lambda: self.step_file(-1), "Предыдущий файл"), flat(">", lambda: self.step_file(1), "Следующий")
+        prev, nxt = (
+            flat("<", lambda: self.step_file(-1), "Предыдущий файл"),
+            flat(">", lambda: self.step_file(1), "Следующий"),
+        )
         self.zoom_lbl = flat("100%", self.canvas_fit, "Целиком (Ctrl+0, двойной щелчок по картинке)")
         self.one_b = flat("1:1", self.canvas_actual, "Пиксель в пиксель (Ctrl+1)")
-        self.back_b = flat("Подложка: шахматка", self.cycle_backdrop, "Под прозрачным: шахматка, тёмная, светлая... (B)")
+        self.back_b = flat(
+            "Подложка: шахматка", self.cycle_backdrop, "Под прозрачным: шахматка, тёмная, светлая... (B)"
+        )
         self.split_b = flat("Шторка", self.toggle_split, "Было слева, стало справа; линию можно тянуть мышью")
         self.split_b.setCheckable(True)
-        seg = QWidget(objectName="seg")          # панель инструментов холста - одна таблетка
+        seg = QWidget(objectName="seg")  # панель инструментов холста - одна таблетка
         sl = QHBoxLayout(seg)
         sl.setContentsMargins(4, 3, 4, 3)
         sl.setSpacing(2)
@@ -656,8 +721,9 @@ class EditDialog(QDialog):
         for w in (prev, nxt):
             w.setVisible(len(self.paths) > 1)
         self.size_lbl = QLabel(objectName="chip")
-        hint = QLabel("Колесо - увеличить, правая кнопка - двигать.  \\ - как было.  Ctrl+Z / Ctrl+Y - шаг",
-                      objectName="dim")
+        hint = QLabel(
+            "Колесо - увеличить, правая кнопка - двигать.  \\ - как было.  Ctrl+Z / Ctrl+Y - шаг", objectName="dim"
+        )
         self.pos_lbl = QLabel(objectName="chip")
         self.pos_lbl.hide()
         hint.setStyleSheet("font-size:9pt")
@@ -671,8 +737,8 @@ class EditDialog(QDialog):
         left.addLayout(bottom)
 
         self.tabs = QTabWidget()
-        self.tabs.setTabBar(TabBar())          # «жидкая» таблетка, как в главном окне
-        self.tabs.tabBar().setUsesScrollButtons(False)       # все пять вкладок видны сразу
+        self.tabs.setTabBar(TabBar())  # «жидкая» таблетка, как в главном окне
+        self.tabs.tabBar().setUsesScrollButtons(False)  # все пять вкладок видны сразу
         self.tabs.tabBar().setExpanding(True)
         self.tabs.setStyleSheet("QTabBar::tab{padding:7px 6px;margin:8px 3px 6px 3px}")
         self.tabs.addTab(self.page_main(), "Основное")
@@ -741,7 +807,7 @@ class EditDialog(QDialog):
         lay.addLayout(left, 1)
         lay.addWidget(rw)
 
-        self.timer = QTimer(self, singleShot=True, interval=40)     # слайдер крутят - считаем по паузе
+        self.timer = QTimer(self, singleShot=True, interval=40)  # слайдер крутят - считаем по паузе
         self.timer.timeout.connect(self.render)
         key("Ctrl+Z", self, self.undo)
         key("Ctrl+Y", self, self.redo)
@@ -782,17 +848,24 @@ class EditDialog(QDialog):
 
     def page_main(self):
         g1 = QGridLayout()
-        for i, (text, fn) in enumerate((("Влево", lambda: self.add(op="rotate", deg=270)),
-                                        ("Вправо", lambda: self.add(op="rotate", deg=90)),
-                                        ("Отразить", lambda: self.add(op="flip", dir="h")),
-                                        ("Вверх ногами", lambda: self.add(op="flip", dir="v")))):
+        for i, (text, fn) in enumerate(
+            (
+                ("Влево", lambda: self.add(op="rotate", deg=270)),
+                ("Вправо", lambda: self.add(op="rotate", deg=90)),
+                ("Отразить", lambda: self.add(op="flip", dir="h")),
+                ("Вверх ногами", lambda: self.add(op="flip", dir="v")),
+            )
+        ):
             g1.addWidget(self.button(text, fn), i // 2, i % 2)
         self.ratio = QComboBox()
         for t, v in RATIOS:
             self.ratio.addItem(t, v)
         self.ratio.currentIndexChanged.connect(lambda _i: self.canvas.set_ratio(self.ratio.currentData()))
-        self.crop_btn = self.button("Кадрировать", self.toggle_crop,
-                                    "Рамка на картинке: тянуть, двигать, уголки. Enter или двойной щелчок - обрезать")
+        self.crop_btn = self.button(
+            "Кадрировать",
+            self.toggle_crop,
+            "Рамка на картинке: тянуть, двигать, уголки. Enter или двойной щелчок - обрезать",
+        )
         self.crop_ok = QPushButton("Обрезать", objectName="primary")
         self.crop_ok.clicked.connect(self.apply_crop)
         self.crop_ok.hide()
@@ -805,8 +878,9 @@ class EditDialog(QDialog):
         r3.addWidget(self.crop_btn)
         r3.addWidget(self.crop_ok)
         v2.addLayout(r3)
-        v2.addWidget(self.button("Срезать пустые поля", lambda: self.add(op="trim"),
-                                 "Убрать прозрачную рамку вокруг рисунка"))
+        v2.addWidget(
+            self.button("Срезать пустые поля", lambda: self.add(op="trim"), "Убрать прозрачную рамку вокруг рисунка")
+        )
         self.angle = QSpinBox(minimum=-45, maximum=45, value=0, suffix=" °")
         self.angle.setToolTip("Наклон по часовой стрелке (минус - против). Чтобы выровнять горизонт")
         self.angle_fit = QCheckBox("срезать углы")
@@ -828,8 +902,11 @@ class EditDialog(QDialog):
         r6 = QHBoxLayout()
         r6.addWidget(self.up_kind, 1)
         for x in (2, 4):
-            b = self.button("x%d" % x, lambda _c=False, x=x: self.add(op="upscale", x=x, kind=self.up_kind.currentData()),
-                            "Увеличить в %d раза нейросетью (Real-ESRGAN): чётко, а не мыльно" % x)
+            b = self.button(
+                "x%d" % x,
+                lambda _c=False, x=x: self.add(op="upscale", x=x, kind=self.up_kind.currentData()),
+                "Увеличить в %d раза нейросетью (Real-ESRGAN): чётко, а не мыльно" % x,
+            )
             b.setEnabled(neural.upscale_available())
             r6.addWidget(b)
         r5w = QVBoxLayout()
@@ -873,11 +950,21 @@ class EditDialog(QDialog):
         r = QHBoxLayout()
         r.addWidget(QLabel("Сила"))
         r.addWidget(self.strength)
-        r.addWidget(self.button("Перекрасить", self.add_recolor,
-                                "Тёмное - в тёмный цвет палитры, светлое - в светлый (градиентная карта)"), 1)
+        r.addWidget(
+            self.button(
+                "Перекрасить",
+                self.add_recolor,
+                "Тёмное - в тёмный цвет палитры, светлое - в светлый (градиентная карта)",
+            ),
+            1,
+        )
         v.addLayout(r)
-        note = QLabel("Если картинка лежит в папке палитры (например «04 Иконки/Космос/Tokyo Night»), "
-                      "после перекраски можно сохранить её в папку новой палитры рядом.", objectName="dim", wordWrap=True)
+        note = QLabel(
+            "Если картинка лежит в папке палитры (например «04 Иконки/Космос/Tokyo Night»), "
+            "после перекраски можно сохранить её в папку новой палитры рядом.",
+            objectName="dim",
+            wordWrap=True,
+        )
         v.addWidget(note)
         if not self.pal.count():
             v.addWidget(QLabel("Палитры берутся из Prompts.html - страница не найдена", objectName="dim"))
@@ -894,31 +981,76 @@ class EditDialog(QDialog):
         self.margin = QSpinBox(minimum=1, maximum=50, value=10, suffix=" %")
         self.margin.setToolTip("Ширина полей - доля длинной стороны")
         self.fill_c = ColorButton("#ffffff", "Цвет фона", self)
-        self.ai_bg = self.button("Убрать фон нейросетью", lambda: self.add(op="nobg_ai"),
-                                 "Любой фон, не только однотонный (BiRefNet). Первый раз - секунд 10")
+        self.ai_bg = self.button(
+            "Убрать фон нейросетью",
+            lambda: self.add(op="nobg_ai"),
+            "Любой фон, не только однотонный (BiRefNet). Первый раз - секунд 10",
+        )
         if not neural.bg_available():
             self.ai_bg.setEnabled(False)
             self.ai_bg.setToolTip("Нет модели: py -3.14 _tools/get_models.py")
         g4 = QGridLayout()
-        rows = ((self.button("Убрать фон", lambda: self.add(op="nobg", tol=self.tol.value()),
-                             "Однотонный фон, связанный с краями; белые детали внутри рисунка остаются"), self.tol),
-                (self.ai_bg,),
-                (self.button("Убрать кайму", lambda: self.add(op="defringe", px=self.fringe.value()),
-                             "Светлый ореол от старого фона вокруг рисунка"), self.fringe),
-                (self.button("Обводка", lambda: self.add(op="outline", px=self.px.value(), color=self.outline_c.color),
-                             "Обводка вокруг рисунка, как у наклеек (нужна прозрачность)"), self.px, self.outline_c),
-                (self.button("Квадрат с полями", lambda: self.add(op="square", pad=self.pad.value() / 100),
-                             "Рисунок по центру квадрата, вокруг - прозрачные поля"), self.pad),
-                (self.button("Поля вокруг", lambda: self.add(op="pad", k=self.margin.value() / 100),
-                             "Расширить холст: прозрачные поля со всех сторон"), self.margin),
-                (self.button("Залить фон", lambda: self.add(op="fill", color=self.fill_c.color),
-                             "Подложить сплошной цвет под прозрачное (например, для jpg или превью)"), self.fill_c))
+        rows = (
+            (
+                self.button(
+                    "Убрать фон",
+                    lambda: self.add(op="nobg", tol=self.tol.value()),
+                    "Однотонный фон, связанный с краями; белые детали внутри рисунка остаются",
+                ),
+                self.tol,
+            ),
+            (self.ai_bg,),
+            (
+                self.button(
+                    "Убрать кайму",
+                    lambda: self.add(op="defringe", px=self.fringe.value()),
+                    "Светлый ореол от старого фона вокруг рисунка",
+                ),
+                self.fringe,
+            ),
+            (
+                self.button(
+                    "Обводка",
+                    lambda: self.add(op="outline", px=self.px.value(), color=self.outline_c.color),
+                    "Обводка вокруг рисунка, как у наклеек (нужна прозрачность)",
+                ),
+                self.px,
+                self.outline_c,
+            ),
+            (
+                self.button(
+                    "Квадрат с полями",
+                    lambda: self.add(op="square", pad=self.pad.value() / 100),
+                    "Рисунок по центру квадрата, вокруг - прозрачные поля",
+                ),
+                self.pad,
+            ),
+            (
+                self.button(
+                    "Поля вокруг",
+                    lambda: self.add(op="pad", k=self.margin.value() / 100),
+                    "Расширить холст: прозрачные поля со всех сторон",
+                ),
+                self.margin,
+            ),
+            (
+                self.button(
+                    "Залить фон",
+                    lambda: self.add(op="fill", color=self.fill_c.color),
+                    "Подложить сплошной цвет под прозрачное (например, для jpg или превью)",
+                ),
+                self.fill_c,
+            ),
+        )
         for i, row in enumerate(rows):
             for j, w in enumerate(row):
                 g4.addWidget(w, i, j)
         self.erase_b = self.button("Стереть", lambda: self.set_brush("erase"), "Кисть: стереть до прозрачного")
-        self.restore_b = self.button("Вернуть", lambda: self.set_brush("restore"),
-                                     "Кисть: вернуть стёртое (например, лишнее, что съело «Убрать фон»)")
+        self.restore_b = self.button(
+            "Вернуть",
+            lambda: self.set_brush("restore"),
+            "Кисть: вернуть стёртое (например, лишнее, что съело «Убрать фон»)",
+        )
         for b in (self.erase_b, self.restore_b):
             b.setCheckable(True)
         self.bsize = QSlider(Qt.Orientation.Horizontal, minimum=3, maximum=120, value=24)
@@ -929,9 +1061,16 @@ class EditDialog(QDialog):
         g5.addWidget(self.restore_b, 0, 1)
         g5.addWidget(QLabel("Размер"), 1, 0)
         g5.addWidget(self.bsize, 1, 1)
-        g5.addWidget(QLabel("Кисть рисует по экрану: увеличьте колесом, чтобы поправить мелочь.",
-                            objectName="dim", wordWrap=True), 2, 0, 1, 2)
-        if len(self.paths) > 1:                 # мазок у каждой картинки свой - на пачку не годится
+        g5.addWidget(
+            QLabel(
+                "Кисть рисует по экрану: увеличьте колесом, чтобы поправить мелочь.", objectName="dim", wordWrap=True
+            ),
+            2,
+            0,
+            1,
+            2,
+        )
+        if len(self.paths) > 1:  # мазок у каждой картинки свой - на пачку не годится
             for b in (self.erase_b, self.restore_b):
                 b.setEnabled(False)
                 b.setToolTip("Кисть - только для одной картинки: мазок лёг бы на все файлы в одно место")
@@ -954,8 +1093,10 @@ class EditDialog(QDialog):
         g.addWidget(self.glow_btn, 1, 2)
         g.addWidget(self.button("Скруглить углы", lambda: self.add(op="round", rad=self.rad.value() / 100)), 2, 0)
         g.addWidget(self.rad, 2, 1)
-        return self.page(self.box("Тень, свечение, углы", g),
-                         QLabel("Тень и свечение расширяют холст, чтобы им хватило места.", objectName="dim", wordWrap=True))
+        return self.page(
+            self.box("Тень, свечение, углы", g),
+            QLabel("Тень и свечение расширяют холст, чтобы им хватило места.", objectName="dim", wordWrap=True),
+        )
 
     def page_recipes(self):
         self.rec = QComboBox()
@@ -967,8 +1108,14 @@ class EditDialog(QDialog):
         r.addWidget(self.button("Добавить в конец", lambda: self.apply_recipe(append=True)), 1)
         v.addLayout(r)
         r2 = QHBoxLayout()
-        r2.addWidget(self.button("Сохранить текущие шаги...", self.save_recipe,
-                                 "Мазки кисти в рецепт не попадают - они у каждой картинки свои"), 1)
+        r2.addWidget(
+            self.button(
+                "Сохранить текущие шаги...",
+                self.save_recipe,
+                "Мазки кисти в рецепт не попадают - они у каждой картинки свои",
+            ),
+            1,
+        )
         self.del_b = self.button("Удалить", self.delete_recipe)
         r2.addWidget(self.del_b)
         v.addLayout(r2)
@@ -976,9 +1123,14 @@ class EditDialog(QDialog):
         v.addWidget(self.rec_lbl)
         self.rec.currentIndexChanged.connect(self.show_recipe)
         self.show_recipe()
-        return self.page(self.box("Рецепты", v),
-                         QLabel("Рецепт можно выбрать и во входящих («Правка кусков») - тогда каждый кусок листа "
-                                "выходит уже готовым.", objectName="dim", wordWrap=True))
+        return self.page(
+            self.box("Рецепты", v),
+            QLabel(
+                "Рецепт можно выбрать и во входящих («Правка кусков») - тогда каждый кусок листа выходит уже готовым.",
+                objectName="dim",
+                wordWrap=True,
+            ),
+        )
 
     # ---------------------------------------------------------------- файл
     def step_file(self, d):
@@ -994,10 +1146,16 @@ class EditDialog(QDialog):
             return
         p = self.paths[self.idx]
         folder, name = os.path.split(os.path.relpath(p, LIB))
-        self.file_lbl.setText("<span style='color:{}'>{} / </span><b>{}</b>{}".format(
-            C["faint"], folder.replace(os.sep, " / "), name,
-            "<span style='color:%s'>&nbsp;&nbsp;%d из %d</span>" % (C["dim"], self.idx + 1, len(self.paths))
-            if len(self.paths) > 1 else ""))
+        self.file_lbl.setText(
+            "<span style='color:{}'>{} / </span><b>{}</b>{}".format(
+                C["faint"],
+                folder.replace(os.sep, " / "),
+                name,
+                "<span style='color:%s'>&nbsp;&nbsp;%d из %d</span>" % (C["dim"], self.idx + 1, len(self.paths))
+                if len(self.paths) > 1
+                else "",
+            )
+        )
         self.file_lbl.setToolTip(p)
         self.base = None
         self.canvas.pm = self.canvas.orig = None
@@ -1041,7 +1199,7 @@ class EditDialog(QDialog):
             self.toggle_crop()
         self.remember()
         if op["op"] == "rotate" and self.ops and self.ops[-1]["op"] == "rotate":
-            deg = (self.ops[-1]["deg"] + op["deg"]) % 360       # подряд идущие повороты - один шаг
+            deg = (self.ops[-1]["deg"] + op["deg"]) % 360  # подряд идущие повороты - один шаг
             self.ops.pop()
             if deg:
                 self.ops.append(dict(op="rotate", deg=deg))
@@ -1058,8 +1216,14 @@ class EditDialog(QDialog):
     # тень и свечение - долями длинной стороны (rel): в пачке файлов разного размера выглядят одинаково
     def add_shadow(self):
         s = self.sh_size.value() / 100
-        self.add(op="shadow", rel=True, dx=round(s * 0.5, 4), dy=round(s * 0.8, 4), blur=round(s, 4),
-                 a=self.sh_a.value() / 100)
+        self.add(
+            op="shadow",
+            rel=True,
+            dx=round(s * 0.5, 4),
+            dy=round(s * 0.8, 4),
+            blur=round(s, 4),
+            a=self.sh_a.value() / 100,
+        )
 
     def add_glow(self):
         self.add(op="glow", rel=True, r=round(self.glow_r.value() / 100, 4), color=self.glow_btn.color, a=0.85)
@@ -1071,16 +1235,16 @@ class EditDialog(QDialog):
     def add_stroke(self, pts, r):
         mode = self.canvas.brushing
         self.add(op="brush", mode=mode, r=round(r, 5), pts=[(round(x, 5), round(y, 5)) for x, y in pts])
-        self.canvas.brushing = mode             # add() не выходит из режима кисти
+        self.canvas.brushing = mode  # add() не выходит из режима кисти
 
     def adj_changed(self, k, v, lbl):
         lbl.setText("%+d" % v if v else "0")
-        lbl.setObjectName("" if v else "dim")         # тронутое значение - ярче
+        lbl.setObjectName("" if v else "dim")  # тронутое значение - ярче
         lbl.style().unpolish(lbl)
         lbl.style().polish(lbl)
         if self.adj[k] != v:
             if not any(s.isSliderDown() for s, _l in self.sliders.values()):
-                self.remember()             # колесо или клавиши - каждое изменение отдельным шагом
+                self.remember()  # колесо или клавиши - каждое изменение отдельным шагом
             self.adj[k] = v
             self.changed()
 
@@ -1153,7 +1317,9 @@ class EditDialog(QDialog):
         lst.blockSignals(True)
         lst.clear()
         if any(self.adj.values()):
-            it = QListWidgetItem("цвет: " + ", ".join("%s %+d" % (t.lower(), self.adj[k]) for k, t in K.ADJ if self.adj[k]))
+            it = QListWidgetItem(
+                "цвет: " + ", ".join("%s %+d" % (t.lower(), self.adj[k]) for k, t in K.ADJ if self.adj[k])
+            )
             it.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
             it.setIcon(dot_icon(C["acc"], C["acc2"]))
             it.setData(Qt.ItemDataRole.UserRole, -1)
@@ -1228,7 +1394,7 @@ class EditDialog(QDialog):
         self.pal_b.setVisible(bool(t))
         if t:
             self.pal_b.setText("Сохранить в «{}»".format(os.path.relpath(t, LIB).replace(os.sep, " / ")))
-            self.save_b.setObjectName("")       # главная кнопка - сохранить в палитру
+            self.save_b.setObjectName("")  # главная кнопка - сохранить в палитру
         else:
             self.save_b.setObjectName("primary")
         self.save_b.style().unpolish(self.save_b)
@@ -1309,12 +1475,15 @@ class EditDialog(QDialog):
             old = self.canvas.pm.size() if self.canvas.pm else None
             self.canvas.img = img
             self.canvas.pm = QPixmap.fromImage(img)
-            if self.canvas.cropping and old != self.canvas.pm.size():     # цвет рамку не сбивает
+            if self.canvas.cropping and old != self.canvas.pm.size():  # цвет рамку не сбивает
                 self.canvas.reset_crop()
             self.canvas.update()
             self.cur = (max(1, round(w / scale)), max(1, round(h / scale)))
-            self.size_lbl.setText("%d × %d  (было %d × %d)" % (*self.cur, *self.full)
-                                  if self.cur != tuple(self.full) else "%d × %d" % self.cur)
+            self.size_lbl.setText(
+                "%d × %d  (было %d × %d)" % (*self.cur, *self.full)
+                if self.cur != tuple(self.full)
+                else "%d × %d" % self.cur
+            )
             self.zoom_changed()
 
         def work():
@@ -1360,17 +1529,28 @@ class EditDialog(QDialog):
             self.pos_lbl.hide()
             return
         x, y = int(norm[0] * self.cur[0]), int(norm[1] * self.cur[1])
-        self.pos_lbl.setText("<span style='color:%s'>&#9632;</span> %s &nbsp;<span style='color:%s'>x</span> %d "
-                             "<span style='color:%s'>y</span> %d%s" % (
-                                 color.name() if color.alpha() else C["faint"], color.name(), C["dim"], x, C["dim"], y,
-                                 "" if color.alpha() == 255 else " &nbsp;<span style='color:%s'>альфа</span> %d%%"
-                                 % (C["dim"], round(color.alpha() / 2.55))))
+        self.pos_lbl.setText(
+            "<span style='color:%s'>&#9632;</span> %s &nbsp;<span style='color:%s'>x</span> %d "
+            "<span style='color:%s'>y</span> %d%s"
+            % (
+                color.name() if color.alpha() else C["faint"],
+                color.name(),
+                C["dim"],
+                x,
+                C["dim"],
+                y,
+                ""
+                if color.alpha() == 255
+                else " &nbsp;<span style='color:%s'>альфа</span> %d%%" % (C["dim"], round(color.alpha() / 2.55)),
+            )
+        )
         self.pos_lbl.show()
 
     def pipette(self, btn):
         def got(c):
             btn.set(c.name())
             self.win.say("Цвет взят: " + c.name())
+
         self.canvas.picking = got
         self.canvas.setCursor(Qt.CursorShape.PointingHandCursor)
         self.win.say("Щёлкните по картинке, чтобы взять цвет")
@@ -1394,7 +1574,7 @@ class EditDialog(QDialog):
         if mode and self.canvas.cropping:
             self.toggle_crop()
         if mode == self.canvas.brushing:
-            mode = None                         # повторное нажатие - выйти из кисти
+            mode = None  # повторное нажатие - выйти из кисти
         self.canvas.brushing = mode
         self.canvas.stroke = []
         self.erase_b.setChecked(mode == "erase")
@@ -1470,7 +1650,7 @@ class EditDialog(QDialog):
             if how == "replace":
                 for old, new in made:
                     if old != new:
-                        self.win.moved(old, new)        # избранное и метки - за файлом, если сменился формат
+                        self.win.moved(old, new)  # избранное и метки - за файлом, если сменился формат
             what = {"replace": "Правка", "copy": "Копии правки", "palette": "Перекрашено"}[how]
             text = "%s: %d шт." % (what, len(made)) + ("   не вышло: %d" % len(bad) if bad else "")
             if target:
@@ -1493,13 +1673,16 @@ class EditDialog(QDialog):
     def reject(self):
         if self.saving:
             return
-        if self.canvas.cropping:                # Esc при рамке - отменить рамку, а не закрыть окно
+        if self.canvas.cropping:  # Esc при рамке - отменить рамку, а не закрыть окно
             self.toggle_crop()
             return
         if self.canvas.brushing:
             self.set_brush(None)
             return
-        if self.dirty() and QMessageBox.question(self, "Правка", "Закрыть без сохранения? Правки пропадут.") \
-                != QMessageBox.StandardButton.Yes:
+        if (
+            self.dirty()
+            and QMessageBox.question(self, "Правка", "Закрыть без сохранения? Правки пропадут.")
+            != QMessageBox.StandardButton.Yes
+        ):
             return
         super().reject()

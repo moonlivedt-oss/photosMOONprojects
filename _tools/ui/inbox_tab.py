@@ -1,4 +1,5 @@
 """Вкладка «Входящие»: лист с рамками, нарезка в фоне, выбор раздела, сохранение."""
+
 import os
 
 from PIL import Image
@@ -79,9 +80,10 @@ from ui.widgets import (
 # ---------------------------------------------------------------- предпросмотр листа
 class Sheet(QWidget):
     """Исходный лист с рамками найденных рисунков и их номерами. Щелчок по рамке - отметить/снять кусок."""
+
     toggled = pyqtSignal(int)
-    edited = pyqtSignal(int, tuple)         # рамку куска подвинули руками: номер, новая рамка (в пикселях листа)
-    added = pyqtSignal(tuple)               # Shift + протяжка по пустому месту - новая рамка
+    edited = pyqtSignal(int, tuple)  # рамку куска подвинули руками: номер, новая рамка (в пикселях листа)
+    added = pyqtSignal(tuple)  # Shift + протяжка по пустому месту - новая рамка
     EDGE = 7
 
     def __init__(self):
@@ -92,7 +94,7 @@ class Sheet(QWidget):
         self.setMouseTracking(True)
 
     def show_sheet(self, im, boxes, mode):
-        self.full, self.boxes = im.size, [tuple(b) for b in boxes]      # своя копия: её тянут мышью
+        self.full, self.boxes = im.size, [tuple(b) for b in boxes]  # своя копия: её тянут мышью
         small = im.copy()
         small.thumbnail((1400, 1400), Image.LANCZOS)
         back = backdrop(small.width, small.height, mode)
@@ -104,7 +106,7 @@ class Sheet(QWidget):
         self.pm, self.boxes, self.on, self.hover = None, [], [], -1
         self.update()
 
-    M = 16                                  # поля вокруг листа внутри панели
+    M = 16  # поля вокруг листа внутри панели
 
     def frame(self):
         aw, ah = self.width() - 2 * self.M, self.height() - 2 * self.M
@@ -128,8 +130,10 @@ class Sheet(QWidget):
     # --- правка рамок руками
     def to_sheet(self, pos):
         x0, y0, w, h = self.frame()
-        return (min(self.full[0], max(0, (pos.x() - x0) * self.full[0] / w)),
-                min(self.full[1], max(0, (pos.y() - y0) * self.full[1] / h)))
+        return (
+            min(self.full[0], max(0, (pos.x() - x0) * self.full[0] / w)),
+            min(self.full[1], max(0, (pos.y() - y0) * self.full[1] / h)),
+        )
 
     def edge_at(self, pos):
         """(номер рамки, какие края тянуть: строка из l t r b) или None."""
@@ -168,17 +172,28 @@ class Sheet(QWidget):
         hit = self.edge_at(pos)
         if hit:
             s = hit[1]
-            self.setCursor(Qt.CursorShape.SizeHorCursor if s in ("l", "r") else
-                           Qt.CursorShape.SizeVerCursor if s in ("t", "b") else
-                           Qt.CursorShape.SizeFDiagCursor if s in ("lt", "rb") else Qt.CursorShape.SizeBDiagCursor)
+            self.setCursor(
+                Qt.CursorShape.SizeHorCursor
+                if s in ("l", "r")
+                else Qt.CursorShape.SizeVerCursor
+                if s in ("t", "b")
+                else Qt.CursorShape.SizeFDiagCursor
+                if s in ("lt", "rb")
+                else Qt.CursorShape.SizeBDiagCursor
+            )
             if self.hover != -1:
                 self.hover = -1
                 self.update()
             return
         i = self.box_at(pos)
         shift = e.modifiers() & Qt.KeyboardModifier.ShiftModifier and self.editable
-        self.setCursor(Qt.CursorShape.CrossCursor if shift and i < 0 else
-                       Qt.CursorShape.PointingHandCursor if i >= 0 else Qt.CursorShape.ArrowCursor)
+        self.setCursor(
+            Qt.CursorShape.CrossCursor
+            if shift and i < 0
+            else Qt.CursorShape.PointingHandCursor
+            if i >= 0
+            else Qt.CursorShape.ArrowCursor
+        )
         if i != self.hover:
             self.hover = i
             self.update()
@@ -230,7 +245,7 @@ class Sheet(QWidget):
         x0, y0, w, h = self.frame()
         img = QRectF(x0, y0, w, h)
         p.setPen(Qt.PenStyle.NoPen)
-        for i in range(1, 6):                       # тень под листом
+        for i in range(1, 6):  # тень под листом
             p.setBrush(QColor(0, 0, 0, 26 - 4 * i))
             p.drawRoundedRect(img.adjusted(-i, -i + 3, i, i + 3), 10 + i, 10 + i)
         clip = QPainterPath()
@@ -248,7 +263,7 @@ class Sheet(QWidget):
         for i, r in enumerate(self.rects()):
             on = self.on[i] if i < len(self.on) else True
             hot = i == self.hover
-            if not on:                              # снятый кусок притушен и обведён пунктиром
+            if not on:  # снятый кусок притушен и обведён пунктиром
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(QColor(9, 9, 13, 170))
                 p.drawRoundedRect(r, 6, 6)
@@ -271,7 +286,7 @@ class Sheet(QWidget):
             p.drawEllipse(dot)
             p.setPen(QColor(C["ink"] if on else C["dim"]))
             p.drawText(dot, Qt.AlignmentFlag.AlignCenter, str(i + 1))
-        if self.drag and self.drag[0] == "new":         # новая рамка, пока её тянут
+        if self.drag and self.drag[0] == "new":  # новая рамка, пока её тянут
             a, b, c, d = self.drag[2]
             kx, ky = w / self.full[0], h / self.full[1]
             pen = QPen(QColor(C["teal"]), 2, Qt.PenStyle.DashLine)
@@ -304,7 +319,7 @@ class Job(QRunnable):
 
 # ---------------------------------------------------------------- вкладка "Входящие"
 class InboxTab(QWidget):
-    changed = pyqtSignal()          # в библиотеку что-то записано
+    changed = pyqtSignal()  # в библиотеку что-то записано
 
     def __init__(self, win):
         super().__init__()
@@ -313,7 +328,7 @@ class InboxTab(QWidget):
         self.pool = QThreadPool.globalInstance()
         self.sig = Sig()
         self.sig.done.connect(self.on_done)
-        self.timer = QTimer(self, singleShot=True, interval=250)     # ждём, пока докрутят настройку
+        self.timer = QTimer(self, singleShot=True, interval=250)  # ждём, пока докрутят настройку
         self.timer.timeout.connect(self.run)
 
         # слева - входящие
@@ -337,8 +352,10 @@ class InboxTab(QWidget):
         self.sheet.toggled.connect(self.toggle_piece)
         self.sheet.edited.connect(self.box_edited)
         self.sheet.added.connect(self.box_added)
-        self.sheet.setToolTip("Щелчок по рамке - отметить или снять кусок.\n"
-                              "Тяните край рамки - поправить, Shift + протяжка по пустому месту - новая рамка.")
+        self.sheet.setToolTip(
+            "Щелчок по рамке - отметить или снять кусок.\n"
+            "Тяните край рамки - поправить, Shift + протяжка по пустому месту - новая рамка."
+        )
         self.manual_boxes = None
         self.out = icon_list(112)
         self.out.setSpacing(0)
@@ -351,7 +368,9 @@ class InboxTab(QWidget):
         self.title = QLabel(objectName="head")
         self.title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.info = QLabel("Выберите лист слева", objectName="dim")
-        self.info.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)   # длинное имя листа не раздвигает окно
+        self.info.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )  # длинное имя листа не раздвигает окно
         self.bg = QComboBox()
         for t, v in (("Фон: шахматка", "chk"), ("Фон: светлый", "light"), ("Фон: тёмный", "dark")):
             self.bg.addItem(t, v)
@@ -387,13 +406,17 @@ class InboxTab(QWidget):
 
         # справа - настройки и раздел
         self.preset = QComboBox()
-        self.kind_lbl = QLabel(objectName="dim", wordWrap=True)      # «цельная картинка - сохраню целиком»
+        self.kind_lbl = QLabel(objectName="dim", wordWrap=True)  # «цельная картинка - сохраню целиком»
         self.kind_lbl.hide()
         for name, _o, _s in PRESETS:
             self.preset.addItem(name)
         self.mode = QComboBox()
-        for t, v in (("Найти рисунки автоматически", "auto"), ("Резать по сетке", "grid"), ("Не резать (целиком)", "whole"),
-                     ("Цельные картинки сеткой (фоны листом)", "cells")):
+        for t, v in (
+            ("Найти рисунки автоматически", "auto"),
+            ("Резать по сетке", "grid"),
+            ("Не резать (целиком)", "whole"),
+            ("Цельные картинки сеткой (фоны листом)", "cells"),
+        ):
             self.mode.addItem(t, v)
         self.cols = QSpinBox(minimum=1, maximum=20, value=4)
         self.rows = QSpinBox(minimum=1, maximum=20, value=3)
@@ -402,8 +425,12 @@ class InboxTab(QWidget):
         grid.addWidget(QLabel("x", objectName="dim"))
         grid.addWidget(self.rows, 1)
         self.bg_mode = QComboBox()
-        for t, v in (("Убрать, если однотонный", "auto"), ("Убрать всегда", "remove"),
-                     ("Убрать нейросетью (любой фон)", "ai"), ("Оставить", "keep")):
+        for t, v in (
+            ("Убрать, если однотонный", "auto"),
+            ("Убрать всегда", "remove"),
+            ("Убрать нейросетью (любой фон)", "ai"),
+            ("Оставить", "keep"),
+        ):
             self.bg_mode.addItem(t, v)
         self.obv = QSpinBox(minimum=0, maximum=40, suffix=" px")
         self.pad = QSpinBox(minimum=0, maximum=30, suffix=" %")
@@ -415,7 +442,9 @@ class InboxTab(QWidget):
         self.names.setClearButtonEnabled(True)
         self.obv.setToolTip("Белая обводка вокруг рисунка, как у наклеек")
         self.pad.setToolTip("Пустые поля вокруг рисунка, доля стороны")
-        self.names.setToolTip("Пусто - имена из названия листа. Одно слово - префикс с номерами. Через запятую - по порядку.")
+        self.names.setToolTip(
+            "Пусто - имена из названия листа. Одно слово - префикс с номерами. Через запятую - по порядку."
+        )
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         form.setVerticalSpacing(5)
@@ -438,14 +467,16 @@ class InboxTab(QWidget):
         form.addRow("Метки", self.tags)
         form.addRow("", self.tag_box)
         self.recipe = QComboBox()
-        self.recipe.setToolTip("Рецепт из редактора применяется к каждому куску: убрать фон, кайма, обводка, квадрат...\n"
-                               "Свои рецепты сохраняются в редакторе (Ctrl+R), вкладка «Рецепты».")
+        self.recipe.setToolTip(
+            "Рецепт из редактора применяется к каждому куску: убрать фон, кайма, обводка, квадрат...\n"
+            "Свои рецепты сохраняются в редакторе (Ctrl+R), вкладка «Рецепты»."
+        )
         self.recipe.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.recipe.setMinimumContentsLength(14)
         self.fill_recipes()
         self.recipe.currentIndexChanged.connect(self.recipe_changed)
         form.addRow("Правка кусков", self.recipe)
-        for c in (self.preset, self.mode, self.bg_mode):          # длинные пункты не раздвигают правую панель
+        for c in (self.preset, self.mode, self.bg_mode):  # длинные пункты не раздвигают правую панель
             c.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
             c.setMinimumContentsLength(14)
         box1 = QGroupBox("НАРЕЗКА")
@@ -456,18 +487,20 @@ class InboxTab(QWidget):
         self.tree.currentItemChanged.connect(lambda *_: self.update_save())
         self.tree.itemClicked.connect(self.tree_clicked)
         self.route, self.manual, self.auto_busy = None, False, False
-        self.no_auto = set()                # вернулись во входящие по Ctrl+Z - сами не раскладывать
+        self.no_auto = set()  # вернулись во входящие по Ctrl+Z - сами не раскладывать
         self.route_lbl = QLabel(objectName="dim", wordWrap=True)
         self.route_lbl.hide()
-        self.where_btn = QPushButton(lib_icon("sparkles"), "", objectName="chip")     # «похоже на» - куда положить
+        self.where_btn = QPushButton(lib_icon("sparkles"), "", objectName="chip")  # «похоже на» - куда положить
         self.where_btn.clicked.connect(self.take_where)
         self.where_btn.hide()
         self.where = None
         newdir = QPushButton(lib_icon("folder"), "Новая папка...")
         newdir.clicked.connect(lambda: new_folder(self, self.tree))
         self.auto = QCheckBox("Помеченные раскладывать сразу")
-        self.auto.setToolTip("Картинки с меткой в имени (кнопка «Имена» в промптах, например «Космос [ic tokyo]»)\n"
-                             "нарезаются и раскладываются сами, как только попадают во входящие. Ctrl+Z отменяет.")
+        self.auto.setToolTip(
+            "Картинки с меткой в имени (кнопка «Имена» в промптах, например «Космос [ic tokyo]»)\n"
+            "нарезаются и раскладываются сами, как только попадают во входящие. Ctrl+Z отменяет."
+        )
         self.auto.setChecked(self.cfg.get("auto_route", False))
         self.auto.toggled.connect(self.auto_toggled)
         self.auto_timer = QTimer(self, singleShot=True, interval=900)
@@ -475,13 +508,17 @@ class InboxTab(QWidget):
         self.keep = QCheckBox("Исходник убрать в _sources")
         self.keep.setChecked(self.cfg.get("archive", True))
         self.squeeze = QCheckBox("Сжимать при сохранении")
-        self.squeeze.setToolTip("Куски сразу сохраняются с подобранным на глаз качеством -\n"
-                                "раздел «Тяжёлые» не копится. Работает по всем ядрам.")
+        self.squeeze.setToolTip(
+            "Куски сразу сохраняются с подобранным на глаз качеством -\n"
+            "раздел «Тяжёлые» не копится. Работает по всем ядрам."
+        )
         self.squeeze.setChecked(self.cfg.get("squeeze", True))
         self.squeeze.toggled.connect(lambda on: self.cfg.__setitem__("squeeze", on))
         self.auto_tags = QCheckBox("Ставить подсказанные метки")
-        self.auto_tags.setToolTip("Для «Разобрать все» и автораскладки: каждый лист получает метки,\n"
-                                  "которые окно подсказывает по смыслу его кусков")
+        self.auto_tags.setToolTip(
+            "Для «Разобрать все» и автораскладки: каждый лист получает метки,\n"
+            "которые окно подсказывает по смыслу его кусков"
+        )
         self.auto_tags.setChecked(self.cfg.get("auto_tags", True) and win.sem.ok)
         self.auto_tags.setVisible(win.sem.ok)
         self.auto_tags.toggled.connect(lambda on: self.cfg.__setitem__("auto_tags", on))
@@ -492,7 +529,18 @@ class InboxTab(QWidget):
         self.all_btn.setToolTip("Помеченные - по своим папкам, остальные - с текущими настройками в выбранный раздел")
         self.all_btn.clicked.connect(self.save_all)
         b2 = QVBoxLayout()
-        for w in (self.route_lbl, self.where_btn, self.tree, newdir, self.auto, self.keep, self.squeeze, self.auto_tags, self.save_btn, self.all_btn):
+        for w in (
+            self.route_lbl,
+            self.where_btn,
+            self.tree,
+            newdir,
+            self.auto,
+            self.keep,
+            self.squeeze,
+            self.auto_tags,
+            self.save_btn,
+            self.all_btn,
+        ):
             b2.addWidget(w)
         box2 = QGroupBox("КУДА")
         box2.setLayout(b2)
@@ -522,7 +570,7 @@ class InboxTab(QWidget):
 
         fill_tree(self.tree)
         self.preset.setCurrentIndex(min(self.cfg.get("preset", 0), len(PRESETS) - 1))
-        self.user_preset = self.preset.currentIndex()     # выбранная руками; цельные картинки её не сбивают
+        self.user_preset = self.preset.currentIndex()  # выбранная руками; цельные картинки её не сбивают
         self.apply_preset()
         self.reload()
 
@@ -532,15 +580,20 @@ class InboxTab(QWidget):
         v.addStretch(1)
         ic = Floaty("download-arrow")
         t = QLabel("Входящих нет", objectName="title", alignment=Qt.AlignmentFlag.AlignCenter)
-        s = QLabel("Перетащите листы в окно, вставьте картинку из буфера (Ctrl+V)\n"
-                   f"или положите файлы в папку «{K.INBOX}»", objectName="dim", alignment=Qt.AlignmentFlag.AlignCenter,
-                   wordWrap=True)
+        s = QLabel(
+            f"Перетащите листы в окно, вставьте картинку из буфера (Ctrl+V)\nили положите файлы в папку «{K.INBOX}»",
+            objectName="dim",
+            alignment=Qt.AlignmentFlag.AlignCenter,
+            wordWrap=True,
+        )
         self.gen_hint = QLabel(objectName="dim", alignment=Qt.AlignmentFlag.AlignCenter, wordWrap=True)
         row = QHBoxLayout()
         row.addStretch(1)
-        for text, icon, fn in (("Добавить файлы...", "plus-circle", self.add_files),
-                               ("Вставить из буфера", "clipboard", self.win.paste),
-                               ("Открыть папку", "folder", lambda: os.startfile(INBOX))):
+        for text, icon, fn in (
+            ("Добавить файлы...", "plus-circle", self.add_files),
+            ("Вставить из буфера", "clipboard", self.win.paste),
+            ("Открыть папку", "folder", lambda: os.startfile(INBOX)),
+        ):
             b = QPushButton(lib_icon(icon), text)
             b.clicked.connect(fn)
             row.addWidget(b)
@@ -557,10 +610,17 @@ class InboxTab(QWidget):
     # --- настройки
     def opts(self, boxes=False):
         """Настройки нарезки. boxes - с рамками, поправленными руками (только для текущего листа)."""
-        o = dict(mode=self.mode.currentData(), cols=self.cols.value(), rows=self.rows.value(),
-                 bg_mode=self.bg_mode.currentData(), obv=self.obv.value(), pad=self.pad.value(),
-                 size=self.size.value(), fmt=self.fmt.currentText(),
-                 recipe=recipe_by_name(self.cfg, self.recipe.currentData()) if self.recipe.currentData() else None)
+        o = dict(
+            mode=self.mode.currentData(),
+            cols=self.cols.value(),
+            rows=self.rows.value(),
+            bg_mode=self.bg_mode.currentData(),
+            obv=self.obv.value(),
+            pad=self.pad.value(),
+            size=self.size.value(),
+            fmt=self.fmt.currentText(),
+            recipe=recipe_by_name(self.cfg, self.recipe.currentData()) if self.recipe.currentData() else None,
+        )
         if boxes and self.manual_boxes and o["mode"] != "whole":
             o["boxes"] = list(self.manual_boxes)
         return o
@@ -619,7 +679,7 @@ class InboxTab(QWidget):
         else:
             m = (b + d) // 2
             two = [(a, b, c, m), (a, m, c, d)]
-        self.set_boxes(boxes[:sel[0]] + two + boxes[sel[0] + 1:])
+        self.set_boxes(boxes[: sel[0]] + two + boxes[sel[0] + 1 :])
 
     def reset_boxes(self):
         self.manual_boxes = None
@@ -639,7 +699,7 @@ class InboxTab(QWidget):
         self.size.setValue(o["size"])
         self.fmt.setCurrentText(o["fmt"])
         self.loading = False
-        last = self.cfg.get("dest", {}).get(str(self.preset.currentIndex()))     # куда сохраняли с этой заготовкой
+        last = self.cfg.get("dest", {}).get(str(self.preset.currentIndex()))  # куда сохраняли с этой заготовкой
         if not (last and os.path.isdir(last) and select_path(self.tree, last)):
             select_path(self.tree, os.path.join(LIB, section))
         self.touched()
@@ -648,7 +708,7 @@ class InboxTab(QWidget):
         if self.loading:
             return
         if self.sender() in (self.mode, self.cols, self.rows) and self.manual_boxes:
-            self.manual_boxes = None            # другая сетка - рамки руками больше не к месту
+            self.manual_boxes = None  # другая сетка - рамки руками больше не к месту
             self.boxes_lbl.setVisible(False)
         mode = self.mode.currentData()
         for w in (self.merge_b, self.split_b):
@@ -673,7 +733,7 @@ class InboxTab(QWidget):
             r = route(p)
             it = QListWidgetItem(stem)
             it.setData(ROLE, p)
-            if thumb_key(p, 256, "chk") in _thumbs:        # остальные дорисуются в фоне
+            if thumb_key(p, 256, "chk") in _thumbs:  # остальные дорисуются в фоне
                 it.setData(PIX, thumb(p, 256, "chk"))
             else:
                 todo.append((row, p))
@@ -702,8 +762,12 @@ class InboxTab(QWidget):
             self.auto_timer.start()
 
     def add_files(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "Добавить во входящие", self.cfg.get("add_dir", ""),
-                                                "Картинки (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.avif)")
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Добавить во входящие",
+            self.cfg.get("add_dir", ""),
+            "Картинки (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.avif)",
+        )
         if files:
             self.cfg["add_dir"] = os.path.dirname(files[0])
         self.win.take(files)
@@ -723,8 +787,9 @@ class InboxTab(QWidget):
 
     def edit(self, p):
         """Поправить лист до нарезки: повернуть, обрезать лишнее, убрать фон."""
+
         def saved(text):
-            self.path = None                    # тот же путь - лист всё равно надо перерезать
+            self.path = None  # тот же путь - лист всё равно надо перерезать
             self.reload()
             self.win.say(text)
 
@@ -735,8 +800,11 @@ class InboxTab(QWidget):
         if not it:
             return
         p = it.data(ROLE)
-        if QMessageBox.question(self, "В корзину", f"Убрать лист в корзину: {os.path.basename(p)}?") \
-                == QMessageBox.StandardButton.Yes and QFile.moveToTrash(p)[0]:
+        if (
+            QMessageBox.question(self, "В корзину", f"Убрать лист в корзину: {os.path.basename(p)}?")
+            == QMessageBox.StandardButton.Yes
+            and QFile.moveToTrash(p)[0]
+        ):
             self.path = None
             self.reload()
             self.win.say("Лист в корзине: " + os.path.basename(p))
@@ -747,7 +815,7 @@ class InboxTab(QWidget):
             return
         self.path = path
         self.route, self.manual = (route(path) if path else None), False
-        self.manual_boxes = None                # рамки руками - только у того листа, где их правили
+        self.manual_boxes = None  # рамки руками - только у того листа, где их правили
         self.boxes_lbl.setVisible(False)
         self.show_route()
         if not path:
@@ -759,7 +827,7 @@ class InboxTab(QWidget):
             self.update_save()
             return
         self.kind_lbl.hide()
-        if self.route:                       # метка в имени: нарезка и папка - по ней
+        if self.route:  # метка в имени: нарезка и папка - по ней
             o = self.route["o"]
             self.loading = True
             self.mode.setCurrentIndex(self.mode.findData(o["mode"]))
@@ -787,17 +855,17 @@ class InboxTab(QWidget):
                 kind = K.sheet_kind(K.upright(im))
         except Exception:
             return
-        named = os.path.splitext(os.path.basename(path))[0].count(",") >= 2    # имена кусков через запятую - лист
+        named = os.path.splitext(os.path.basename(path))[0].count(",") >= 2  # имена кусков через запятую - лист
         whole = next(i for i, (_n, o, _s) in enumerate(PRESETS) if o["mode"] == "whole" and o["fmt"] != "ico")
         want = whole if (kind == "whole" and not named) or kind == "cells" else self.user_preset
         self.guessing = True
         try:
             if self.preset.currentIndex() != want:
                 self.preset.setCurrentIndex(want)
-            mode = PRESETS[want][1]["mode"]     # прошлый лист мог переключить режим на «один рисунок»
+            mode = PRESETS[want][1]["mode"]  # прошлый лист мог переключить режим на «один рисунок»
             if kind == "single" and not named and mode == "grid":
                 mode = "auto"
-            if kind == "cells":                 # фоны листом 2x2 - резать по пурпурным полосам
+            if kind == "cells":  # фоны листом 2x2 - резать по пурпурным полосам
                 mode = "cells"
                 self.loading = True
                 self.cols.setValue(2)
@@ -809,10 +877,11 @@ class InboxTab(QWidget):
                 self.loading = False
         finally:
             self.guessing = False
-        text = {"whole": "Похоже на цельную картинку (фон, иллюстрация) - сохраню целиком.",
-                "single": "Похоже на один рисунок - вырежу его.",
-                "cells": "Похоже на несколько фонов в пурпурной рамке - разрежу по полосам и увеличу каждый x2."
-                }.get(kind if not named or kind == "cells" else "")
+        text = {
+            "whole": "Похоже на цельную картинку (фон, иллюстрация) - сохраню целиком.",
+            "single": "Похоже на один рисунок - вырежу его.",
+            "cells": "Похоже на несколько фонов в пурпурной рамке - разрежу по полосам и увеличу каждый x2.",
+        }.get(kind if not named or kind == "cells" else "")
         if text:
             self.kind_lbl.setText(text + " Другая заготовка выше - решить иначе.")
         self.kind_lbl.setVisible(bool(text))
@@ -822,13 +891,15 @@ class InboxTab(QWidget):
         r = self.route
         if r and not self.manual:
             new = "" if os.path.isdir(r["dest"]) else "  (папка появится при сохранении)"
-            self.route_lbl.setText("По имени файла: {}{}\nЩёлкните раздел ниже, чтобы выбрать другой.".format(short(r["dest"]), new))
+            self.route_lbl.setText(
+                "По имени файла: {}{}\nЩёлкните раздел ниже, чтобы выбрать другой.".format(short(r["dest"]), new)
+            )
         self.route_lbl.setVisible(bool(r and not self.manual))
         self.update_save()
 
     def tree_clicked(self, *_):
         if self.route:
-            self.manual = True                  # раздел выбран руками - метка больше не решает
+            self.manual = True  # раздел выбран руками - метка больше не решает
             self.show_route()
 
     def auto_toggled(self, on):
@@ -885,7 +956,7 @@ class InboxTab(QWidget):
         self.pool.start(Job(self.gen, self.path, self.opts(boxes=True), self.sig))
 
     def on_done(self, gen, im, pieces, boxes, err):
-        if gen != self.gen:                 # пока резали, настройки уже поменяли
+        if gen != self.gen:  # пока резали, настройки уже поменяли
             return
         if err:
             self.pieces, self.dupe = [], {}
@@ -896,7 +967,7 @@ class InboxTab(QWidget):
             return
         self.im, self.pieces, self.boxes = im, pieces, boxes
         self.dupe = {}
-        self.out.clear()                    # новый результат: отметки и имена прошлой нарезки не переносим
+        self.out.clear()  # новый результат: отметки и имена прошлой нарезки не переносим
         for i, piece in enumerate(pieces):
             hit = self.win.sigs.find(piece)
             if hit:
@@ -952,7 +1023,7 @@ class InboxTab(QWidget):
             return
         self.sheet.show_sheet(self.im, self.boxes, mode)
         old = {self.out.item(i).data(ROLE): self.out.item(i) for i in range(self.out.count())}
-        same = len(old) == len(self.pieces)            # сменили только подложку - отметки и имена не трогаем
+        same = len(old) == len(self.pieces)  # сменили только подложку - отметки и имена не трогаем
         states = {i: (it.checkState(), it.text()) for i, it in old.items()} if same else {}
         self.out.blockSignals(True)
         self.out.clear()
@@ -985,8 +1056,9 @@ class InboxTab(QWidget):
 
     # --- отметки
     def checked(self):
-        return [self.out.item(i) for i in range(self.out.count())
-                if self.out.item(i).checkState() == Qt.CheckState.Checked]
+        return [
+            self.out.item(i) for i in range(self.out.count()) if self.out.item(i).checkState() == Qt.CheckState.Checked
+        ]
 
     def checks_changed(self, *_):
         self.sheet.on = [self.out.item(i).checkState() == Qt.CheckState.Checked for i in range(self.out.count())]
@@ -995,7 +1067,10 @@ class InboxTab(QWidget):
             name = os.path.splitext(os.path.basename(self.path))[0]
             self.title.setToolTip(name)
             self.title.setText(name if len(name) <= 60 else name[:57] + "...")
-            text = "Отмечено %d из %d" % (len(self.checked()), len(self.pieces))      # главное - в начале, хвост может не влезть
+            text = "Отмечено %d из %d" % (
+                len(self.checked()),
+                len(self.pieces),
+            )  # главное - в начале, хвост может не влезть
             if self.dupe:
                 text += ", уже есть: %d" % len(self.dupe)
             self.info.setText(text + ", лист %d × %d" % (self.im.width, self.im.height))
@@ -1049,7 +1124,7 @@ class InboxTab(QWidget):
     def save_current(self):
         if not self.path or not self.pieces:
             return
-        if self.auto_busy:                      # Ctrl+S, пока в фоне режется пачка, - тот же лист дважды
+        if self.auto_busy:  # Ctrl+S, пока в фоне режется пачка, - тот же лист дважды
             self.win.say("Сейчас разбирается пачка - подождите, пока закончится")
             return
         dest = self.dest()
@@ -1058,8 +1133,14 @@ class InboxTab(QWidget):
             return
         steps = []
         try:
-            saved = store(self.path, self.opts(), [self.pieces[it.data(ROLE)] for it in picked],
-                          [it.text() for it in picked], dest, self.squeeze.isChecked())
+            saved = store(
+                self.path,
+                self.opts(),
+                [self.pieces[it.data(ROLE)] for it in picked],
+                [it.text() for it in picked],
+                dest,
+                self.squeeze.isChecked(),
+            )
             steps = [("new", p) for p in saved]
             tag_saved(saved, self.tag_list())
             if self.keep.isChecked():
@@ -1070,7 +1151,9 @@ class InboxTab(QWidget):
             self.win.push("Сохранено частично: %d шт." % len(steps), steps)
             if steps:
                 self.changed.emit()
-            QMessageBox.warning(self, "Не сохранилось", str(e) + ("\n\nУже записанное убирает Ctrl+Z." if steps else ""))
+            QMessageBox.warning(
+                self, "Не сохранилось", str(e) + ("\n\nУже записанное убирает Ctrl+Z." if steps else "")
+            )
             return
         text = "Сохранено: %d шт. в «%s»" % (len(saved), os.path.relpath(dest, LIB))
         if self.tag_list():
@@ -1093,18 +1176,20 @@ class InboxTab(QWidget):
             text += "\nС меткой в имени: %d - уйдут по своим папкам." % (len(files) - len(plain))
         if plain:
             text += "\nБез метки: %d - с текущими настройками в «%s»." % (len(plain), os.path.relpath(dest, LIB))
-        ask = QMessageBox.question(self, "Разобрать все входящие",
-                                   text + "\nКуски, которые уже есть в библиотеке или повторяются в этой пачке, "
-                                          "будут пропущены. Продолжить?")
+        ask = QMessageBox.question(
+            self,
+            "Разобрать все входящие",
+            text + "\nКуски, которые уже есть в библиотеке или повторяются в этой пачке, будут пропущены. Продолжить?",
+        )
         if ask != QMessageBox.StandardButton.Yes or self.auto_busy:
             return
         opts = self.opts()
         items = [(f, routes[f]["o"], routes[f]["dest"]) if routes[f] else (f, opts, dest) for f in files]
         keep_src, sigs, squeeze = self.keep.isChecked(), self.win.sigs, self.squeeze.isChecked()
-        self.auto_busy = True                   # пока режется пачка - ни автораскладки, ни второго запуска
+        self.auto_busy = True  # пока режется пачка - ни автораскладки, ни второго запуска
         self.all_btn.setEnabled(False)
         self.save_btn.setEnabled(False)
-        say = lambda t: in_main(self.win.say, t)    # noqa: E731
+        say = lambda t: in_main(self.win.say, t)  # noqa: E731
 
         def done(res):
             self.auto_busy = False
@@ -1119,15 +1204,14 @@ class InboxTab(QWidget):
             self.win.push(text, steps)
             self.finish(text, dest)
             if bad:
-                QMessageBox.warning(self, "Не всё получилось",
-                                    "\n".join(f"{os.path.basename(f)}: {e}" for f, e in bad))
+                QMessageBox.warning(self, "Не всё получилось", "\n".join(f"{os.path.basename(f)}: {e}" for f, e in bad))
 
         tagger = self.win.tagger if self.auto_tags.isChecked() else None
         bg(lambda: sort_files(items, sigs, keep_src, squeeze, say, tagger), done)
 
     def finish(self, text, dest=None):
         self.cfg["archive"] = self.keep.isChecked()
-        self.cfg["preset"] = self.user_preset     # не «целиком», если окно само так решило
+        self.cfg["preset"] = self.user_preset  # не «целиком», если окно само так решило
         if dest and not (self.route and not self.manual):
             self.cfg.setdefault("dest", {})[str(self.preset.currentIndex())] = dest
         self.path = None

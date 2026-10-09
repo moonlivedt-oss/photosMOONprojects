@@ -1,4 +1,5 @@
 """Картинки -> Qt: подложки, плитки, кэш миниатюр (память + диск), значки из библиотеки."""
+
 import hashlib
 import os
 import time
@@ -42,7 +43,7 @@ def backdrop(w, h, mode):
 def to_qimage(im):
     im = im.convert("RGBA")
     q = QImage(im.tobytes("raw", "RGBA"), im.width, im.height, im.width * 4, QImage.Format.Format_RGBA8888)
-    return q.copy()                         # copy: буфер PIL не переживёт выход из функции
+    return q.copy()  # copy: буфер PIL не переживёт выход из функции
 
 
 def to_pix(im):
@@ -90,7 +91,7 @@ def swatch(color, side=14):
     return QIcon(pm)
 
 
-_thumbs = OrderedDict()                 # плитки в памяти, самые давние выбрасываются
+_thumbs = OrderedDict()  # плитки в памяти, самые давние выбрасываются
 THUMBS_MAX = 2500
 THUMBS_DIR = os.path.join(HERE, "_thumbs")
 
@@ -109,12 +110,12 @@ def raw_thumb(path, side):
                     im.load()
                     im = im.convert("RGBA")
                 if time.time() - os.path.getmtime(cache) > 3 * 86400:
-                    os.utime(cache)             # нужная миниатюра «свежеет» - чистка её не тронет
+                    os.utime(cache)  # нужная миниатюра «свежеет» - чистка её не тронет
                 return im
             except Exception:
                 pass
     with Image.open(path) as im:
-        im.draft("RGB", (side * 2, side * 2))      # jpg открывается сразу уменьшенным
+        im.draft("RGB", (side * 2, side * 2))  # jpg открывается сразу уменьшенным
         im = K.upright(im).convert("RGBA")
     im.thumbnail((side, side), Image.LANCZOS)
     if cache:
@@ -222,7 +223,7 @@ def lib_pix(name, side=48):
     global _icons
     if _icons is None:
         _icons = {}
-        for p in K.images_in(os.path.join(LIB, "04 Иконки")):      # иконки лежат по подпапкам
+        for p in K.images_in(os.path.join(LIB, "04 Иконки")):  # иконки лежат по подпапкам
             _icons.setdefault(os.path.splitext(os.path.basename(p))[0], p)
     p = _icons.get(name)
     return thumb(p, side) if p else QPixmap()
@@ -240,7 +241,8 @@ class TileDelegate(QStyledItemDelegate):
     только что загруженная картинка проявляется (view.fade_amount).
     Размер плитки не зависит от того, загрузилась ли картинка: Qt меряет все плитки по первой,
     и пустая первая (ещё грузится в фоне) раньше сплющивала все картинки в полоску."""
-    PAD, CAP = 9, 40                        # поля внутри карточки, высота подписи
+
+    PAD, CAP = 9, 40  # поля внутри карточки, высота подписи
 
     def __init__(self, view):
         super().__init__(view)
@@ -263,11 +265,11 @@ class TileDelegate(QStyledItemDelegate):
         h = self.view.hover_amount(row)
         fade = self.view.fade_amount(row)
         sel = bool(option.state & QStyle.StateFlag.State_Selected)
-        r = QRectF(option.rect).adjusted(5, 5 - 2 * h, -5, -5 - 2 * h)      # наведённая чуть всплывает
+        r = QRectF(option.rect).adjusted(5, 5 - 2 * h, -5, -5 - 2 * h)  # наведённая чуть всплывает
 
         tint = index.data(TINT)
-        acc = QColor(tint or C["acc"])            # цвет раздела (как цвет вида у ассетов Unreal)
-        if h > 0.01 or sel:                  # мягкая тень под карточкой
+        acc = QColor(tint or C["acc"])  # цвет раздела (как цвет вида у ассетов Unreal)
+        if h > 0.01 or sel:  # мягкая тень под карточкой
             k = max(h, 0.6 if sel else 0)
             p.setPen(Qt.PenStyle.NoPen)
             for i in range(1, 7):
@@ -291,7 +293,7 @@ class TileDelegate(QStyledItemDelegate):
         else:
             p.setPen(QPen(mix(QColor(C["line"]), acc, 0.15 + h * 0.6), 1))
         p.drawRoundedRect(r, 14, 14)
-        if tint:                                 # цветная черта сверху - какого вида ассет
+        if tint:  # цветная черта сверху - какого вида ассет
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(tint))
             p.drawRoundedRect(QRectF(r.x() + 18, r.y() + 1.5, r.width() - 36, 3.5), 1.75, 1.75)
@@ -306,13 +308,13 @@ class TileDelegate(QStyledItemDelegate):
             clip = QPainterPath()
             clip.addRoundedRect(img, 10, 10)
             p.setClipPath(clip)
-            z = 1 + 0.045 * h                   # приближение внутри своей рамки
+            z = 1 + 0.045 * h  # приближение внутри своей рамки
             src = QRectF(img.center().x() - w * z / 2, img.center().y() - hh * z / 2, w * z, hh * z)
             p.setOpacity(fade)
             p.drawPixmap(src, pm, QRectF(pm.rect()))
             p.setOpacity(1)
             p.setClipping(False)
-        else:                                    # ещё грузится - заглушка с бегущим переливом
+        else:  # ещё грузится - заглушка с бегущим переливом
             ph = (time.monotonic() * 0.9 + (r.x() + r.y()) / 1600) % 1.4 - 0.2
             g = QLinearGradient(box.topLeft(), box.bottomRight())
             g.setColorAt(0, QColor(C["bg3"]))
@@ -328,7 +330,7 @@ class TileDelegate(QStyledItemDelegate):
                 if not self.view.anim.isActive():
                     self.view.anim.start()
 
-        if index.data(STAR):                     # в избранном - звезда на тёмном кружке
+        if index.data(STAR):  # в избранном - звезда на тёмном кружке
             c = QRectF(box.x() + 5, box.y() + 5, 24, 24)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(13, 13, 19, 200))
@@ -338,7 +340,7 @@ class TileDelegate(QStyledItemDelegate):
                 p.drawPixmap(c.adjusted(4, 4, -4, -4), star, QRectF(star.rect()))
 
         ext = index.data(EXT)
-        if ext:                                  # формат - всегда, бледно; при наведении ярче и с весом
+        if ext:  # формат - всегда, бледно; при наведении ярче и с весом
             label = ext
             if h > 0.05:
                 path = index.data(ROLE)
@@ -361,8 +363,9 @@ class TileDelegate(QStyledItemDelegate):
         text = QRect(int(r.x()) + 10, int(box.bottom()) + 7, int(r.width()) - 20, 18)
         p.setFont(self.f1)
         p.setPen(QColor(C["selt"] if sel else C["text"]))
-        name = p.fontMetrics().elidedText(index.data(Qt.ItemDataRole.DisplayRole) or "",
-                                          Qt.TextElideMode.ElideMiddle, text.width())
+        name = p.fontMetrics().elidedText(
+            index.data(Qt.ItemDataRole.DisplayRole) or "", Qt.TextElideMode.ElideMiddle, text.width()
+        )
         p.drawText(text, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter, name)
         p.setFont(self.f2)
         p.setPen(QColor(C["dim"]))
@@ -374,8 +377,11 @@ class TileDelegate(QStyledItemDelegate):
 def mix(a, b, t):
     """Цвет между a и b (t от 0 до 1)."""
     t = max(0.0, min(1.0, t))
-    return QColor(round(a.red() + (b.red() - a.red()) * t), round(a.green() + (b.green() - a.green()) * t),
-                  round(a.blue() + (b.blue() - a.blue()) * t))
+    return QColor(
+        round(a.red() + (b.red() - a.red()) * t),
+        round(a.green() + (b.green() - a.green()) * t),
+        round(a.blue() + (b.blue() - a.blue()) * t),
+    )
 
 
 def palette(path, n=6):
@@ -385,6 +391,7 @@ def palette(path, n=6):
 class PieceDelegate(QStyledItemDelegate):
     """Кусок нарезанного листа: карточка с номером, круглой галочкой (щелчок - отметить/снять),
     плашкой «уже есть» и именем (двойной щелчок - переименовать). Снятые - притушены."""
+
     PAD = 8
 
     def __init__(self, view):
@@ -412,13 +419,18 @@ class PieceDelegate(QStyledItemDelegate):
 
     def editorEvent(self, event, model, option, index):
         """Щелчок по кружку - отметить или снять кусок, не трогая выделение."""
-        if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease) \
-                and event.button() == Qt.MouseButton.LeftButton \
-                and self.check_rect(option).adjusted(-4, -4, 4, 4).contains(event.position()):
+        if (
+            event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease)
+            and event.button() == Qt.MouseButton.LeftButton
+            and self.check_rect(option).adjusted(-4, -4, 4, 4).contains(event.position())
+        ):
             if event.type() == QEvent.Type.MouseButtonRelease:
                 on = index.data(Qt.ItemDataRole.CheckStateRole) in (Qt.CheckState.Checked, 2)
-                model.setData(index, (Qt.CheckState.Unchecked if on else Qt.CheckState.Checked).value,
-                              Qt.ItemDataRole.CheckStateRole)
+                model.setData(
+                    index,
+                    (Qt.CheckState.Unchecked if on else Qt.CheckState.Checked).value,
+                    Qt.ItemDataRole.CheckStateRole,
+                )
             return True
         return super().editorEvent(event, model, option, index)
 
@@ -456,7 +468,7 @@ class PieceDelegate(QStyledItemDelegate):
             p.setOpacity(1)
             p.setClipping(False)
 
-        c = self.check_rect(option)                     # галочка: полный градиентный кружок или пустое кольцо
+        c = self.check_rect(option)  # галочка: полный градиентный кружок или пустое кольцо
         if on:
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QBrush(grad))
@@ -475,7 +487,7 @@ class PieceDelegate(QStyledItemDelegate):
             p.drawEllipse(c.adjusted(1, 1, -1, -1))
 
         p.setFont(self.f3)
-        num = str(index.row() + 1)                      # номер - как у рамки на листе
+        num = str(index.row() + 1)  # номер - как у рамки на листе
         tw = p.fontMetrics().horizontalAdvance(num) + 12
         pill = QRectF(box.right() - tw - 4, box.y() + 4, tw, 18)
         dupe = index.data(DUPE)
@@ -498,7 +510,8 @@ class PieceDelegate(QStyledItemDelegate):
         p.setFont(self.f1)
         p.setPen(QColor(C["selt"] if sel else C["text"] if on else C["faint"]))
         nr = self.name_rect(option)
-        name = p.fontMetrics().elidedText(index.data(Qt.ItemDataRole.DisplayRole) or "",
-                                          Qt.TextElideMode.ElideMiddle, nr.width())
+        name = p.fontMetrics().elidedText(
+            index.data(Qt.ItemDataRole.DisplayRole) or "", Qt.TextElideMode.ElideMiddle, nr.width()
+        )
         p.drawText(nr, Qt.AlignmentFlag.AlignCenter, name)
         p.restore()

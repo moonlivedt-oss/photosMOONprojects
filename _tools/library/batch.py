@@ -1,6 +1,7 @@
 """Пакетные действия с файлами без Qt: сжатие, копии в другом формате, правка по рецепту, выгрузка
 в проект. Работают по ядрам процессора; возвращают шаги для отмены (журнал, Ctrl+Z).
 Их зовут окно, командная строка и сервер для ИИ-помощников."""
+
 import os
 import shutil
 import time
@@ -26,7 +27,7 @@ def keep_path(arch, p):
     """Куда убрать оригинал: та же раскладка папок внутри arch (файл не из библиотеки - по имени)."""
     try:
         rel = os.path.relpath(p, C.LIB)
-    except ValueError:                      # другой диск
+    except ValueError:  # другой диск
         rel = ""
     if not rel or rel.startswith(".."):
         rel = os.path.basename(p)
@@ -57,10 +58,12 @@ def compress_files(paths, o, report):
         if src_fmt == "svg" or (fmt not in CAN and o["fmt"] not in ("clean", K.BEST)):
             skipped["не поддерживается"] = skipped.get("не поддерживается", 0) + 1
             continue
-        if K.is_animated(p):                    # из анимации остался бы один кадр
+        if K.is_animated(p):  # из анимации остался бы один кадр
             skipped["анимация"] = skipped.get("анимация", 0) + 1
             continue
-        items.append((p, {k: v for k, v in o.items() if k != "stop"} | dict(fmt=fmt if o["fmt"] != "clean" else "clean")))
+        items.append(
+            (p, {k: v for k, v in o.items() if k != "stop"} | dict(fmt=fmt if o["fmt"] != "clean" else "clean"))
+        )
     for i, (p, res) in enumerate(run(K.job_compress, items, o.get("stop"))):
         report((i, len(items), os.path.basename(p), before, after, p))
         try:
@@ -88,20 +91,28 @@ def compress_files(paths, o, report):
             sec[1] += len(data)
         except Exception as e:
             skipped[f"ошибка: {e}"] = skipped.get(f"ошибка: {e}", 0) + 1
-    return steps, dict(
-        done=done, before=before, after=after, skipped=skipped, total=len(paths), sections=sections
-    )
+    return steps, dict(done=done, before=before, after=after, skipped=skipped, total=len(paths), sections=sections)
 
 
-COPY_FORMATS = [("webp", "webp"), ("avif", "avif"), ("png", "png"), ("jpg", "jpg"), ("ico", "ico"),
-                (K.BEST, "самый лёгкий"), ("svg", "svg - контуры")]
+COPY_FORMATS = [
+    ("webp", "webp"),
+    ("avif", "avif"),
+    ("png", "png"),
+    ("jpg", "jpg"),
+    ("ico", "ico"),
+    (K.BEST, "самый лёгкий"),
+    ("svg", "svg - контуры"),
+]
 
 
 def copy_files(paths, fmt, report, stop=None):
     """Копии рядом с оригиналами в другом формате, качество подбирается на глаз, по ядрам.
     Возвращает (шаги для Ctrl+Z, сделано, не вышло)."""
-    items = [(p, dict(fmt=fmt, q=0, target=0.99, kind="auto")) for p in paths
-             if not p.lower().endswith(".svg") and K.fmt_of(p) != fmt and not K.is_animated(p)]
+    items = [
+        (p, dict(fmt=fmt, q=0, target=0.99, kind="auto"))
+        for p in paths
+        if not p.lower().endswith(".svg") and K.fmt_of(p) != fmt and not K.is_animated(p)
+    ]
     steps, bad = [], 0
     for i, (p, res) in enumerate(run(K.job_compress, items, stop)):
         report((i, len(items), os.path.basename(p)))
@@ -113,12 +124,11 @@ def copy_files(paths, fmt, report, stop=None):
         try:
             with open(new, "wb") as fh:
                 fh.write(data)
-        except OSError:                         # нет места или прав - остальные копии всё равно делаем
+        except OSError:  # нет места или прав - остальные копии всё равно делаем
             bad += 1
             continue
         steps.append(("new", new))
     return steps, len(steps), bad
-
 
 
 # ---------------------------------------------------------------- правка
@@ -178,8 +188,10 @@ EXPORT_PRESETS = [
     ),
     ("Для сайта: набор @1x @2x @3x (webp)", dict(fmt="webp", q=0, size=0, fit="fit", retina=True)),
     ("Под лимит Discord (самый лёгкий, до 8 МБ)", dict(fmt="best", q=0, size=0, fit="fit", budget=8000)),
-    ("Наклейка для телеграма (webp 512, до 64 КБ)",
-     dict(fmt="webp", q=0, size=512, fit="square", trim=True, budget=64)),
+    (
+        "Наклейка для телеграма (webp 512, до 64 КБ)",
+        dict(fmt="webp", q=0, size=512, fit="square", trim=True, budget=64),
+    ),
     ("Значок в svg (контуры)", dict(fmt="svg", q=0, size=0, fit="fit", trim=True)),
     ("Атлас для игры или сайта (клетка 128)", dict(fmt="atlas", q=0, size=128, fit="fit")),
     ("SVG-спрайт для сайта (symbol + use)", dict(fmt="svgsprite", q=0, size=0, fit="fit", trim=True)),
@@ -196,8 +208,12 @@ def export(paths, folder, o, report=None):
         return export_atlas(paths, folder, o)
     if fmt == "svgsprite":
         return export_sprite(paths, folder, o, report)
-    plain = not fmt and not o.get("size") and o.get("fit", "fit") == "fit" and not (
-        o.get("trim") or o.get("retina") or o.get("budget"))
+    plain = (
+        not fmt
+        and not o.get("size")
+        and o.get("fit", "fit") == "fit"
+        and not (o.get("trim") or o.get("retina") or o.get("budget"))
+    )
     for p in paths:
         stem, ext = os.path.splitext(os.path.basename(p))
         if p.lower().endswith(".svg") or plain:
@@ -252,16 +268,20 @@ def export_sprite(paths, folder, o, report=None):
     svg = unique(os.path.join(folder, "спрайт.svg"))
     with open(svg, "w", encoding="utf-8") as fh:
         fh.write(K.svg_sprite(items))
-    demo = ['<!doctype html><meta charset="utf-8"><title>Спрайт</title>',
-            '<style>body{font:14px system-ui;background:#15151c;color:#e8e6f0;padding:20px}'
-            '.g{display:grid;grid-template-columns:repeat(auto-fill,120px);gap:12px}'
-            '.i{background:#1f1f29;border-radius:10px;padding:10px;text-align:center}'
-            'svg.ic{width:64px;height:64px}code{font-size:11px;color:#9a98a8;word-break:break-all}</style>',
-            f"<p>Вставьте содержимое {os.path.basename(svg)} в страницу (или подключите файлом) и пишите "
-            '<code>&lt;svg&gt;&lt;use href="#имя"/&gt;&lt;/svg&gt;</code></p><div class="g">']
+    demo = [
+        '<!doctype html><meta charset="utf-8"><title>Спрайт</title>',
+        "<style>body{font:14px system-ui;background:#15151c;color:#e8e6f0;padding:20px}"
+        ".g{display:grid;grid-template-columns:repeat(auto-fill,120px);gap:12px}"
+        ".i{background:#1f1f29;border-radius:10px;padding:10px;text-align:center}"
+        "svg.ic{width:64px;height:64px}code{font-size:11px;color:#9a98a8;word-break:break-all}</style>",
+        f"<p>Вставьте содержимое {os.path.basename(svg)} в страницу (или подключите файлом) и пишите "
+        '<code>&lt;svg&gt;&lt;use href="#имя"/&gt;&lt;/svg&gt;</code></p><div class="g">',
+    ]
     for name, _d in items:
         i = K.css_id(name)
-        demo.append(f'<div class="i"><svg class="ic"><use href="{os.path.basename(svg)}#{i}"/></svg><br><code>#{i}</code></div>')
+        demo.append(
+            f'<div class="i"><svg class="ic"><use href="{os.path.basename(svg)}#{i}"/></svg><br><code>#{i}</code></div>'
+        )
     demo.append("</div>")
     with open(os.path.splitext(svg)[0] + " - шпаргалка.html", "w", encoding="utf-8") as fh:
         fh.write("\n".join(demo))

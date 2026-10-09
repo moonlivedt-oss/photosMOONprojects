@@ -1,6 +1,7 @@
 """Чего не хватает: карточки Prompts.html (наборы и одиночные) против палитр - что уже лежит
 в библиотеке, что сделано частично, чего нет. По ячейке: копировать промпт или имя файла с меткой,
 открыть папку, а если набор уже есть в другой палитре - перекрасить его в эту без генерации."""
+
 import os
 
 from PyQt6 import sip
@@ -49,8 +50,10 @@ class MissingDialog(QDialog):
         self.head = QLabel("Считаю...", objectName="title")
         self.sub = QLabel(objectName="dim", wordWrap=True)
         if not data.get("node"):
-            self.sub.setText("Карточки берутся из Prompts.html через node - он не найден. Поставьте Node.js "
-                             "(nodejs.org) и откройте окно снова; палитры для перекраски работают и без него.")
+            self.sub.setText(
+                "Карточки берутся из Prompts.html через node - он не найден. Поставьте Node.js "
+                "(nodejs.org) и откройте окно снова; палитры для перекраски работают и без него."
+            )
         self.sec = QComboBox()
         self.sec.addItem("Все разделы", "")
         for s in dict.fromkeys(c["sec"] for c in self.cards):
@@ -90,8 +93,10 @@ class MissingDialog(QDialog):
         self.src = QComboBox()
         self.src.setToolTip("Готовая палитра этого набора - из неё перекрасить")
         self.b_recolor = QPushButton("Перекрасить из готовой")
-        self.b_recolor.setToolTip("Взять набор из выбранной готовой палитры и перекрасить в эту - без генерации.\n"
-                                  "Откроется редактор: можно поправить силу перекраски и сохранить.")
+        self.b_recolor.setToolTip(
+            "Взять набор из выбранной готовой палитры и перекрасить в эту - без генерации.\n"
+            "Откроется редактор: можно поправить силу перекраски и сохранить."
+        )
         self.b_recolor.clicked.connect(self.recolor)
         self.b_open = QPushButton("Открыть папку")
         self.b_open.clicked.connect(self.open_folder)
@@ -106,8 +111,12 @@ class MissingDialog(QDialog):
         sv.addSpacing(10)
         sv.addWidget(self.b_open)
         sv.addStretch(1)
-        legend = QLabel("Ячейка: «есть» - готово (2/3 имён и больше), число - сделано частично, пусто - нет. "
-                        "Жирным и точкой - задуманная палитра карточки.", objectName="dim", wordWrap=True)
+        legend = QLabel(
+            "Ячейка: «есть» - готово (2/3 имён и больше), число - сделано частично, пусто - нет. "
+            "Жирным и точкой - задуманная палитра карточки.",
+            objectName="dim",
+            wordWrap=True,
+        )
         sv.addWidget(legend)
         side.setMinimumWidth(300)
         split = QSplitter()
@@ -142,8 +151,10 @@ class MissingDialog(QDialog):
             mine = sum(1 for i, c in enumerate(cards) if prompts.done(*res.get((i, c["pal"]), (0, 1))))
             self.head.setText("Готово: %d из %d" % (ready, len(res)))
             if self.node:
-                self.sub.setText("Карточек: %d, палитр: %d. В задуманных палитрах готово %d из %d."
-                                 % (len(cards), len(pals), mine, len(cards)))
+                self.sub.setText(
+                    "Карточек: %d, палитр: %d. В задуманных палитрах готово %d из %d."
+                    % (len(cards), len(pals), mine, len(cards))
+                )
             self.fill()
 
         bg(work, done)
@@ -155,7 +166,11 @@ class MissingDialog(QDialog):
             if sec and c["sec"] != sec:
                 continue
             cols = [p for p in self.pals if not self.mine.isChecked() or p[0] == c["pal"]]
-            if self.only.isChecked() and self.stat and all(prompts.done(*self.stat.get((i, p[0]), (0, 1))) for p in cols):
+            if (
+                self.only.isChecked()
+                and self.stat
+                and all(prompts.done(*self.stat.get((i, p[0]), (0, 1))) for p in cols)
+            ):
                 continue
             out.append(i)
         return out
@@ -197,8 +212,10 @@ class MissingDialog(QDialog):
                     it.setFont(bold)
                     if not got:
                         it.setText("-")
-                it.setToolTip("%s - %s: %d из %d%s" % (c["title"], name, got, total,
-                                                      "   (задуманная палитра)" if pid == c["pal"] else ""))
+                it.setToolTip(
+                    "%s - %s: %d из %d%s"
+                    % (c["title"], name, got, total, "   (задуманная палитра)" if pid == c["pal"] else "")
+                )
                 t.setItem(r, j, it)
         t.blockSignals(False)
         if rows:
@@ -221,19 +238,27 @@ class MissingDialog(QDialog):
         got, total = self.stat.get((self.shown[r], pal[0]), (0, 1))
         self.title.setText("{}, {}".format(card["title"], pal[1]))
         d = prompts.dest(card, pal[0])
-        self.info.setText("%s\nСделано: %d из %d%s" % (os.path.relpath(d, LIB) if d else "", got, total,
-                                                       "   (задуманная палитра)" if pal[0] == card["pal"] else ""))
+        self.info.setText(
+            "%s\nСделано: %d из %d%s"
+            % (
+                os.path.relpath(d, LIB) if d else "",
+                got,
+                total,
+                "   (задуманная палитра)" if pal[0] == card["pal"] else "",
+            )
+        )
         names = prompts.names(card)
         have = set()
         if d and os.path.isdir(d):
             stems = [os.path.splitext(f)[0] for f in os.listdir(d)]
             have = {n for n in names if any(s == n or s.startswith(n + "_") for s in stems)}
         missing = [n for n in names if n not in have]
-        self.miss.setText(("Нет: " + ", ".join(missing)) if missing and len(names) > 1 else
-                          "" if not missing else "Картинки пока нет")
+        self.miss.setText(
+            ("Нет: " + ", ".join(missing)) if missing and len(names) > 1 else "" if not missing else "Картинки пока нет"
+        )
         self.b_open.setEnabled(bool(d and os.path.isdir(d)))
         self.src.clear()
-        for p in self.pals:                             # готовые палитры этой карточки - источники перекраски
+        for p in self.pals:  # готовые палитры этой карточки - источники перекраски
             if p[0] != pal[0] and prompts.done(*self.stat.get((self.shown[r], p[0]), (0, 1))):
                 self.src.addItem(swatch_icon(p[3]), p[1], p[0])
         can = self.src.count() > 0 and len(missing) > 0
@@ -266,8 +291,11 @@ class MissingDialog(QDialog):
         _i, card, pal = self.cur
         src_dir = prompts.dest(card, self.src.currentData())
         names = prompts.names(card)
-        files = sorted(os.path.join(src_dir, f) for f in os.listdir(src_dir)
-                       if any(os.path.splitext(f)[0] == n or os.path.splitext(f)[0].startswith(n + "_") for n in names))
+        files = sorted(
+            os.path.join(src_dir, f)
+            for f in os.listdir(src_dir)
+            if any(os.path.splitext(f)[0] == n or os.path.splitext(f)[0].startswith(n + "_") for n in names)
+        )
         if not files:
             return
         op = dict(op="recolor", colors=pal[3], k=1.0, pal=pal[0], folder=pal[2])

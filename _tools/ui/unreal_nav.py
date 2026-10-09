@@ -12,8 +12,8 @@ from ui.thumbnails import lib_icon, lib_pix
 from ui.widgets import make_tree, tree_item
 
 ALL, FAV = "::all", "::fav"
-NEW, SETS = "::new", "::sets"       # скачанное за последние дни; свои подборки
-SET = "::set:"                      # + имя подборки
+NEW, SETS = "::new", "::sets"  # скачанное за последние дни; свои подборки
+SET = "::set:"  # + имя подборки
 HOME = "::home"  # все темы «Дом - ...» разом
 SECTION = "::sec:"  # + раздел «Дома» (Кровати, Столы...) - по назначению, из любого источника
 HOME_PREFIX = "Дом - "
@@ -339,10 +339,10 @@ class Nav(QWidget):
         if self.theme == HOME:
             return [a for a in lst if a.get("theme", "").startswith(HOME_PREFIX)]
         if self.theme and self.theme.startswith(SET):
-            ids = set(self.sets().get(self.theme[len(SET):], []))
+            ids = set(self.sets().get(self.theme[len(SET) :], []))
             return [a for a in lst if a.get("id") in ids]
         if self.theme and self.theme.startswith(SECTION):
-            sec = self.theme[len(SECTION):]
+            sec = self.theme[len(SECTION) :]
             return [a for a in lst if a.get("theme", "").startswith(HOME_PREFIX) and a.get("section") == sec]
         if self.theme:
             return [a for a in lst if a.get("theme") == self.theme]
@@ -353,9 +353,9 @@ class Nav(QWidget):
         if self.theme == HOME:
             return f"{name} / Дом"
         if self.theme and self.theme.startswith(SET):
-            return f"Подборка / {self.theme[len(SET):]}"
+            return f"Подборка / {self.theme[len(SET) :]}"
         if self.theme and self.theme.startswith(SECTION):
-            return f"{name} / Дом / {self.theme[len(SECTION):]}"
+            return f"{name} / Дом / {self.theme[len(SECTION) :]}"
         if self.theme:
             return (
                 f"{name} / {theme_label(self.theme)}"

@@ -1,4 +1,5 @@
 """Пути библиотеки, чтение и запись файлов картинок."""
+
 import os
 import threading
 
@@ -6,7 +7,7 @@ from PIL import Image, ImageOps
 
 LIB = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 EXT = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".ico", ".svg", ".avif")
-INBOX = "00 Входящие"      # неразобранное: в галерею и в поиск дублей не попадает
+INBOX = "00 Входящие"  # неразобранное: в галерею и в поиск дублей не попадает
 
 
 def images_in(root):
@@ -19,7 +20,7 @@ def images_in(root):
     return out
 
 
-ORIENT = 274                            # тег EXIF «как повернуть при показе»
+ORIENT = 274  # тег EXIF «как повернуть при показе»
 
 
 def upright(im):
@@ -65,7 +66,7 @@ def is_animated(path):
 def write_atomic(path, data, encoding=None):
     """Запись через временный файл: браузер или второй поток не увидят файл наполовину,
     а сбой посреди записи не оставит пустышку вместо старого."""
-    tmp = "%s.tmp%d-%d" % (path, os.getpid(), threading.get_ident())     # у каждого потока свой
+    tmp = "%s.tmp%d-%d" % (path, os.getpid(), threading.get_ident())  # у каждого потока свой
     with open(tmp, "w" if encoding else "wb", **({"encoding": encoding} if encoding else {})) as fh:
         fh.write(data)
     os.replace(tmp, path)
@@ -78,4 +79,4 @@ def fmt_of(path):
 
 def hex_rgb(h):
     h = h.lstrip("#")
-    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))

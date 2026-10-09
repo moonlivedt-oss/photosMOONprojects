@@ -31,8 +31,9 @@ def to_pil(img: QImage):
     img = img.convertToFormat(QImage.Format.Format_RGBA8888)
     ptr = img.constBits()
     ptr.setsize(img.sizeInBytes())
-    return Image.frombuffer("RGBA", (img.width(), img.height()), bytes(ptr), "raw", "RGBA",
-                            img.bytesPerLine(), 1).copy()
+    return Image.frombuffer(
+        "RGBA", (img.width(), img.height()), bytes(ptr), "raw", "RGBA", img.bytesPerLine(), 1
+    ).copy()
 
 
 def save_preview(img: QImage, dst):
@@ -107,7 +108,7 @@ class PreviewRenderer(QObject):
         img = self.view.grabFramebuffer()
         if touches_edge(img) and self.tries < 4:  # модель вылезла за кадр - отъехать и снять заново
             self.tries += 1
-            self.root.setProperty("camScale", 1.35 * 1.5 ** self.tries)
+            self.root.setProperty("camScale", 1.35 * 1.5**self.tries)
             self.root.resetView()
             self.wait = 0
             return

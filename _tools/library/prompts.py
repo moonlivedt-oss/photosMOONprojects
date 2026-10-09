@@ -2,6 +2,7 @@
 Страница - это JS; его выполняет node (так имена, маршруты и тексты совпадают со страницей до буквы).
 Результат кэшируется в _prompts_cache.json по времени изменения страницы. Без node - только палитры
 (их хватает перекраске), а «чего не хватает» просит поставить node."""
+
 import json
 import os
 import re
@@ -70,8 +71,12 @@ def load():
         node = shutil.which("node")
         if node:
             try:
-                r = subprocess.run([node, "-e", NODE, PAGE], capture_output=True, timeout=30,
-                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                r = subprocess.run(
+                    [node, "-e", NODE, PAGE],
+                    capture_output=True,
+                    timeout=30,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
                 v = json.loads(r.stdout.decode("utf-8"))
                 v["node"] = True
             except Exception as e:
@@ -121,6 +126,7 @@ def names(card):
 def dest(card, pal):
     """Папка, куда ляжет карточка в этой палитре (как route() у файла с меткой), или None."""
     from library.sorting import ROUTES
+
     if card["r"] not in ROUTES:
         return None
     pals = {p[0]: p for p in (load() or {"pals": []})["pals"]}
@@ -132,6 +138,7 @@ def dest(card, pal):
 
 def has_pal(card):
     from library.sorting import ROUTES
+
     return card["r"] in ROUTES and "{pal}" in ROUTES[card["r"]][0]
 
 

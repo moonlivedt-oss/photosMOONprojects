@@ -1,6 +1,7 @@
 """Движение в окне: живой фон, вкладки с бегущей таблеткой, переходы страниц, свечение и рябь
 на кнопках, всплывающие сообщения, оверлей перетаскивания, парящий значок пустых страниц.
 Всё рисуется само и само останавливается, когда двигать нечего."""
+
 import math
 import time
 
@@ -84,8 +85,9 @@ class Aurora(QObject):
     так что списки с тысячами плиток из-за фона не перерисовываются.
     Пятна огромные и размытые, им хватает 12 кадров в секунду; кадр собирается один раз на тик,
     а окно в фоне (не в фокусе или свёрнуто) фон не двигает вовсе."""
+
     FPS = 10
-    BLOBS = (       # цвет, сила, радиус (доля диагонали), скорость, фаза
+    BLOBS = (  # цвет, сила, радиус (доля диагонали), скорость, фаза
         ("acc", 120, 0.42, 0.050, 0.0),
         ("acc2", 95, 0.36, 0.037, 2.1),
         ("teal", 70, 0.34, 0.043, 4.2),
@@ -125,15 +127,18 @@ class Aurora(QObject):
         now = time.monotonic()
         if now - self.solid_at > 1.0:
             self.solid_at = now
-            self.solid = [w for w in self.win.findChildren(QWidget)
-                          if isinstance(w, (QAbstractScrollArea, QGroupBox, QLineEdit, QComboBox, QAbstractSpinBox))
-                          or w.objectName() in ("panel", "drop")]
+            self.solid = [
+                w
+                for w in self.win.findChildren(QWidget)
+                if isinstance(w, (QAbstractScrollArea, QGroupBox, QLineEdit, QComboBox, QAbstractSpinBox))
+                or w.objectName() in ("panel", "drop")
+            ]
         return self.solid
 
     def tick(self):
         now = time.monotonic()
-        self.cache = None                       # новый кадр соберётся при первой отрисовке
-        if now - self.full_at > 6.0:            # изредка целиком: подтянуть уголки скруглённых панелей
+        self.cache = None  # новый кадр соберётся при первой отрисовке
+        if now - self.full_at > 6.0:  # изредка целиком: подтянуть уголки скруглённых панелей
             self.full_at = now
             self.win.update()
             return
@@ -143,7 +148,7 @@ class Aurora(QObject):
                 if not w.isVisible():
                     continue
                 r = QRect(w.mapTo(self.win, QPoint(0, 0)), w.size())
-            except RuntimeError:                # панель уже удалена
+            except RuntimeError:  # панель уже удалена
                 self.solid_at = 0
                 continue
             # целиком, с уголками: иначе Qt перерисовывал бы весь список ради уголка;
@@ -278,24 +283,24 @@ class PageFade(QObject):
         ghost = QLabel(self.tabs)
         ghost.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         ghost.setPixmap(shot)
-        geo = QRect(new.mapTo(self.tabs, QPoint(0, 0)), QWidget.size(new))     # у вкладок свои size и move
+        geo = QRect(new.mapTo(self.tabs, QPoint(0, 0)), QWidget.size(new))  # у вкладок свои size и move
         ghost.setGeometry(geo)
         ghost.show()
         ghost.raise_()
         fx = QGraphicsOpacityEffect(ghost)
         ghost.setGraphicsEffect(fx)
-        fx_new = QGraphicsOpacityEffect(new)          # на время перехода; свой эффект у вкладок не бывает
+        fx_new = QGraphicsOpacityEffect(new)  # на время перехода; свой эффект у вкладок не бывает
         fx_new.setOpacity(0)
         new.setGraphicsEffect(fx_new)
         home = QWidget.pos(new)
 
         def step(v):
-            out = min(1.0, v / 0.55)                    # старая уходит быстрее, чем приходит новая
+            out = min(1.0, v / 0.55)  # старая уходит быстрее, чем приходит новая
             inn = max(0.0, (v - 0.2) / 0.8)
             fx.setOpacity(1 - out)
             fx_new.setOpacity(inn)
             ghost.move(geo.x() - int(d * 36 * out), geo.y())
-            QWidget.move(new, home.x() + int(d * 36 * (1 - inn)), home.y())   # у вкладки библиотеки свой move()
+            QWidget.move(new, home.x() + int(d * 36 * (1 - inn)), home.y())  # у вкладки библиотеки свой move()
 
         def done():
             QWidget.move(new, home)
@@ -422,8 +427,14 @@ class Motion(QObject):
 
     def eventFilter(self, obj, e):
         t = e.type()
-        if t not in (QEvent.Type.Enter, QEvent.Type.Leave, QEvent.Type.MouseButtonPress,
-                     QEvent.Type.FocusIn, QEvent.Type.FocusOut, QEvent.Type.Show):
+        if t not in (
+            QEvent.Type.Enter,
+            QEvent.Type.Leave,
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.FocusIn,
+            QEvent.Type.FocusOut,
+            QEvent.Type.Show,
+        ):
             return False
         if isinstance(obj, QPushButton):
             primary = obj.objectName() == "primary"
@@ -436,8 +447,11 @@ class Motion(QObject):
                 self.glow(obj, False, C["acc"], 200 if primary else 120)
             elif t == QEvent.Type.MouseButtonPress and obj.isEnabled() and e.button() == Qt.MouseButton.LeftButton:
                 Ripple(obj, e.position())
-        elif (isinstance(obj, QLineEdit) and t in (QEvent.Type.FocusIn, QEvent.Type.FocusOut)
-              and not isinstance(obj.parent(), (QAbstractSpinBox, QComboBox))):   # не поле внутри счётчика
+        elif (
+            isinstance(obj, QLineEdit)
+            and t in (QEvent.Type.FocusIn, QEvent.Type.FocusOut)
+            and not isinstance(obj.parent(), (QAbstractSpinBox, QComboBox))
+        ):  # не поле внутри счётчика
             self.glow(obj, t == QEvent.Type.FocusIn, C["acc"], 150)
         return False
 
@@ -467,7 +481,7 @@ class Toast(QWidget):
 
     def leave_later(self):
         if self.underMouse():
-            self.hide_timer.start(1200)         # читают или тянутся к кнопке - не убегать
+            self.hide_timer.start(1200)  # читают или тянутся к кнопке - не убегать
         else:
             self.fade(False)
 
@@ -495,7 +509,7 @@ class Toast(QWidget):
         self.base = QRect((self.win.width() - w) // 2, bottom - h - 22, w, h)
         self.setGeometry(self.base)
         if self.isVisible() and self.v > 0.5:
-            if time.monotonic() - self.bumped > 0.6:        # частые «Режу 3 из 10» не дёргают пузырь
+            if time.monotonic() - self.bumped > 0.6:  # частые «Режу 3 из 10» не дёргают пузырь
                 self.bumped = time.monotonic()
                 anim(self, 380, self.set_bump, 1.0, 0.0, curve=QEasingCurve.Type.OutElastic)
         else:
@@ -518,9 +532,15 @@ class Toast(QWidget):
             self.move(self.base.x(), self.base.y() + int(18 * (1 - v)))
             self.update()
 
-        self.cur = anim(self, 340 if on else 420, step, self.v, 1.0 if on else 0.0,
-                        curve=QEasingCurve.Type.OutBack if on else QEasingCurve.Type.InCubic,
-                        done=None if on else self.hide)
+        self.cur = anim(
+            self,
+            340 if on else 420,
+            step,
+            self.v,
+            1.0 if on else 0.0,
+            curve=QEasingCurve.Type.OutBack if on else QEasingCurve.Type.InCubic,
+            done=None if on else self.hide,
+        )
 
     def paintEvent(self, _e):
         p = QPainter(self)
@@ -544,9 +564,11 @@ class Toast(QWidget):
         fm = self.fontMetrics()
         b = self.btn_rect()
         room = r.width() - 50 - (b.width() + 12 if self.action else 0)
-        p.drawText(QRectF(dot.right() + 10, r.top(), room, r.height()),
-                   Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
-                   fm.elidedText(self.text, Qt.TextElideMode.ElideMiddle, int(room)))
+        p.drawText(
+            QRectF(dot.right() + 10, r.top(), room, r.height()),
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            fm.elidedText(self.text, Qt.TextElideMode.ElideMiddle, int(room)),
+        )
         if self.action:
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QBrush(g) if self.hot else QColor(C["accd"]))
@@ -598,8 +620,9 @@ class DropOverlay(QWidget):
         p.fillRect(self.rect(), QColor(6, 6, 12, 200))
         r = QRectF(self.rect()).adjusted(28, 28, -28, -28)
         k = 1 - 0.02 * (1 - self.v)
-        r = QRectF(r.center().x() - r.width() * k / 2, r.center().y() - r.height() * k / 2,
-                   r.width() * k, r.height() * k)
+        r = QRectF(
+            r.center().x() - r.width() * k / 2, r.center().y() - r.height() * k / 2, r.width() * k, r.height() * k
+        )
         glow = QRadialGradient(r.center(), max(r.width(), r.height()) * 0.5)
         glow.setColorAt(0, rgba("acc", 60 + 25 * math.sin(t * 3)))
         glow.setColorAt(1, rgba("acc", 0))
@@ -609,7 +632,7 @@ class DropOverlay(QWidget):
         g.setColorAt(1, QColor(C["acc2"]))
         pen = QPen(QBrush(g), 3)
         pen.setDashPattern([6, 5])
-        pen.setDashOffset(-t * 14)                 # «бегущие муравьи»
+        pen.setDashOffset(-t * 14)  # «бегущие муравьи»
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(r, 24, 24)

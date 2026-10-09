@@ -1,4 +1,5 @@
 """Сжатие и конвертация: шторка до/после, подбор качества, пакетное сжатие с отменой."""
+
 import io
 import math
 import os
@@ -91,9 +92,7 @@ class Compare(QWidget):
         p.fillRect(self.rect(), QColor("#111117"))
         if not self.a:
             p.setPen(QColor("#9a98a8"))
-            p.drawText(
-                self.rect(), Qt.AlignmentFlag.AlignCenter, "Готовлю предпросмотр..."
-            )
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Готовлю предпросмотр...")
             return
         r = self.frame()
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, self.scale() < 2)
@@ -125,10 +124,7 @@ class Compare(QWidget):
         p.end()
 
     def mousePressEvent(self, e):
-        if (
-            e.button() == Qt.MouseButton.RightButton
-            or e.button() == Qt.MouseButton.MiddleButton
-        ):
+        if e.button() == Qt.MouseButton.RightButton or e.button() == Qt.MouseButton.MiddleButton:
             self.pan = (e.position(), QPointF(self.off))
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
         else:
@@ -155,9 +151,7 @@ class Compare(QWidget):
         old = self.scale()
         new = max(0.05, min(16.0, old * (1.25 if e.angleDelta().y() > 0 else 0.8)))
         c = e.position() - QPointF(self.width() / 2, self.height() / 2)
-        self.off = c - (c - self.off) * (
-            new / old
-        )  # точка под курсором остаётся на месте
+        self.off = c - (c - self.off) * (new / old)  # точка под курсором остаётся на месте
         self.zoom = new
         self.update()
 
@@ -255,7 +249,7 @@ class Variants(QWidget):
             p.setBrush(QColor(C["bg2"]))
             p.drawRoundedRect(r, 12, 12)
             pic = QRectF(r.x() + 8, r.y() + 8, r.width() - 16, r.height() - 64)
-            if it is None:                       # считается - перелив
+            if it is None:  # считается - перелив
                 ph = (time.monotonic() * 0.8 + i * 0.15) % 1.4 - 0.2
                 g = QLinearGradient(pic.topLeft(), pic.topRight())
                 g.setColorAt(0, QColor(C["bg3"]))
@@ -278,16 +272,25 @@ class Variants(QWidget):
             p.restore()
             p.setPen(QColor(C["text"]))
             p.setFont(f1)
-            p.drawText(QRectF(r.x() + 10, r.bottom() - 52, r.width() - 20, 20),
-                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, it["fmt"])
-            p.drawText(QRectF(r.x() + 10, r.bottom() - 52, r.width() - 20, 20),
-                       Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, human(it["bytes"]))
+            p.drawText(
+                QRectF(r.x() + 10, r.bottom() - 52, r.width() - 20, 20),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                it["fmt"],
+            )
+            p.drawText(
+                QRectF(r.x() + 10, r.bottom() - 52, r.width() - 20, 20),
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                human(it["bytes"]),
+            )
             p.setFont(f2)
             p.setPen(QColor(C["dim"]))
             score = "похожесть %.1f%%" % (100 * it["score"]) if it.get("score") is not None else "размер другой"
-            p.drawText(QRectF(r.x() + 10, r.bottom() - 30, r.width() - 20, 20),
-                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, score)
-            if it["bytes"] == smallest:          # самый лёгкий - плашка
+            p.drawText(
+                QRectF(r.x() + 10, r.bottom() - 30, r.width() - 20, 20),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                score,
+            )
+            if it["bytes"] == smallest:  # самый лёгкий - плашка
                 tag = QRectF(r.right() - 74, r.y() + 12, 62, 20)
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(QColor(C["acc"]))
@@ -373,7 +376,7 @@ class Progress(QWidget):
         skipped = ", ".join("%s: %d" % kv for kv in r["skipped"].items())
         if skipped:
             self.line2 = (self.line2 + ", " if self.line2 else "") + "пропущено (" + skipped + ")"
-        if r["done"]:                                   # искры из кольца
+        if r["done"]:  # искры из кольца
             for _k in range(46):
                 a = random.uniform(0, 2 * math.pi)
                 v = random.uniform(2.2, 5.5)
@@ -420,7 +423,7 @@ class Progress(QWidget):
         done = self.result is not None
         age = time.monotonic() - self.t_done if done else 0.0
 
-        glow = QRadialGradient(center, rad * 1.9)           # мягкий ореол за кольцом, в конце вспыхивает
+        glow = QRadialGradient(center, rad * 1.9)  # мягкий ореол за кольцом, в конце вспыхивает
         g0 = QColor(C["acc"])
         g0.setAlpha(int(70 + (70 * max(0.0, 1 - age) if done else 0)))
         glow.setColorAt(0, g0)
@@ -430,7 +433,7 @@ class Progress(QWidget):
         p.setBrush(QBrush(glow))
         p.drawEllipse(center, rad * 1.9, rad * 1.9)
 
-        if self.pm and not self.pm.isNull():               # текущий файл внутри кольца
+        if self.pm and not self.pm.isNull():  # текущий файл внутри кольца
             inner = rad - 14
             path = QPainterPath()
             path.addEllipse(center, inner, inner)
@@ -453,7 +456,7 @@ class Progress(QWidget):
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         p.setPen(pen)
         p.drawArc(ring, 90 * 16, -int(max(0.02, self.shown_v) * 360 * 16))
-        if not done:                                       # бегущая искра по кольцу - «работаю»
+        if not done:  # бегущая искра по кольцу - «работаю»
             a = math.radians(90 - self.spin)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor("#ffffff"))
@@ -461,7 +464,7 @@ class Progress(QWidget):
 
         if done and self.result["done"]:
             e = 1 - (1 - min(1.0, age / 0.5)) ** 3
-            s = 30 * (0.6 + 0.4 * e)                       # галочка в кружке выпрыгивает
+            s = 30 * (0.6 + 0.4 * e)  # галочка в кружке выпрыгивает
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QBrush(grad))
             p.drawEllipse(center, s, s)
@@ -473,7 +476,7 @@ class Progress(QWidget):
             path.lineTo(center.x() - s * 0.1, center.y() + s * 0.34)
             path.lineTo(center.x() + s * 0.45, center.y() - s * 0.3)
             p.drawPath(path)
-            if age < 1.4:                                  # искры разлетаются и гаснут
+            if age < 1.4:  # искры разлетаются и гаснут
                 t = age * 60
                 p.setPen(Qt.PenStyle.NoPen)
                 for vx, vy, size, hue in self.sparks:
@@ -486,7 +489,7 @@ class Progress(QWidget):
         f.setWeight(QFont.Weight.Bold)
         p.setFont(f)
         if done:
-            k = 1 - (1 - min(1.0, age / 0.9)) ** 3        # счётчик набегает
+            k = 1 - (1 - min(1.0, age / 0.9)) ** 3  # счётчик набегает
             big = "-%d%%" % round(self.percent() * k) if self.result["done"] else "0%"
         else:
             big = "%d%%" % round(self.shown_v * 100)
@@ -496,11 +499,17 @@ class Progress(QWidget):
         p.setFont(QFont("Segoe UI", 10))
         fm = p.fontMetrics()
         p.setPen(QColor(C["text"] if done else C["dim"]))
-        p.drawText(QRectF(c.x() + 20, top + 46, c.width() - 40, 22), Qt.AlignmentFlag.AlignCenter,
-                   fm.elidedText(self.line1, Qt.TextElideMode.ElideMiddle, int(c.width() - 40)))
+        p.drawText(
+            QRectF(c.x() + 20, top + 46, c.width() - 40, 22),
+            Qt.AlignmentFlag.AlignCenter,
+            fm.elidedText(self.line1, Qt.TextElideMode.ElideMiddle, int(c.width() - 40)),
+        )
         p.setPen(QColor(C["dim"]))
-        p.drawText(QRectF(c.x() + 20, top + 70, c.width() - 40, 22), Qt.AlignmentFlag.AlignCenter,
-                   fm.elidedText(self.line2, Qt.TextElideMode.ElideRight, int(c.width() - 40)))
+        p.drawText(
+            QRectF(c.x() + 20, top + 70, c.width() - 40, 22),
+            Qt.AlignmentFlag.AlignCenter,
+            fm.elidedText(self.line2, Qt.TextElideMode.ElideRight, int(c.width() - 40)),
+        )
         p.end()
 
 
@@ -515,13 +524,22 @@ class CompressDialog(QDialog):
             [p for p in paths if not p.lower().endswith(".svg")],
         )
         self.o = dict(
-            fmt="", q=0, target=0.99, lossless=False, size=0, fit="fit", smaller=True,
-            kind="auto", trim=False, budget=0, matte="white",
+            fmt="",
+            q=0,
+            target=0.99,
+            lossless=False,
+            size=0,
+            fit="fit",
+            smaller=True,
+            kind="auto",
+            trim=False,
+            budget=0,
+            matte="white",
         )
         self.o.update(tab.cfg.get("comp", {}))
         self.cache, self.gen, self.stop = {}, 0, [False]
         self.setWindowTitle("Сжать и конвертировать: %d шт." % len(self.paths))
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)     # оригинал в self.cache не копится в памяти
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)  # оригинал в self.cache не копится в памяти
         self.resize(1100, 680)
 
         self.fmt = QComboBox()
@@ -532,13 +550,9 @@ class CompressDialog(QDialog):
             self.how.addItem("Подобрать: " + t.lower(), v)
         self.how.addItem("Задать вручную", 0)
         self.q = QSpinBox(minimum=1, maximum=100, value=82, suffix=" %")
-        self.q.setToolTip(
-            "Качество: меньше - легче файл. Для png - сколько цветов оставить (100 - без потерь)"
-        )
+        self.q.setToolTip("Качество: меньше - легче файл. Для png - сколько цветов оставить (100 - без потерь)")
         self.lossless = QCheckBox("Без потерь")
-        self.lossless.setToolTip(
-            "webp и png: картинка не меняется ни на пиксель, файл обычно тяжелее"
-        )
+        self.lossless.setToolTip("webp и png: картинка не меняется ни на пиксель, файл обычно тяжелее")
         self.size = QSpinBox(
             minimum=0,
             maximum=8192,
@@ -553,14 +567,19 @@ class CompressDialog(QDialog):
         self.kind = QComboBox()
         for v, t in K.KINDS:
             self.kind.addItem(t, v)
-        self.kind.setToolTip("Рисунку (иконка, наклейка) цвет не прореживается - контуры не мылятся,\n"
-                             "и для webp пробуется сжатие без потерь. «Само» - по прозрачности и числу цветов.")
+        self.kind.setToolTip(
+            "Рисунку (иконка, наклейка) цвет не прореживается - контуры не мылятся,\n"
+            "и для webp пробуется сжатие без потерь. «Само» - по прозрачности и числу цветов."
+        )
         self.trim = QCheckBox("Срезать прозрачные поля")
         self.trim.setToolTip("Пустая прозрачная рамка вокруг рисунка весит и мешает выравнивать")
-        self.budget = QSpinBox(minimum=0, maximum=50000, singleStep=50, suffix=" КБ",
-                               specialValueText="без ограничения")
-        self.budget.setToolTip("Не больше стольких КБ: сначала снижается качество, не хватает - размер.\n"
-                               "Для лимитов телеграма, Discord, аватаров, README.")
+        self.budget = QSpinBox(
+            minimum=0, maximum=50000, singleStep=50, suffix=" КБ", specialValueText="без ограничения"
+        )
+        self.budget.setToolTip(
+            "Не больше стольких КБ: сначала снижается качество, не хватает - размер.\n"
+            "Для лимитов телеграма, Discord, аватаров, README."
+        )
         self.matte = QComboBox()
         for v, t, _rgb in K.MATTES:
             self.matte.addItem(t, v)
@@ -568,20 +587,14 @@ class CompressDialog(QDialog):
         self.files = QComboBox()
         for p in self.paths:
             self.files.addItem(os.path.relpath(p, LIB), p)
-        self.files.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
-        )
+        self.files.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.files.setMinimumContentsLength(20)
         for c in (self.fmt, self.how, self.fit, self.kind, self.matte):
-            c.setSizeAdjustPolicy(
-                QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
-            )
+            c.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
             c.setMinimumContentsLength(16)
 
         form = QFormLayout()
-        form.setLabelAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        )
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         form.addRow("Формат", self.fmt)
         form.addRow("Качество", self.how)
         qrow = QHBoxLayout()
@@ -629,8 +642,11 @@ class CompressDialog(QDialog):
             flat("<", lambda: self.step(-1), "Предыдущий файл"),
             flat(">", lambda: self.step(1), "Следующий файл"),
         )
-        self.cmp_btn = flat("Сравнить форматы", self.compare_formats,
-                            "Этот файл в webp, avif, png и jpg рядом: вес, похожесть, кусочек 1:1")
+        self.cmp_btn = flat(
+            "Сравнить форматы",
+            self.compare_formats,
+            "Этот файл в webp, avif, png и jpg рядом: вес, похожесть, кусочек 1:1",
+        )
         top = QHBoxLayout()
         top.addWidget(prev)
         top.addWidget(self.files, 1)
@@ -653,9 +669,7 @@ class CompressDialog(QDialog):
 
         self.fmt.setCurrentIndex(max(0, self.fmt.findData(self.o["fmt"])))
         q = self.o["q"]
-        self.how.setCurrentIndex(
-            self.how.findData(0) if q else max(0, self.how.findData(self.o["target"]))
-        )
+        self.how.setCurrentIndex(self.how.findData(0) if q else max(0, self.how.findData(self.o["target"])))
         if q:
             self.q.setValue(q)
         self.lossless.setChecked(self.o["lossless"])
@@ -680,9 +694,7 @@ class CompressDialog(QDialog):
 
     def step(self, d):
         if self.files.count():
-            self.files.setCurrentIndex(
-                (self.files.currentIndex() + d) % self.files.count()
-            )
+            self.files.setCurrentIndex((self.files.currentIndex() + d) % self.files.count())
 
     def opts(self):
         target = self.how.currentData()
@@ -709,9 +721,7 @@ class CompressDialog(QDialog):
         for w in (self.size, self.fit, self.kind, self.trim, self.budget):
             w.setEnabled(not clean)
         self.matte.setEnabled(o["fmt"] in ("jpg", K.BEST, "") and not clean)
-        self.go.setText(
-            "Сжать %d шт." % len(self.paths) if len(self.paths) > 1 else "Сжать"
-        )
+        self.go.setText("Сжать %d шт." % len(self.paths) if len(self.paths) > 1 else "Сжать")
         self.go.setEnabled(bool(self.paths))
         self.timer.start()
 
@@ -739,13 +749,13 @@ class CompressDialog(QDialog):
             data, info = K.compress(src, dict(o, fmt=fmt))
             out = Image.open(io.BytesIO(data))
             out.load()
-            shown = K.trim(src)[0] if info.get("trimmed") else src     # шторке - тот же кадр, без полей
+            shown = K.trim(src)[0] if info.get("trimmed") else src  # шторке - тот же кадр, без полей
             return gen, shown, out, data, info, fmt
 
         bg(work, self.shown)
 
     def shown(self, res):
-        if sip.isdeleted(self):                         # окно закрыли, пока считался предпросмотр
+        if sip.isdeleted(self):  # окно закрыли, пока считался предпросмотр
             return
         if isinstance(res, Exception):
             self.result.setText(f"Не получилось: {res}")
@@ -756,7 +766,7 @@ class CompressDialog(QDialog):
         p = self.files.currentData()
         try:
             was = os.path.getsize(p)
-        except OSError:                                 # файл уже сжат и уехал в _sources
+        except OSError:  # файл уже сжат и уехал в _sources
             self.result.setText("Файла уже нет на месте")
             return
         self.cmp.set_images(to_pix(src), to_pix(out) if out is not None else None)
@@ -769,11 +779,7 @@ class CompressDialog(QDialog):
             self.detail.setText("")
             return
         now = len(data)
-        sign = (
-            "-%d%%" % round(100 * (1 - now / was))
-            if now < was
-            else "+%d%%" % round(100 * (now / was - 1))
-        )
+        sign = "-%d%%" % round(100 * (1 - now / was)) if now < was else "+%d%%" % round(100 * (now / was - 1))
         self.result.setText(f"{human(was)}  ->  {human(now)}   ({sign})")
         text = describe(info, src)
         if fmt == K.BEST:
@@ -788,7 +794,7 @@ class CompressDialog(QDialog):
             return
         o = self.opts()
         o.update(lossless=False)
-        src = self.cache.get(p)                     # оригинал уже открыт для шторки - второй раз не читаем
+        src = self.cache.get(p)  # оригинал уже открыт для шторки - второй раз не читаем
         fmts = ["webp", "avif", "png"] + ([] if K.has_alpha(src if src is not None else K.load(p)) else ["jpg"])
         self.variants.loading(len(fmts))
         self.vgen = getattr(self, "vgen", 0) + 1
@@ -802,10 +808,16 @@ class CompressDialog(QDialog):
                 data, info = res
                 im = Image.open(io.BytesIO(data))
                 im.load()
-                side = 132                                   # кусочек 1:1 из середины - видны артефакты
+                side = 132  # кусочек 1:1 из середины - видны артефакты
                 cx, cy = im.width // 2, im.height // 2
-                crop = im.crop((max(0, cx - side // 2), max(0, cy - side // 2),
-                                min(im.width, cx + side // 2), min(im.height, cy + side // 2)))
+                crop = im.crop(
+                    (
+                        max(0, cx - side // 2),
+                        max(0, cy - side // 2),
+                        min(im.width, cx + side // 2),
+                        min(im.height, cy + side // 2),
+                    )
+                )
                 got[info["fmt"]] = dict(fmt=info["fmt"], bytes=len(data), score=info.get("score"), img=crop)
             return [got[f] for f in fmts if f in got]
 
@@ -854,7 +866,7 @@ class CompressDialog(QDialog):
         self.accept()
 
     def reject(self):
-        if not getattr(self, "running", False):         # пока сжимается, окно не закрыть - только остановить
+        if not getattr(self, "running", False):  # пока сжимается, окно не закрыть - только остановить
             super().reject()
 
     def accept(self):

@@ -1,6 +1,7 @@
 """База библиотеки (SQLite, _tools/library.db): отпечатки, метки, заметки, избранное, умные папки,
 векторы CLIP, журнал действий. Её одновременно открывают окно и сервер для ИИ - WAL это позволяет.
 Пути - относительно корня библиотеки, как у избранного в настройках."""
+
 import os
 import sqlite3
 import threading
@@ -54,8 +55,11 @@ def load_sigs():
 
 def save_sigs(new, old):
     """Записать только разницу между old и new."""
-    up = [(rel, v[0], v[1], np.asarray(v[2], np.uint8).tobytes(), v[3], v[4])
-          for rel, v in new.items() if rel not in old or old[rel][0] != v[0] or old[rel][4] != v[4]]
+    up = [
+        (rel, v[0], v[1], np.asarray(v[2], np.uint8).tobytes(), v[3], v[4])
+        for rel, v in new.items()
+        if rel not in old or old[rel][0] != v[0] or old[rel][4] != v[4]
+    ]
     gone = [(rel,) for rel in old if rel not in new]
     if not up and not gone:
         return
@@ -165,16 +169,20 @@ def save_clip(rows, gone=()):
     with _lock:
         c = conn()
         with c:
-            c.executemany("INSERT OR REPLACE INTO clip VALUES (?,?,?)",
-                          [(rel, mt, np.asarray(v, np.float16).tobytes()) for rel, mt, v in rows])
+            c.executemany(
+                "INSERT OR REPLACE INTO clip VALUES (?,?,?)",
+                [(rel, mt, np.asarray(v, np.float16).tobytes()) for rel, mt, v in rows],
+            )
             c.executemany("DELETE FROM clip WHERE rel=?", [(r,) for r in gone])
 
 
 def smart_folders():
     """[(имя, запрос, цвет, по смыслу)] - сохранённые поиски."""
     with _lock:
-        return [(n, q, col or "", bool(sem)) for n, q, col, sem in
-                conn().execute("SELECT name, query, color, sem FROM smart ORDER BY name")]
+        return [
+            (n, q, col or "", bool(sem))
+            for n, q, col, sem in conn().execute("SELECT name, query, color, sem FROM smart ORDER BY name")
+        ]
 
 
 def save_smart(name, query, color, sem):

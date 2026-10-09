@@ -179,8 +179,10 @@ def studio_probe(items, cfg):
     saved = cfg.get("ue_env")
     if saved and os.path.exists(saved):
         return saved
-    hd = sorted((a for a in items if a.get("kind") == "hdri" and a.get("main")),
-                key=lambda a: (a.get("theme") != "Студия", a.get("name", "")))
+    hd = sorted(
+        (a for a in items if a.get("kind") == "hdri" and a.get("main")),
+        key=lambda a: (a.get("theme") != "Студия", a.get("name", "")),
+    )
     return os.path.join(hd[0]["dir"], hd[0]["main"][0]) if hd else ""
 
 
@@ -277,7 +279,9 @@ class Viewer3D(QDialog):
         hint = QLabel(
             "Тянуть - вращать, колесо - ближе, правая кнопка - сдвиг, F - вид заново, "
             "Пробел - вращение, W - каркас, G - пол, стрелки - соседний ассет",
-            objectName="faint", wordWrap=True)
+            objectName="faint",
+            wordWrap=True,
+        )
         mid = QWidget()
         mv = QVBoxLayout(mid)
         mv.setContentsMargins(0, 0, 0, 0)

@@ -1,4 +1,5 @@
 """Мелкие общие виджеты: дерево разделов, списки плиток, горячие клавиши, выбор папки."""
+
 import os
 import time
 
@@ -97,9 +98,19 @@ def header(tree, text):
 
 
 # цвет раздела библиотеки - как цвет вида у ассетов Unreal: черта на плитках, числа в дереве
-SECTION_COLORS = {"01": "#6cb8ff", "02": "#ff8ac9", "03": "#f0a35e", "04": "#a897ff", "05": "#ffd166",
-                  "06": "#5ee0d0", "07": "#7ee0a0", "08": "#c9a0ff", "09": "#ffb86c", "10": "#ff7b7b",
-                  "11": "#8fd3ff"}
+SECTION_COLORS = {
+    "01": "#6cb8ff",
+    "02": "#ff8ac9",
+    "03": "#f0a35e",
+    "04": "#a897ff",
+    "05": "#ffd166",
+    "06": "#5ee0d0",
+    "07": "#7ee0a0",
+    "08": "#c9a0ff",
+    "09": "#ffb86c",
+    "10": "#ff7b7b",
+    "11": "#8fd3ff",
+}
 
 
 def section_color(path):
@@ -118,8 +129,12 @@ def fill_tree(tree, planned=True, recent=False):
     if recent:
         # быстрый доступ - карточками над деревом (QuickCards); строки остаются скрытыми: выбор раздела
         # по-прежнему идёт через дерево (show_section, «назад», запоминание раздела)
-        for text, role, icon in (("Недавние", RECENT, "hourglass"), ("Избранное", FAV, "star"),
-                                 ("Наборы", SETS, "color-palette"), ("Тяжёлые", HEAVY, "zip-archive")):
+        for text, role, icon in (
+            ("Недавние", RECENT, "hourglass"),
+            ("Избранное", FAV, "star"),
+            ("Наборы", SETS, "color-palette"),
+            ("Тяжёлые", HEAVY, "zip-archive"),
+        ):
             tree_item(tree, text, role, lib_icon(icon)).setHidden(True)
         try:
             tags = db.all_tags().most_common(40)
@@ -155,8 +170,11 @@ def fill_tree(tree, planned=True, recent=False):
                     add(it, sub, depth + 1)
         return it
 
-    names = [d for d in os.listdir(LIB) if os.path.isdir(os.path.join(LIB, d))
-             and not d.startswith(("_", ".")) and d != K.INBOX]
+    names = [
+        d
+        for d in os.listdir(LIB)
+        if os.path.isdir(os.path.join(LIB, d)) and not d.startswith(("_", ".")) and d != K.INBOX
+    ]
     for d in sorted(set(names) | (set(PLANNED) if planned else set())):
         path = os.path.join(LIB, d)
         if os.path.isdir(path):
@@ -189,7 +207,7 @@ def select_path(tree, path):
 def make_tree():
     t = QTreeWidget()
     t.setHeaderHidden(True)
-    t.setColumnCount(2)                     # имя и число картинок справа: длинное имя не съедает число
+    t.setColumnCount(2)  # имя и число картинок справа: длинное имя не съедает число
     t.header().setStretchLastSection(False)
     t.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
     t.header().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -276,11 +294,12 @@ class PicView(QWidget):
     def __init__(self, hint="Выберите картинку", frame=True):
         super().__init__()
         self.pm, self.glow, self.hint, self.frame = None, None, hint, frame
-        self.old, self.old_glow, self.t = None, None, 1.0      # прошлая картинка тает, новая проявляется
-        self.fade = QVariantAnimation(self, duration=360, startValue=0.0, endValue=1.0,
-                                      easingCurve=QEasingCurve.Type.OutCubic)
+        self.old, self.old_glow, self.t = None, None, 1.0  # прошлая картинка тает, новая проявляется
+        self.fade = QVariantAnimation(
+            self, duration=360, startValue=0.0, endValue=1.0, easingCurve=QEasingCurve.Type.OutCubic
+        )
         self.fade.valueChanged.connect(self.step)
-        self.zoomable, self.zoom, self.off, self.pan = False, 1.0, QPointF(0, 0), None     # увеличение (просмотр)
+        self.zoomable, self.zoom, self.off, self.pan = False, 1.0, QPointF(0, 0), None  # увеличение (просмотр)
         self.setMinimumSize(200, 200)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
@@ -324,12 +343,12 @@ class PicView(QWidget):
         box = r.adjusted(18, 18, -18, -18)
         s = min(box.width() / pm.width(), box.height() / pm.height()) * zoom
         off = QPointF(0, 0)
-        if user:                                # увеличение и сдвиг - только у текущей картинки
+        if user:  # увеличение и сдвиг - только у текущей картинки
             s *= self.zoom
             off = self.off
         w, h = pm.width() * s, pm.height() * s
         img = QRectF(box.center().x() - w / 2 + off.x(), box.center().y() - h / 2 + off.y(), w, h)
-        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, s < 2.5)   # крупно - пиксели чёткие
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, s < 2.5)  # крупно - пиксели чёткие
         path = QPainterPath()
         path.addRoundedRect(img, 8, 8)
         p.save()
@@ -372,8 +391,11 @@ class PicView(QWidget):
             p.drawRoundedRect(r, 14, 14)
         if self.zoomable and self.pm and self.zoom != 1.0:
             p.setPen(QColor(C["dim"]))
-            p.drawText(QRectF(r.right() - 140, r.top() + 10, 130, 20), Qt.AlignmentFlag.AlignRight,
-                       "%d%%" % round(self.fit() * self.zoom * 100))
+            p.drawText(
+                QRectF(r.right() - 140, r.top() + 10, 130, 20),
+                Qt.AlignmentFlag.AlignRight,
+                "%d%%" % round(self.fit() * self.zoom * 100),
+            )
         p.end()
 
     # --- увеличение (только если zoomable)
@@ -424,8 +446,9 @@ class PicView(QWidget):
 class LibList(QListWidget):
     """Плитки библиотеки: Ctrl+колесо меняет размер, перетаскивание отдаёт файлы другим программам.
     Здесь же живут анимации плиток: наведение (hover_amount) и проявление после загрузки (fade_amount)."""
+
     zoom = pyqtSignal(int)
-    FADE = 0.28                             # секунд на проявление загруженной плитки
+    FADE = 0.28  # секунд на проявление загруженной плитки
 
     def __init__(self, side):
         super().__init__()
@@ -442,7 +465,7 @@ class LibList(QListWidget):
         self.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
         self.verticalScrollBar().setSingleStep(24)
         self.setItemDelegate(TileDelegate(self))
-        self.shimmer = False                    # на экране есть ещё не загруженные плитки - перелив
+        self.shimmer = False  # на экране есть ещё не загруженные плитки - перелив
         self.scroll_to = None
         self.glide = QVariantAnimation(self, duration=260, easingCurve=QEasingCurve.Type.OutCubic)
         self.glide.valueChanged.connect(lambda v: self.verticalScrollBar().setValue(int(v)))
@@ -528,7 +551,7 @@ class LibList(QListWidget):
                 continue
             want = 1.0 if row == self.hover_row else 0.0
             v = self.hover.get(row, 0.0)
-            v += (want - v) * 0.28              # плавно догоняет цель
+            v += (want - v) * 0.28  # плавно догоняет цель
             if abs(want - v) < 0.02:
                 v = want
             else:
@@ -544,7 +567,7 @@ class LibList(QListWidget):
             else:
                 busy = True
         busy = busy or self.shimmer
-        self.shimmer = False                    # рисовальщик снова поднимет, если заглушки ещё видны
+        self.shimmer = False  # рисовальщик снова поднимет, если заглушки ещё видны
         self.viewport().update()
         if not busy:
             self.anim.stop()
@@ -565,7 +588,7 @@ class LibList(QListWidget):
 
     def paintEvent(self, e):
         super().paintEvent(e)
-        if not self.count() and self.empty:      # пустая заглушка: значок и пояснение
+        if not self.count() and self.empty:  # пустая заглушка: значок и пояснение
             p = QPainter(self.viewport())
             p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
             vr = self.viewport().rect()
@@ -576,8 +599,11 @@ class LibList(QListWidget):
                 p.drawPixmap(QRectF(vr.center().x() - 40, y, 80, 80), ic, QRectF(ic.rect()))
                 p.setOpacity(1)
             p.setPen(QColor(C["dim"]))
-            p.drawText(QRectF(vr.x() + 30, y + 96, vr.width() - 60, 80),
-                       Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap, self.empty)
+            p.drawText(
+                QRectF(vr.x() + 30, y + 96, vr.width() - 60, 80),
+                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+                self.empty,
+            )
             p.end()
 
     def wheelEvent(self, e):
@@ -586,10 +612,10 @@ class LibList(QListWidget):
             e.accept()
             return
         dy = e.angleDelta().y()
-        if not dy or e.pixelDelta().y():        # тачпад крутит сам и плавно
+        if not dy or e.pixelDelta().y():  # тачпад крутит сам и плавно
             super().wheelEvent(e)
             return
-        bar = self.verticalScrollBar()          # колесо - плавный разгон к цели, а не скачок
+        bar = self.verticalScrollBar()  # колесо - плавный разгон к цели, а не скачок
         if self.glide.state() != QVariantAnimation.State.Running:
             self.scroll_to = bar.value()
         self.scroll_to = max(bar.minimum(), min(bar.maximum(), self.scroll_to - dy * 1.1))
@@ -615,13 +641,15 @@ class LibList(QListWidget):
         drag.setMimeData(self.mimeData(items))
         pm = items[0].data(PIX)
         if isinstance(pm, QPixmap) and not pm.isNull():
-            drag.setPixmap(pm.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio,
-                                     Qt.TransformationMode.SmoothTransformation))
-        drag.exec(Qt.DropAction.CopyAction)     # только копия: проводник не должен уносить файл из библиотеки
+            drag.setPixmap(
+                pm.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            )
+        drag.exec(Qt.DropAction.CopyAction)  # только копия: проводник не должен уносить файл из библиотеки
 
 
 class TagHints(QWidget):
     """Подсказанные метки кнопками по три в ряд; щелчок - picked(метка), «все» - picked по каждой."""
+
     picked = pyqtSignal(str)
 
     def __init__(self):

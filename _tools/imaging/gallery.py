@@ -1,4 +1,5 @@
 """Сборка Gallery.html и done.js по папкам библиотеки."""
+
 import html
 import json
 import os
@@ -18,7 +19,7 @@ def build_gallery():
         if len(parts) < 2:
             continue
         try:
-            st = os.stat(f)                 # файл могли перенести, пока шла сборка
+            st = os.stat(f)  # файл могли перенести, пока шла сборка
         except OSError:
             continue
         files.append(f)
@@ -30,9 +31,16 @@ def build_gallery():
             except Exception:
                 pass
         secs.setdefault(sec, {}).setdefault(grp, []).append(
-            {"file": rel, "name": html.escape(parts[-1]), "info": info, "t": int(st.st_mtime)})
-    data = {"sections": [{"name": html.escape(s), "groups": [{"name": html.escape(g), "items": secs[s][g]} for g in sorted(secs[s])]}
-                         for s in sorted(secs)], "built": time.strftime("%d.%m.%Y %H:%M"), "root": LIB}
+            {"file": rel, "name": html.escape(parts[-1]), "info": info, "t": int(st.st_mtime)}
+        )
+    data = {
+        "sections": [
+            {"name": html.escape(s), "groups": [{"name": html.escape(g), "items": secs[s][g]} for g in sorted(secs[s])]}
+            for s in sorted(secs)
+        ],
+        "built": time.strftime("%d.%m.%Y %H:%M"),
+        "root": LIB,
+    }
     with open(TEMPLATE, encoding="utf-8") as fh:
         page = fh.read()
     js = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
@@ -40,6 +48,7 @@ def build_gallery():
     have = {}
     for f in files:
         have.setdefault(os.path.basename(os.path.dirname(f)), []).append(os.path.splitext(os.path.basename(f))[0])
-    write_atomic(os.path.join(LIB, "_tools", "done.js"),
-                 "window.HAVE = " + json.dumps(have, ensure_ascii=False) + ";\n", "utf-8")
+    write_atomic(
+        os.path.join(LIB, "_tools", "done.js"), "window.HAVE = " + json.dumps(have, ensure_ascii=False) + ";\n", "utf-8"
+    )
     return {s: sum(len(v) for v in secs[s].values()) for s in sorted(secs)}

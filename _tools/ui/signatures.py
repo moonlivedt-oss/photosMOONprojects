@@ -1,4 +1,5 @@
 """Отпечатки в окне: то же, что library.signatures, но пересчёт идёт в фоне и не держит окно."""
+
 from library import signatures
 from library.signatures import build_sigs
 from ui.common import bg

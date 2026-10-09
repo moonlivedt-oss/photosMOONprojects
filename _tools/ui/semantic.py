@@ -1,5 +1,6 @@
 """Поиск по смыслу в окне: то же, что library.semantic, но досчёт новых картинок идёт в фоне,
 а ход виден в строке состояния."""
+
 from library import semantic
 from ui.common import bg, in_main
 

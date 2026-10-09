@@ -1,4 +1,5 @@
 """Нарезка листа: удаление фона, обводка, поиск рисунков на листе."""
+
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -24,14 +25,14 @@ def remove_bg(im, tol=38):
     clear = alpha < 16
     if clear.any():
         edge = np.concatenate([alpha[0], alpha[-1], alpha[:, 0], alpha[:, -1]]) >= 16
-        if edge.mean() < 0.05:                  # края уже прозрачные - убирать нечего
+        if edge.mean() < 0.05:  # края уже прозрачные - убирать нечего
             return im
         b = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])[edge]
         bg = np.median(b, 0)
     else:
         bg, _ = border_color(im)
     cand = ((np.abs(rgb - bg).max(2) <= tol) | clear).astype(np.uint8) * 255
-    m = Image.fromarray(cand, "L").copy()   # copy: иначе буфер только для чтения и заливка уходит в копию
+    m = Image.fromarray(cand, "L").copy()  # copy: иначе буфер только для чтения и заливка уходит в копию
     px, (w, h) = m.load(), m.size
     for x in range(w):
         for y in (0, h - 1):
@@ -57,7 +58,7 @@ def add_outline(im, px, color="#ffffff"):
     big.paste(im, (pad, pad), im)
     m = big.getchannel("A").point(lambda v: 255 if v > 100 else 0)
     left = px
-    while left > 0:                       # MaxFilter большого размера медленный - наращиваем шагами
+    while left > 0:  # MaxFilter большого размера медленный - наращиваем шагами
         step = min(left, 5)
         m = m.filter(ImageFilter.MaxFilter(2 * step + 1))
         left -= step
@@ -106,14 +107,20 @@ def find_pieces(mask):
     area = lambda c: (c["box"][2] - c["box"][0]) * (c["box"][3] - c["box"][1])
     med = float(np.median([area(c) for c in comps]))
     big = [c for c in comps if area(c) >= 0.2 * med] or comps
-    for c in comps:                         # мелочь (искорки, звёздочки) - к ближайшему крупному
+    for c in comps:  # мелочь (искорки, звёздочки) - к ближайшему крупному
         if c in big:
             continue
         cx, cy = (c["box"][0] + c["box"][2]) / 2, (c["box"][1] + c["box"][3]) / 2
-        t = min(big, key=lambda b: ((b["box"][0] + b["box"][2]) / 2 - cx) ** 2 + ((b["box"][1] + b["box"][3]) / 2 - cy) ** 2)
+        t = min(
+            big, key=lambda b: ((b["box"][0] + b["box"][2]) / 2 - cx) ** 2 + ((b["box"][1] + b["box"][3]) / 2 - cy) ** 2
+        )
         t["ids"] |= c["ids"]
-        t["box"] = [min(t["box"][0], c["box"][0]), min(t["box"][1], c["box"][1]),
-                    max(t["box"][2], c["box"][2]), max(t["box"][3], c["box"][3])]
+        t["box"] = [
+            min(t["box"][0], c["box"][0]),
+            min(t["box"][1], c["box"][1]),
+            max(t["box"][2], c["box"][2]),
+            max(t["box"][3], c["box"][3]),
+        ]
     big.sort(key=lambda c: c["box"][1])
     rows, cur = [], []
     for c in big:
@@ -140,9 +147,9 @@ def grid_pieces(mask, cols, rows):
         L = len(prof)
         res = [0]
         for i in range(1, n):
-            c, r = L * i // n, max(1, L // (2 * n))      # max: у крошечного листа окно поиска было пустым
+            c, r = L * i // n, max(1, L // (2 * n))  # max: у крошечного листа окно поиска было пустым
             a = max(0, c - r)
-            win = prof[a:max(a + 1, c + r)]
+            win = prof[a : max(a + 1, c + r)]
             res.append(a + int(np.flatnonzero(win == win.min()).mean()) if len(win) else c)
         return res + [L]
 
@@ -153,8 +160,10 @@ def grid_pieces(mask, cols, rows):
     w, h = W // k, H // k
     small = np.asarray(Image.fromarray((mask * 255).astype(np.uint8), "L").resize((w, h), Image.BOX)) > 127
     L, n = label(small)
-    grid = (np.searchsorted(np.array(ys[1:-1]) / k, np.arange(h), side="right")[:, None] * cols
-            + np.searchsorted(np.array(xs[1:-1]) / k, np.arange(w), side="right")[None, :])
+    grid = (
+        np.searchsorted(np.array(ys[1:-1]) / k, np.arange(h), side="right")[:, None] * cols
+        + np.searchsorted(np.array(xs[1:-1]) / k, np.arange(w), side="right")[None, :]
+    )
     py, px = np.nonzero(L)
     lab = L[py, px]
     x0, y0 = np.full(n + 1, w), np.full(n + 1, h)
@@ -174,7 +183,7 @@ def grid_pieces(mask, cols, rows):
             gx = np.maximum(0, np.maximum(x0[big] - x1[i], x0[i] - x1[big]))
             gy = np.maximum(0, np.maximum(y0[big] - y1[i], y0[i] - y1[big]))
             home[i] = home[big[int(np.argmin(gx * gx + gy * gy))]]
-    stuck = (x1 - x0 > 1.4 * w / cols) | (y1 - y0 > 1.4 * h / rows)     # слиплось с соседом - режем по линии
+    stuck = (x1 - x0 > 1.4 * w / cols) | (y1 - y0 > 1.4 * h / rows)  # слиплось с соседом - режем по линии
     own = np.where(stuck[L], grid, home[L])
     sm = stuck[L] & (L > 0)
     if sm.any():
@@ -194,7 +203,9 @@ def grid_pieces(mask, cols, rows):
             g = Le.copy()
             for _ in range(10):
                 pad = np.pad(g, 1)
-                nb = np.max([pad[1 + dy:h + 1 + dy, 1 + dx:w + 1 + dx] for dy in (-1, 0, 1) for dx in (-1, 0, 1)], axis=0)
+                nb = np.max(
+                    [pad[1 + dy : h + 1 + dy, 1 + dx : w + 1 + dx] for dy in (-1, 0, 1) for dx in (-1, 0, 1)], axis=0
+                )
                 fill = sm & (g == 0) & (nb > 0)
                 if not fill.any():
                     break
@@ -209,9 +220,14 @@ def grid_pieces(mask, cols, rows):
                 out.append(((xs[c], ys[r], xs[c + 1], ys[r + 1]), None))
                 continue
             my, mx = np.nonzero(m)
-            box = (max(0, (mx.min() - 2) * k), max(0, (my.min() - 2) * k), min(W, (mx.max() + 3) * k), min(H, (my.max() + 3) * k))
+            box = (
+                max(0, (mx.min() - 2) * k),
+                max(0, (my.min() - 2) * k),
+                min(W, (mx.max() + 3) * k),
+                min(H, (my.max() + 3) * k),
+            )
             grown = np.asarray(Image.fromarray((m * 255).astype(np.uint8), "L").filter(ImageFilter.MaxFilter(5))) > 0
-            grown &= ~(small & (own != r * cols + c))        # запас по краю, но без пикселей соседа
+            grown &= ~(small & (own != r * cols + c))  # запас по краю, но без пикселей соседа
             full = Image.fromarray((grown * 255).astype(np.uint8), "L").resize((W, H), Image.NEAREST)
             out.append((box, np.asarray(full) > 0))
     return out
@@ -219,7 +235,7 @@ def grid_pieces(mask, cols, rows):
 
 def label(s):
     """Связные области булевой маски -> (карта номеров с 1, их количество)."""
-    lab = Image.fromarray(np.where(s, -1, 0).astype(np.int32)).copy()   # copy: см. remove_bg
+    lab = Image.fromarray(np.where(s, -1, 0).astype(np.int32)).copy()  # copy: см. remove_bg
     px, n = lab.load(), 0
     for y, x in zip(*np.nonzero(s)):
         if px[int(x), int(y)] == -1:
@@ -228,7 +244,7 @@ def label(s):
     return np.asarray(lab), n
 
 
-GUTTER = (255, 0, 255)                  # пурпурные промежутки между картинками листа: в сценах такого цвета нет
+GUTTER = (255, 0, 255)  # пурпурные промежутки между картинками листа: в сценах такого цвета нет
 
 
 def _gutter(im):
@@ -263,7 +279,7 @@ def _shave(g, limit=0.15):
     def edge(line, n):
         k = max(1, int(n * limit))
         head = np.flatnonzero(line[:k])
-        tail = np.flatnonzero(line[n - k:])
+        tail = np.flatnonzero(line[n - k :])
         return (int(head[-1]) + 1 if len(head) else 0), (n - k + int(tail[0]) if len(tail) else n)
 
     top, bottom = edge(rows, h)
@@ -283,7 +299,7 @@ def cells(im, cols, rows, boxes=None):
     out, final = [], []
     for b in boxes:
         b = tuple(int(v) for v in b)
-        x0, y0, x1, y1 = _shave(g[b[1]:b[3], b[0]:b[2]])
+        x0, y0, x1, y1 = _shave(g[b[1] : b[3], b[0] : b[2]])
         if x1 - x0 > 16 and y1 - y0 > 16:
             b = (b[0] + x0, b[1] + y0, b[0] + x1, b[1] + y1)
         out.append(im.crop(b))
@@ -343,11 +359,11 @@ def cut(im, grid=None, size=256, bg_mode="auto", outline=0, pad=0.06, boxes=None
     for box, m in pieces:
         piece = im.crop(box)
         if m is not None and (removed or has_alpha):
-            sub = m[box[1]:box[3], box[0]:box[2]]
+            sub = m[box[1] : box[3], box[0] : box[2]]
             al = np.asarray(piece.getchannel("A")) * sub
             piece.putalpha(Image.fromarray(al.astype(np.uint8), "L"))
         if not (removed or has_alpha):
-            pm = mask[box[1]:box[3], box[0]:box[2]]
+            pm = mask[box[1] : box[3], box[0] : box[2]]
             ys, xs = np.nonzero(pm)
             if len(xs):
                 piece = piece.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))

@@ -77,8 +77,9 @@ class TestThemes(unittest.TestCase):
 
 class TestCatalog(unittest.TestCase):
     def test_guess_theme(self):
-        self.assertEqual(U.guess_theme("model", {"categories": ["furniture", "seating"], "tags": ["chair"]}),
-                         "Дом - мебель")
+        self.assertEqual(
+            U.guess_theme("model", {"categories": ["furniture", "seating"], "tags": ["chair"]}), "Дом - мебель"
+        )
         self.assertEqual(U.guess_theme("model", {"categories": ["rocks"], "tags": ["boulder"]}), "Пустыня и скалы")
         self.assertEqual(U.guess_theme("model", {"categories": ["xyz"], "tags": []}), "Разное")
 

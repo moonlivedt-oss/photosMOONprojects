@@ -1,10 +1,11 @@
 """Отпечатки картинок (дубли, «уже есть») и коды главных цветов (поиск по цвету)."""
+
 import numpy as np
 from PIL import Image
 
 from imaging.files import upright
 
-SAME_RATIO, SAME_DIFF = 0.04, 3.5      # насколько похожи пропорции и уменьшенная копия у одинаковых картинок
+SAME_RATIO, SAME_DIFF = 0.04, 3.5  # насколько похожи пропорции и уменьшенная копия у одинаковых картинок
 
 
 def signature(im):
@@ -22,10 +23,18 @@ def same_sig(a, b):
 
 
 # Цвета для поиска по цвету: код, название, образец. Порядок - как в списке окна.
-COLORS = [("r", "Красный", "#e5484d"), ("o", "Оранжевый", "#f08c3a"), ("y", "Жёлтый", "#f2c94c"),
-          ("g", "Зелёный", "#4cb782"), ("c", "Бирюзовый", "#3cc7c7"), ("b", "Синий", "#4a7ef0"),
-          ("v", "Фиолетовый", "#9d6cf0"), ("p", "Розовый", "#ef6fb0"), ("w", "Светлый", "#f2f0f7"),
-          ("k", "Тёмный", "#202028")]
+COLORS = [
+    ("r", "Красный", "#e5484d"),
+    ("o", "Оранжевый", "#f08c3a"),
+    ("y", "Жёлтый", "#f2c94c"),
+    ("g", "Зелёный", "#4cb782"),
+    ("c", "Бирюзовый", "#3cc7c7"),
+    ("b", "Синий", "#4a7ef0"),
+    ("v", "Фиолетовый", "#9d6cf0"),
+    ("p", "Розовый", "#ef6fb0"),
+    ("w", "Светлый", "#f2f0f7"),
+    ("k", "Тёмный", "#202028"),
+]
 
 
 def colors(im):
@@ -60,6 +69,6 @@ def main_colors(path, n=6):
     if not len(px):
         return []
     q = Image.fromarray(px.reshape(1, -1, 3).astype(np.uint8), "RGB").quantize(n, method=Image.Quantize.MEDIANCUT)
-    pal = q.getpalette()[:3 * n]
+    pal = q.getpalette()[: 3 * n]
     counts = sorted(q.getcolors() or [], reverse=True)
-    return ["#{:02x}{:02x}{:02x}".format(*tuple(pal[3 * i:3 * i + 3])) for c, i in counts if c >= len(px) * 0.02]
+    return ["#{:02x}{:02x}{:02x}".format(*tuple(pal[3 * i : 3 * i + 3])) for c, i in counts if c >= len(px) * 0.02]

@@ -2,6 +2,7 @@
 фон не убран, рисунок обрезан краем, кусок соседа у края, светлая кайма), по всем ядрам.
 Найденное можно открыть в редакторе (там есть «Убрать кайму», кисть, кадрирование), показать
 в библиотеке или убрать в корзину."""
+
 import os
 
 from PyQt6 import sip
@@ -122,8 +123,10 @@ class DoctorDialog(QDialog):
             for c in codes:
                 counts[c] = counts.get(c, 0) + 1
         self.head.setText("Найдено: %d из %d" % (len(self.found), total) if self.found else "Всё в порядке")
-        self.sub.setText(", ".join("%s: %d" % (NAMES[c], counts[c]) for c, _n in K.PROBLEMS if c in counts)
-                         or "Проверено %d картинок - проблем нет." % total)
+        self.sub.setText(
+            ", ".join("%s: %d" % (NAMES[c], counts[c]) for c, _n in K.PROBLEMS if c in counts)
+            or "Проверено %d картинок - проблем нет." % total
+        )
         cur = self.kind.currentData()
         self.kind.blockSignals(True)
         self.kind.clear()
@@ -165,8 +168,10 @@ class DoctorDialog(QDialog):
         if len(sel) == 1:
             self.tip.setText("Что делать: " + "; ".join(HELP[c] for c in self.found.get(sel[0], [])))
         else:
-            self.tip.setText("Выберите картинку - здесь будет подсказка, что с ней сделать. "
-                             "Наведите на плитку - причина во всплывающей подсказке.")
+            self.tip.setText(
+                "Выберите картинку - здесь будет подсказка, что с ней сделать. "
+                "Наведите на плитку - причина во всплывающей подсказке."
+            )
 
     def edit(self, paths):
         paths = [p for p in paths if "broken" not in self.found.get(p, [])]
@@ -194,8 +199,13 @@ class DoctorDialog(QDialog):
 
     def trash(self):
         sel = self.paths()
-        if not sel or QMessageBox.question(self, "В корзину", "Убрать в корзину: %d шт.?\n(вернуть можно из корзины Windows)"
-                                           % len(sel)) != QMessageBox.StandardButton.Yes:
+        if (
+            not sel
+            or QMessageBox.question(
+                self, "В корзину", "Убрать в корзину: %d шт.?\n(вернуть можно из корзины Windows)" % len(sel)
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
             return
         n, steps = to_trash(sel)
         for p in sel:
@@ -206,5 +216,5 @@ class DoctorDialog(QDialog):
         self.show_list()
 
     def reject(self):
-        self.stop[0] = True                 # проверка по ядрам бросается, если окно закрыли
+        self.stop[0] = True  # проверка по ядрам бросается, если окно закрыли
         super().reject()

@@ -1,4 +1,5 @@
 """Окно «Найти дубли»: лишние копии уезжают в «_duplicates» (Ctrl+Z вернёт)."""
+
 import os
 import shutil
 
@@ -32,7 +33,7 @@ class DupesDialog(QDialog):
         rows = QWidget()
         rv = QVBoxLayout(rows)
         for g in groups:
-            g.sort(key=self.quality, reverse=True)       # первой - самая крупная и тяжёлая: её и оставить
+            g.sort(key=self.quality, reverse=True)  # первой - самая крупная и тяжёлая: её и оставить
             row = QFrame(objectName="drop")
             h = QHBoxLayout(row)
             for i, p in enumerate(g):
@@ -54,8 +55,12 @@ class DupesDialog(QDialog):
         area = QScrollArea()
         area.setWidgetResizable(True)
         area.setWidget(rows)
-        hint = QLabel("Отмеченные остаются. Неотмеченные уедут в «_duplicates» с той же структурой папок; "
-                      "не дубли - отметьте все в группе.", objectName="dim", wordWrap=True)
+        hint = QLabel(
+            "Отмеченные остаются. Неотмеченные уедут в «_duplicates» с той же структурой папок; "
+            "не дубли - отметьте все в группе.",
+            objectName="dim",
+            wordWrap=True,
+        )
         go = QPushButton(lib_icon("trash-bin"), "Убрать неотмеченные в «_duplicates»", objectName="primary")
         go.clicked.connect(self.apply)
         close = QPushButton("Закрыть")
@@ -91,7 +96,7 @@ class DupesDialog(QDialog):
                 try:
                     os.makedirs(os.path.dirname(dst), exist_ok=True)
                     shutil.move(p, dst)
-                except OSError:                 # открыт в другой программе - остальные переносим
+                except OSError:  # открыт в другой программе - остальные переносим
                     bad += 1
                     continue
                 self.win.moved(p, dst)

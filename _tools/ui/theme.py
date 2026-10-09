@@ -1,24 +1,25 @@
 """Оформление окна: цвета (C), стили (QSS) и svg-стрелки для них. Темы - тёмная и светлая, акцент - на выбор.
 Цвета заданы один раз в C: и стили, и рисовальщики плиток берут их отсюда; apply() меняет C на месте,
 поэтому после смены темы достаточно пересобрать стили и перерисовать окно."""
+
 import os
 import re
 
 from ui.common import UI
 
 DARK = dict(
-    bg0="#0d0d13",          # окно
-    bg1="#14141c",          # панели
-    bg2="#1b1b26",          # поля, карточки
-    bg3="#242432",          # наведение
+    bg0="#0d0d13",  # окно
+    bg1="#14141c",  # панели
+    bg2="#1b1b26",  # поля, карточки
+    bg3="#242432",  # наведение
     line="#252533",
     line2="#343448",
     text="#eceaf6",
     dim="#8e8ba6",
     faint="#5d5b70",
-    teal="#5ee0d0",         # третье пятно живого фона
-    ink="#120f1f",          # текст на акцентной кнопке
-    selt="#ffffff",         # текст выделенной строки
+    teal="#5ee0d0",  # третье пятно живого фона
+    ink="#120f1f",  # текст на акцентной кнопке
+    selt="#ffffff",  # текст выделенной строки
     arrow="#b9b6c8",
 )
 LIGHT = dict(
@@ -53,7 +54,7 @@ CURRENT = {"theme": "dark", "accent": "lavender"}
 
 def _rgb(h):
     h = h.lstrip("#")
-    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
 
 
 def _mix(a, b, t):
@@ -72,27 +73,26 @@ def apply(theme="dark", accent="lavender"):
     C.clear()
     C.update(base)
     C["acc"], C["acc2"] = acc, acc2
-    C["accd"] = _mix(base["bg2"], acc, 0.32 if theme == "dark" else 0.28)   # выделение
+    C["accd"] = _mix(base["bg2"], acc, 0.32 if theme == "dark" else 0.28)  # выделение
     if theme == "light":
         C["ink"] = "#ffffff" if accent in ("sky", "lavender") else "#1e1c28"
     r, g, b = _rgb(acc)
     r2, g2, b2 = _rgb(acc2)
     k = (0.30, 0.10) if theme == "dark" else (0.22, 0.08)
-    SOFT = (f"qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba({r},{g},{b},{k[0]}),"
-            f"stop:1 rgba({r2},{g2},{b2},{k[1]}))")
+    SOFT = f"qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba({r},{g},{b},{k[0]}),stop:1 rgba({r2},{g2},{b2},{k[1]}))"
 
 
 apply()
 
 SVG = {
     "down": '<path d="M2.5 4l3.5 3.5 3.5-3.5" fill="none" stroke="$arrow" stroke-width="1.6" '
-            'stroke-linecap="round" stroke-linejoin="round"/>',
+    'stroke-linecap="round" stroke-linejoin="round"/>',
     "up": '<path d="M2.5 8l3.5-3.5 3.5 3.5" fill="none" stroke="$arrow" stroke-width="1.6" '
-          'stroke-linecap="round" stroke-linejoin="round"/>',
+    'stroke-linecap="round" stroke-linejoin="round"/>',
     "right": '<path d="M4.5 2.5l3.5 3.5-3.5 3.5" fill="none" stroke="$faint" stroke-width="1.6" '
-             'stroke-linecap="round" stroke-linejoin="round"/>',
+    'stroke-linecap="round" stroke-linejoin="round"/>',
     "check": '<path d="M2.6 6.3l2.3 2.3 4.5-5" fill="none" stroke="$ink" stroke-width="1.9" '
-             'stroke-linecap="round" stroke-linejoin="round"/>',
+    'stroke-linecap="round" stroke-linejoin="round"/>',
 }
 
 # $имя - цвет из C, $grad / $soft - градиенты, @UI - папка со стрелками

@@ -1,4 +1,5 @@
 """Правка по рецепту: цвет (adj) и список шагов (ops) - одинаково для превью и полного размера."""
+
 import math
 
 import numpy as np
@@ -12,12 +13,20 @@ from imaging.files import fmt_of, hex_rgb, load
 # Правка - это рецепт: цвет (adj) и список шагов (ops). Окно показывает его на уменьшенной копии
 # (scale < 1), а сохранение применяет тот же рецепт к полному размеру. Размеры в шагах (обводка,
 # длинная сторона) заданы для полного размера, обрезка - долями (0..1) от текущей картинки.
-ADJ = [("bright", "Яркость"), ("contrast", "Контраст"), ("sat", "Насыщенность"),
-       ("hue", "Оттенок"), ("warm", "Тепло"), ("shadows", "Тени"), ("highlights", "Света"),
-       ("sharp", "Резкость"), ("opacity", "Прозрачность")]
-ADJ_RANGE = {"hue": (-180, 180), "opacity": (0, 100)}      # остальные - -100..100
+ADJ = [
+    ("bright", "Яркость"),
+    ("contrast", "Контраст"),
+    ("sat", "Насыщенность"),
+    ("hue", "Оттенок"),
+    ("warm", "Тепло"),
+    ("shadows", "Тени"),
+    ("highlights", "Света"),
+    ("sharp", "Резкость"),
+    ("opacity", "Прозрачность"),
+]
+ADJ_RANGE = {"hue": (-180, 180), "opacity": (0, 100)}  # остальные - -100..100
 
-PREVIEW_MAX = 2400       # предпросмотр после увеличения нейросетью - не больше этой стороны
+PREVIEW_MAX = 2400  # предпросмотр после увеличения нейросетью - не больше этой стороны
 
 
 def adjust(im, bright=0, contrast=0, sat=0, hue=0, warm=0, shadows=0, highlights=0, sharp=0, opacity=0, scale=1.0):
@@ -44,12 +53,12 @@ def adjust(im, bright=0, contrast=0, sat=0, hue=0, warm=0, shadows=0, highlights
         rgb = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGB")
     if sat:
         rgb = ImageEnhance.Color(rgb).enhance(1 + sat / 100)
-    if shadows or highlights:                   # тени - тёмная половина, света - светлая, плавно
+    if shadows or highlights:  # тени - тёмная половина, света - светлая, плавно
         a = np.asarray(rgb).astype(np.float32)
         y = _lum(a)[..., None] / 255
-        lift = shadows / 100 * 80 * (1 - y) ** 2 + highlights / 100 * 80 * y ** 2
+        lift = shadows / 100 * 80 * (1 - y) ** 2 + highlights / 100 * 80 * y**2
         rgb = Image.fromarray(np.clip(a + lift, 0, 255).astype(np.uint8), "RGB")
-    if warm:                                    # теплее - краснее и желтее, холоднее - синее
+    if warm:  # теплее - краснее и желтее, холоднее - синее
         a = np.asarray(rgb).astype(np.int16)
         k = warm * 0.35
         a[..., 0] += int(k)
@@ -61,7 +70,7 @@ def adjust(im, bright=0, contrast=0, sat=0, hue=0, warm=0, shadows=0, highlights
         alpha = alpha.point(lambda v: round(v * (1 - opacity / 100)))
     out = rgb.convert("RGBA")
     out.putalpha(alpha)
-    if sharp < 0:                               # размытие с учётом прозрачности - без тёмного ореола
+    if sharp < 0:  # размытие с учётом прозрачности - без тёмного ореола
         out = out.convert("RGBa").filter(ImageFilter.GaussianBlur(-sharp / 100 * 8 * scale)).convert("RGBA")
     return out
 
@@ -73,12 +82,15 @@ def apply_edits(im, ops, adj=None, scale=1.0, info=None):
     info (dict) получает итоговый scale."""
     im = adjust(im.convert("RGBA"), **(adj or {}), scale=scale)
     for o in ops:
-        if o.get("off"):                        # шаг выключен галкой в окне правки
+        if o.get("off"):  # шаг выключен галкой в окне правки
             continue
         k = o["op"]
-        if k == "rotate":                       # deg: 90 - по часовой
-            im = im.transpose({90: Image.Transpose.ROTATE_270, 180: Image.Transpose.ROTATE_180,
-                               270: Image.Transpose.ROTATE_90}[o["deg"] % 360])
+        if k == "rotate":  # deg: 90 - по часовой
+            im = im.transpose(
+                {90: Image.Transpose.ROTATE_270, 180: Image.Transpose.ROTATE_180, 270: Image.Transpose.ROTATE_90}[
+                    o["deg"] % 360
+                ]
+            )
         elif k == "flip":
             im = im.transpose(Image.Transpose.FLIP_LEFT_RIGHT if o["dir"] == "h" else Image.Transpose.FLIP_TOP_BOTTOM)
         elif k == "crop":
@@ -91,13 +103,13 @@ def apply_edits(im, ops, adj=None, scale=1.0, info=None):
             im = trim(im)[0]
         elif k == "nobg":
             im = remove_bg(im, o.get("tol", 38))
-        elif k == "nobg_ai":                    # любой фон - нейросеть (BiRefNet)
+        elif k == "nobg_ai":  # любой фон - нейросеть (BiRefNet)
             im = neural.cached("bg", im, neural.remove_bg_ai)
-        elif k == "upscale":                    # x: 2 или 4; kind: auto / art / photo
+        elif k == "upscale":  # x: 2 или 4; kind: auto / art / photo
             x, kind = o.get("x", 4), o.get("kind", "auto")
             kind = ("art" if is_art(im) else "photo") if kind == "auto" else kind
             im = neural.cached("up%d%s" % (x, kind), im, lambda a, x=x, kind=kind: neural.upscale(a, x, kind))
-            if scale < 1 and max(im.size) > PREVIEW_MAX:    # превью: полный размер вырос в x раз, копия - тоже
+            if scale < 1 and max(im.size) > PREVIEW_MAX:  # превью: полный размер вырос в x раз, копия - тоже
                 f = PREVIEW_MAX / max(im.size)
                 im = im.resize((max(1, round(im.width * f)), max(1, round(im.height * f))), Image.LANCZOS)
                 scale *= f
@@ -107,20 +119,22 @@ def apply_edits(im, ops, adj=None, scale=1.0, info=None):
             im = to_square(im, o.get("pad", 0.06), (0, 0, 0, 0))
         elif k == "resize":
             if scale < 1 and o["size"] <= max(im.size):
-                scale = 1.0                     # превью дальше - в полном размере
+                scale = 1.0  # превью дальше - в полном размере
             side = max(1, round(o["size"] * scale))
             f = side / max(im.size)
             im = im.resize((max(1, round(im.width * f)), max(1, round(im.height * f))), Image.LANCZOS)
-        elif k == "angle":                      # свободный поворот (выровнять горизонт), deg - по часовой
+        elif k == "angle":  # свободный поворот (выровнять горизонт), deg - по часовой
             w0, h0 = im.size
-            im = im.convert("RGBa").rotate(-o["deg"], Image.BICUBIC, expand=True).convert("RGBA")   # RGBa: без тёмной каймы
-            if o.get("fit"):                    # срезать прозрачные клинья по углам
+            im = (
+                im.convert("RGBa").rotate(-o["deg"], Image.BICUBIC, expand=True).convert("RGBA")
+            )  # RGBa: без тёмной каймы
+            if o.get("fit"):  # срезать прозрачные клинья по углам
                 im = im.crop(_inner_box(im.size, w0, h0, o["deg"]))
-        elif k == "fill":                       # подложить сплошной цвет под прозрачное
+        elif k == "fill":  # подложить сплошной цвет под прозрачное
             base = Image.new("RGBA", im.size, hex_rgb(o.get("color", "#ffffff")) + (255,))
             base.alpha_composite(im)
             im = base
-        elif k == "pad":                        # поля вокруг: доля длинной стороны, прозрачные или цветом
+        elif k == "pad":  # поля вокруг: доля длинной стороны, прозрачные или цветом
             m = round(max(im.size) * o.get("k", 0.1))
             fill = hex_rgb(o["color"]) + (255,) if o.get("color") else (0, 0, 0, 0)
             big = Image.new("RGBA", (im.width + 2 * m, im.height + 2 * m), fill)
@@ -132,16 +146,17 @@ def apply_edits(im, ops, adj=None, scale=1.0, info=None):
             im = defringe(im, max(0, round(o.get("px", 1) * max(scale, 0.5))))
         elif k == "brush":
             im = brush(im, o["mode"], o["r"], o["pts"])
-        elif k == "shadow":                     # rel: размеры - доли длинной стороны (одинаково на всех файлах)
+        elif k == "shadow":  # rel: размеры - доли длинной стороны (одинаково на всех файлах)
             u = max(im.size) if o.get("rel") else scale
-            im = shadow(im, o["dx"] * u, o["dy"] * u, max(0.5, o["blur"] * u), o.get("a", 0.45),
-                        o.get("color", "#000000"))
+            im = shadow(
+                im, o["dx"] * u, o["dy"] * u, max(0.5, o["blur"] * u), o.get("a", 0.45), o.get("color", "#000000")
+            )
         elif k == "glow":
             u = max(im.size) if o.get("rel") else scale
             im = shadow(im, 0, 0, max(0.5, o["r"] * u), o.get("a", 0.8), o.get("color", "#ffffff"), spread=True)
         elif k == "round":
             im = round_corners(im, o["rad"])
-        elif k == "center":                     # квадрат из середины (аватар, превью)
+        elif k == "center":  # квадрат из середины (аватар, превью)
             side = min(im.size)
             x, y = (im.width - side) // 2, (im.height - side) // 2
             im = im.crop((x, y, x + side, y + side))
@@ -184,8 +199,8 @@ def recolor(im, colors, k=1.0):
     a = np.asarray(im).astype(np.float32)
     lum = _lum(a[..., :3])
     solid = a[..., 3] > 40
-    lo, hi = (np.percentile(lum[solid], (2, 98)) if solid.any() else (0, 255))
-    if hi - lo < 60:                            # почти одноцветный рисунок - растягивать нечего
+    lo, hi = np.percentile(lum[solid], (2, 98)) if solid.any() else (0, 255)
+    if hi - lo < 60:  # почти одноцветный рисунок - растягивать нечего
         lo, hi = 0, 255
     t = np.clip((lum - lo) / max(1.0, hi - lo), 0, 1) * (len(pal) - 1)
     i = np.minimum(t.astype(int), len(pal) - 2)
@@ -240,7 +255,7 @@ def brush(im, mode, r, pts):
         d.line(xy, fill=255, width=2 * rad, joint="curve")
     for x, y in xy:
         d.ellipse((x - rad, y - rad, x + rad, y + rad), fill=255)
-    if rad > 2:                                 # мягкий край кисти, без лесенки
+    if rad > 2:  # мягкий край кисти, без лесенки
         m = m.filter(ImageFilter.GaussianBlur(min(2.0, rad * 0.15)))
     a = np.asarray(im.getchannel("A")).astype(np.int16)
     mk = np.asarray(m).astype(np.int16)
@@ -256,11 +271,13 @@ def shadow(im, dx, dy, blur, opacity, color="#000000", spread=False):
     m = int(blur * 3 + max(abs(dx), abs(dy))) + 2
     big = Image.new("RGBA", (im.width + 2 * m, im.height + 2 * m), (0, 0, 0, 0))
     sh = im.getchannel("A")
-    if spread:                                  # свечение: форма чуть шире, потом размыта
+    if spread:  # свечение: форма чуть шире, потом размыта
         sh = sh.filter(ImageFilter.MaxFilter(3))
     mask = Image.new("L", big.size, 0)
     mask.paste(sh, (m + round(dx), m + round(dy)))
-    mask = mask.filter(ImageFilter.GaussianBlur(blur)).point(lambda v: int(min(255, v * opacity * (1.6 if spread else 1))))
+    mask = mask.filter(ImageFilter.GaussianBlur(blur)).point(
+        lambda v: int(min(255, v * opacity * (1.6 if spread else 1)))
+    )
     layer = Image.new("RGBA", big.size, hex_rgb(color) + (0,))
     layer.putalpha(mask)
     big.alpha_composite(layer)
@@ -274,7 +291,7 @@ def shadow(im, dx, dy, blur, opacity, color="#000000", spread=False):
 def round_corners(im, rad):
     """Скругление углов: rad - доля короткой стороны (0.5 - круг или «таблетка»)."""
     im = im.convert("RGBA")
-    ss = 4                                      # маска вчетверо крупнее и вниз - гладкий край без лесенки
+    ss = 4  # маска вчетверо крупнее и вниз - гладкий край без лесенки
     r = max(1, round(rad * min(im.size) * ss))
     m = Image.new("L", (im.width * ss, im.height * ss), 0)
     ImageDraw.Draw(m).rounded_rectangle((0, 0, im.width * ss - 1, im.height * ss - 1), r, fill=255)
@@ -293,7 +310,7 @@ def edit_format(path, im):
     f = fmt_of(path)
     if f in ("bmp", "gif"):
         return "png"
-    if f == "jpg" and has_alpha(im):           # фон убран - jpg прозрачность не хранит
+    if f == "jpg" and has_alpha(im):  # фон убран - jpg прозрачность не хранит
         return "webp"
     return f
 

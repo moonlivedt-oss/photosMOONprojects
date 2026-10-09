@@ -1,5 +1,6 @@
 """Вес разделов: где библиотека тяжелее всего, сколько там тяжёлых файлов и сколько уже сэкономлено
 сжатием. Полосы вырастают при открытии; щелчок по разделу открывает его подразделы."""
+
 import os
 import time
 
@@ -51,6 +52,7 @@ def weigh():
 
 class Bars(QWidget):
     """Строки-полосы: длина - вес раздела, яркая часть - тяжёлые файлы, справа - сэкономлено."""
+
     ROW = 46
 
     def __init__(self, dlg):
@@ -127,32 +129,41 @@ class Bars(QWidget):
             g.setColorAt(1, QColor(C["teal"]))
             p.setBrush(QBrush(g))
             p.drawRoundedRect(QRectF(bx, by, max(full, 4), 14), 7, 7)
-            if r["heavy"]:                            # тяжёлая доля - розовым поверх
+            if r["heavy"]:  # тяжёлая доля - розовым поверх
                 hw = full * r["heavy"] / max(1, r["bytes"])
                 p.setBrush(QColor(C["acc2"]))
                 p.drawRoundedRect(QRectF(bx + full - hw, by, max(hw, 4), 14), 7, 7)
             p.setPen(QColor(C["text"]))
             p.setFont(f1)
             fm = p.fontMetrics()
-            p.drawText(QRectF(row.x() + 12, row.y(), name_w - 20, row.height() / 2 + 4),
-                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom,
-                       fm.elidedText(r["name"], Qt.TextElideMode.ElideRight, name_w - 20))
+            p.drawText(
+                QRectF(row.x() + 12, row.y(), name_w - 20, row.height() / 2 + 4),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom,
+                fm.elidedText(r["name"], Qt.TextElideMode.ElideRight, name_w - 20),
+            )
             p.setFont(f2)
             p.setPen(QColor(C["dim"]))
-            p.drawText(QRectF(row.x() + 12, row.center().y() + 2, name_w - 20, row.height() / 2 - 2),
-                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
-                       "%d шт.%s" % (r["count"], "   тяжёлых: %d" % r["heavy_n"] if r["heavy_n"] else ""))
+            p.drawText(
+                QRectF(row.x() + 12, row.center().y() + 2, name_w - 20, row.height() / 2 - 2),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                "%d шт.%s" % (r["count"], "   тяжёлых: %d" % r["heavy_n"] if r["heavy_n"] else ""),
+            )
             rx = bx + bar_w + 14
             p.setFont(f1)
             p.setPen(QColor(C["text"]))
-            p.drawText(QRectF(rx, row.y(), right_w, row.height() / 2 + 4),
-                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom, human(r["bytes"]))
+            p.drawText(
+                QRectF(rx, row.y(), right_w, row.height() / 2 + 4),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom,
+                human(r["bytes"]),
+            )
             if r["saved"]:
                 p.setFont(f2)
                 p.setPen(QColor(C["teal"]))
-                p.drawText(QRectF(rx, row.center().y() + 2, right_w, row.height() / 2 - 2),
-                           Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
-                           "сэкономлено {}".format(human(r["saved"])))
+                p.drawText(
+                    QRectF(rx, row.center().y() + 2, right_w, row.height() / 2 - 2),
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                    "сэкономлено {}".format(human(r["saved"])),
+                )
         if not self.rows:
             p.setPen(QColor(C["dim"]))
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Взвешиваю библиотеку...")
@@ -175,8 +186,12 @@ class WeightDialog(QDialog):
         head.addWidget(self.title)
         head.addStretch(1)
         head.addWidget(self.back)
-        legend = QLabel("Полоса - вес раздела, розовая часть - файлы тяжелее %d КБ. "
-                        "Щелчок - выбрать, двойной щелчок - подразделы." % HEAVY_KB, objectName="dim", wordWrap=True)
+        legend = QLabel(
+            "Полоса - вес раздела, розовая часть - файлы тяжелее %d КБ. "
+            "Щелчок - выбрать, двойной щелчок - подразделы." % HEAVY_KB,
+            objectName="dim",
+            wordWrap=True,
+        )
         self.bars = Bars(self)
         area = QScrollArea()
         area.setWidgetResizable(True)
@@ -210,7 +225,7 @@ class WeightDialog(QDialog):
         bg(weigh, self.weighed)
 
     def weighed(self, res):
-        if sip.isdeleted(self):                 # окно закрыли раньше, чем библиотека взвесилась
+        if sip.isdeleted(self):  # окно закрыли раньше, чем библиотека взвесилась
             return
         if isinstance(res, Exception):
             self.sub.setText(f"Не получилось: {res}")
@@ -219,9 +234,15 @@ class WeightDialog(QDialog):
         tops = [v for k, v in res.items() if os.path.dirname(k) == LIB]
         total, heavy = sum(v[0] for v in tops), sum(v[2] for v in tops)
         saved = sum(self.win.cfg.get("saved", {}).values())
-        self.sub.setText("Всего %s в %d файлах, тяжёлых %s, %s" % (
-            human(total), sum(v[1] for v in tops), human(heavy) if heavy else "нет",
-            "сжатием уже сэкономлено " + human(saved) if saved else "сжатием пока ничего не экономили"))
+        self.sub.setText(
+            "Всего %s в %d файлах, тяжёлых %s, %s"
+            % (
+                human(total),
+                sum(v[1] for v in tops),
+                human(heavy) if heavy else "нет",
+                "сжатием уже сэкономлено " + human(saved) if saved else "сжатием пока ничего не экономили",
+            )
+        )
         self.enter(self.root)
 
     def enter(self, path):
@@ -234,8 +255,18 @@ class WeightDialog(QDialog):
         for k in subs:
             b, n, hb, hn, hp = self.data[k]
             rel = os.path.relpath(k, LIB)
-            rows.append(dict(path=k, name=os.path.basename(k), bytes=b, count=n, heavy=hb, heavy_n=hn,
-                             heavy_paths=hp, saved=saved.get(rel, 0) if os.sep not in rel else 0))
+            rows.append(
+                dict(
+                    path=k,
+                    name=os.path.basename(k),
+                    bytes=b,
+                    count=n,
+                    heavy=hb,
+                    heavy_n=hn,
+                    heavy_paths=hp,
+                    saved=saved.get(rel, 0) if os.sep not in rel else 0,
+                )
+            )
         self.title.setText("Вес разделов" if path == LIB else os.path.relpath(path, LIB))
         self.back.setVisible(path != LIB)
         self.row = None
@@ -248,8 +279,11 @@ class WeightDialog(QDialog):
         self.row = row
         self.open_btn.setEnabled(True)
         self.comp_btn.setEnabled(bool(row["heavy_n"]))
-        self.info.setText("%s: тяжёлых %d (%s)" % (row["name"], row["heavy_n"], human(row["heavy"]))
-                          if row["heavy_n"] else "{}: тяжёлых нет".format(row["name"]))
+        self.info.setText(
+            "%s: тяжёлых %d (%s)" % (row["name"], row["heavy_n"], human(row["heavy"]))
+            if row["heavy_n"]
+            else "{}: тяжёлых нет".format(row["name"])
+        )
 
     def open_section(self):
         if self.row:

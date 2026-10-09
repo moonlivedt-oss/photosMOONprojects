@@ -1,4 +1,5 @@
 """Задачи для процессов по ядрам: на входе путь и словарь настроек, на выходе байты."""
+
 import io
 
 from PIL import Image
@@ -44,7 +45,7 @@ def job_export(path, o):
     out, last = [], None
     for tail, k in RETINA:
         data, info = compress(im, dict(base, size=side * k, trim=False))
-        if tuple(info["size"]) == last:          # исходник меньше - крупнее не будет, копию не пишем
+        if tuple(info["size"]) == last:  # исходник меньше - крупнее не будет, копию не пишем
             break
         last = tuple(info["size"])
         out.append((tail, info["fmt"], data))

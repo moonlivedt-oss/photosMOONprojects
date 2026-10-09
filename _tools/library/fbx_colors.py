@@ -66,9 +66,21 @@ def colorize(fbx_path, mtl_text):
 
 # Когда в .mtl цвета нет (старый набор Quaternius Furniture: всё 0.64), цвет берётся по имени материала.
 BY_NAME = {
-    "wood": "#9a6b43", "darkwood": "#5a3a24", "darkbrown": "#4a2f1e", "white": "#e8e6e0", "sheets": "#c9d3e6",
-    "metal": "#8c9096", "top": "#b08a62", "sofa": "#6f8fb5", "cover2": "#b5473a", "cover3": "#3f6fa8",
-    "cover4": "#4f8a4a", "pages": "#efe9da", "red": "#b23a32", "green": "#4f8f4a", "vase": "#c9895c",
+    "wood": "#9a6b43",
+    "darkwood": "#5a3a24",
+    "darkbrown": "#4a2f1e",
+    "white": "#e8e6e0",
+    "sheets": "#c9d3e6",
+    "metal": "#8c9096",
+    "top": "#b08a62",
+    "sofa": "#6f8fb5",
+    "cover2": "#b5473a",
+    "cover3": "#3f6fa8",
+    "cover4": "#4f8a4a",
+    "pages": "#efe9da",
+    "red": "#b23a32",
+    "green": "#4f8f4a",
+    "vase": "#c9895c",
 }
 
 
@@ -78,12 +90,14 @@ def srgb_to_linear(h):
         return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
 
     h = h.lstrip("#")
-    return tuple(ch(int(h[i:i + 2], 16)) for i in (0, 2, 4))
+    return tuple(ch(int(h[i : i + 2], 16)) for i in (0, 2, 4))
 
 
 def names_in(data: bytes):
-    return [m.group(2).decode("utf-8", "replace")
-            for m in re.finditer(rb"S(....)([^\x00]{1,128})\x00\x01Material", data, re.S)]
+    return [
+        m.group(2).decode("utf-8", "replace")
+        for m in re.finditer(rb"S(....)([^\x00]{1,128})\x00\x01Material", data, re.S)
+    ]
 
 
 def colorize_by_name(fbx_path):
@@ -126,9 +140,9 @@ def _read_node(d, pos, wide):
     if end == 0:
         return None, pos + head
     nlen = d[pos + head - 1]
-    name = d[pos + head:pos + head + nlen]
+    name = d[pos + head : pos + head + nlen]
     p = pos + head + nlen
-    node = Node(name, (nprops, d[p:p + plen]))
+    node = Node(name, (nprops, d[p : p + plen]))
     p += plen
     if p < end:  # вложенные узлы, в конце - пустая запись
         node.null = True
@@ -159,13 +173,13 @@ def _strings(raw):
     out, p = [], 0
     sizes = {b"Y": 2, b"C": 1, b"I": 4, b"F": 4, b"D": 8, b"L": 8}
     while p < len(raw):
-        t = raw[p:p + 1]
+        t = raw[p : p + 1]
         p += 1
         if t in sizes:
             p += sizes[t]
         elif t in (b"S", b"R"):
             n = struct.unpack_from("<I", raw, p)[0]
-            out.append(raw[p + 4:p + 4 + n])
+            out.append(raw[p + 4 : p + 4 + n])
             p += 4 + n
         else:  # массивы: длина, кодировка, размер
             n = struct.unpack_from("<III", raw, p)[2]

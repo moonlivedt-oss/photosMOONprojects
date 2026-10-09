@@ -27,8 +27,16 @@ WIDE = ("hdri", "ies")  # картинка во всю карточку, а не
 
 def card_of(kind, name, sub="", res="", size="", fav=False, have=False, pickable=False):
     """pickable - карточка каталога: отметка галочкой в кружке справа сверху."""
-    return {"kind": kind, "name": name, "sub": sub, "res": res, "size": size, "fav": fav, "have": have,
-            "pickable": pickable}
+    return {
+        "kind": kind,
+        "name": name,
+        "sub": sub,
+        "res": res,
+        "size": size,
+        "fav": fav,
+        "have": have,
+        "pickable": pickable,
+    }
 
 
 def pill(p, rect, text, fg, bg, font, icon=None):

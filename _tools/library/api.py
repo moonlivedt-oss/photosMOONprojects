@@ -941,7 +941,7 @@ def cut_sheet(
         grid = {"whole": "whole", "single": "auto"}.get(kind)
         if kind in ("whole", "cells") and size is None:
             size = 1920
-        if kind == "cells":                     # фоны листом 2x2 в пурпурной рамке
+        if kind == "cells":  # фоны листом 2x2 в пурпурной рамке
             o.update(mode="cells", cols=2, rows=2, bg_mode="keep", pad=0, obv=0)
     if grid:
         g = grid.lower().replace("х", "x")
@@ -1012,8 +1012,11 @@ def in_folder(paths, folder):
     "крупная - её обычно оставляют, остальные можно убрать trash.",
     {
         "folder": {"type": "string", "description": "только в этой папке; пусто - вся библиотека"},
-        "imported": {"type": "boolean", "default": False,
-                     "description": "и в чужих наборах (Kenney, Hero Patterns): там похожие детали - нарочно"},
+        "imported": {
+            "type": "boolean",
+            "default": False,
+            "description": "и в чужих наборах (Kenney, Hero Patterns): там похожие детали - нарочно",
+        },
     },
 )
 def duplicates(folder=None, imported=False):

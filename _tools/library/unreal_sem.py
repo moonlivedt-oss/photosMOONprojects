@@ -17,7 +17,14 @@ from library.unreal import CACHE, ROOT
 STORE = os.path.join(os.path.dirname(CACHE), "_unreal_clip.npz")
 TEXT_WEIGHT = 0.6  # насколько важны имя и метки рядом с картинкой
 GAP = 2.2  # дальше этого от лучшего (в стандартных отклонениях) - уже случайные
-GENERIC = ("a photo", "an object", "a picture", "предмет", "вещь", "картинка")  # «похожесть на всё» вычитается, как в библиотеке
+GENERIC = (
+    "a photo",
+    "an object",
+    "a picture",
+    "предмет",
+    "вещь",
+    "картинка",
+)  # «похожесть на всё» вычитается, как в библиотеке
 
 
 def available():

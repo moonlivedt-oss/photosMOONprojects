@@ -1,4 +1,5 @@
 """Выгрузка копий в папку проекта: заготовки, формат, размер."""
+
 import os
 
 from PyQt6.QtWidgets import (
@@ -29,9 +30,7 @@ class ExportDialog(QDialog):
         super().__init__(parent)
         self.cfg = cfg
         self.setWindowTitle("Выгрузить в папку: %d шт." % n)
-        self.dir = QLineEdit(
-            cfg.get("export_dir", ""), placeholderText="папка, куда положить копии"
-        )
+        self.dir = QLineEdit(cfg.get("export_dir", ""), placeholderText="папка, куда положить копии")
         pick = QPushButton(lib_icon("folder"), "")
         pick.clicked.connect(self.pick)
         row = QHBoxLayout()
@@ -54,12 +53,8 @@ class ExportDialog(QDialog):
             ("SVG-спрайт: все значки в одном svg", "svgsprite"),
         ):
             self.fmt.addItem(t, v)
-        self.q = QSpinBox(
-            minimum=0, maximum=100, suffix=" %", specialValueText="подобрать на глаз"
-        )
-        self.q.setToolTip(
-            "0 - окно само подберёт качество без видимой разницы; 100 - без потерь"
-        )
+        self.q = QSpinBox(minimum=0, maximum=100, suffix=" %", specialValueText="подобрать на глаз")
+        self.q.setToolTip("0 - окно само подберёт качество без видимой разницы; 100 - без потерь")
         self.size = QSpinBox(
             minimum=0,
             maximum=8192,
@@ -67,18 +62,19 @@ class ExportDialog(QDialog):
             suffix=" px",
             specialValueText="не менять",
         )
-        self.size.setToolTip(
-            "Длинная сторона; меньшие картинки не увеличиваются (кроме квадрата и обрезки)"
-        )
+        self.size.setToolTip("Длинная сторона; меньшие картинки не увеличиваются (кроме квадрата и обрезки)")
         self.fit = QComboBox()
         for v, t in K.FITS:
             self.fit.addItem(t, v)
         self.trim = QCheckBox("Срезать прозрачные поля")
         self.retina = QCheckBox("Набор @1x @2x @3x")
-        self.retina.setToolTip("name, name@2x, name@3x. Размер выше - для @1x; не задан - треть исходника.\n"
-                               "Меньшие исходники не увеличиваются.")
-        self.budget = QSpinBox(minimum=0, maximum=50000, singleStep=50, suffix=" КБ",
-                               specialValueText="без ограничения")
+        self.retina.setToolTip(
+            "name, name@2x, name@3x. Размер выше - для @1x; не задан - треть исходника.\n"
+            "Меньшие исходники не увеличиваются."
+        )
+        self.budget = QSpinBox(
+            minimum=0, maximum=50000, singleStep=50, suffix=" КБ", specialValueText="без ограничения"
+        )
         self.budget.setToolTip("Каждый файл не больше стольких КБ: снижается качество, не хватает - размер")
         self.matte = QComboBox()
         for v, t, _rgb in K.MATTES:
@@ -99,9 +95,7 @@ class ExportDialog(QDialog):
         form.addRow("Не больше", self.budget)
         form.addRow("Подложка jpg", self.matte)
         form.addRow("", self.open_after)
-        bb = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         bb.button(QDialogButtonBox.StandardButton.Ok).setText("Выгрузить")
         bb.button(QDialogButtonBox.StandardButton.Cancel).setText("Отмена")
         bb.accepted.connect(self.accept)
@@ -116,15 +110,11 @@ class ExportDialog(QDialog):
         self.resize(520, 0)
         last = cfg.get("export", dict(fmt="", q=0, size=0, fit="fit"))
         self.set_opts(last)
-        self.preset.setCurrentIndex(
-            max(0, self.preset.findText(cfg.get("export_preset", "")))
-        )
+        self.preset.setCurrentIndex(max(0, self.preset.findText(cfg.get("export_preset", ""))))
         self.preset.currentIndexChanged.connect(self.apply_preset)
 
     def presets(self):
-        return EXPORT_PRESETS + [
-            (k, v) for k, v in self.cfg.get("export_presets", {}).items()
-        ]
+        return EXPORT_PRESETS + [(k, v) for k, v in self.cfg.get("export_presets", {}).items()]
 
     def fill_presets(self):
         self.preset.clear()
@@ -159,9 +149,7 @@ class ExportDialog(QDialog):
             self.set_opts(o)
 
     def save_preset(self):
-        name, ok = QInputDialog.getText(
-            self, "Заготовка выгрузки", "Название, например «Для игры (png 128)»:"
-        )
+        name, ok = QInputDialog.getText(self, "Заготовка выгрузки", "Название, например «Для игры (png 128)»:")
         name = name.strip()
         if ok and name:
             self.cfg.setdefault("export_presets", {})[name] = self.opts()
@@ -185,5 +173,3 @@ class ExportDialog(QDialog):
             export_open=self.open_after.isChecked(),
         )
         super().accept()
-
-

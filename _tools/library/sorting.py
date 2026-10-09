@@ -1,4 +1,5 @@
 """Нарезка и раскладка: заготовки, метки в имени файла («Космос [ic tokyo]»), имена кусков, запись."""
+
 import os
 import re
 import shutil
@@ -12,15 +13,29 @@ from library.prompts import set_name
 from library.tagging import tag_saved
 
 # Разделы, которых пока нет на диске: папка создаётся при первом сохранении в неё.
-PLANNED = ["08 Градиенты", "09 Эффекты и частицы", "10 Рамки и орнаменты", "11 Аватары",
-           "12 Медали и достижения", "13 Экраны ошибок и пустоты"]
+PLANNED = [
+    "08 Градиенты",
+    "09 Эффекты и частицы",
+    "10 Рамки и орнаменты",
+    "11 Аватары",
+    "12 Медали и достижения",
+    "13 Экраны ошибок и пустоты",
+]
 
 # имя, настройки нарезки, раздел по умолчанию
 PRESETS = [
     ("Лист 4x3 (обводка уже есть)", dict(mode="grid", bg_mode="auto", obv=0, pad=6, size=256, fmt="webp"), "04 Иконки"),
-    ("Наклейки (добавить белую обводку)", dict(mode="grid", bg_mode="auto", obv=8, pad=6, size=256, fmt="webp"), "02 Наклейки"),
+    (
+        "Наклейки (добавить белую обводку)",
+        dict(mode="grid", bg_mode="auto", obv=8, pad=6, size=256, fmt="webp"),
+        "02 Наклейки",
+    ),
     ("Иконки (автопоиск рисунков)", dict(mode="auto", bg_mode="auto", obv=0, pad=6, size=256, fmt="webp"), "04 Иконки"),
-    ("Частицы на чёрном фоне", dict(mode="auto", bg_mode="keep", obv=0, pad=6, size=256, fmt="webp"), "09 Эффекты и частицы"),
+    (
+        "Частицы на чёрном фоне",
+        dict(mode="auto", bg_mode="keep", obv=0, pad=6, size=256, fmt="webp"),
+        "09 Эффекты и частицы",
+    ),
     ("Фон или иллюстрация целиком", dict(mode="whole", bg_mode="keep", obv=0, pad=0, size=1920, fmt="webp"), "01 Фоны"),
     ("Логотип в ICO", dict(mode="whole", bg_mode="keep", obv=0, pad=0, size=0, fmt="ico"), "05 Логотипы"),
 ]
@@ -29,7 +44,7 @@ PRESETS = [
 def process(path, o):
     """Исходник + настройки -> (лист, готовые картинки, рамки на листе)."""
     im = K.load(path)
-    rec = o.get("recipe")                   # правка кусков: рецепт из редактора (убрать фон, обводка...)
+    rec = o.get("recipe")  # правка кусков: рецепт из редактора (убрать фон, обводка...)
     if o["mode"] == "whole":
         out = {"remove": K.remove_bg, "ai": neural.remove_bg_ai}.get(o["bg_mode"], lambda a: a)(im)
         if rec:
@@ -38,16 +53,20 @@ def process(path, o):
             k = o["size"] / max(out.size)
             out = out.resize((round(out.width * k), round(out.height * k)), Image.LANCZOS)
         return im, [out], []
-    if o["mode"] == "cells":                # несколько цельных картинок сеткой (фоны листом)
+    if o["mode"] == "cells":  # несколько цельных картинок сеткой (фоны листом)
         pieces, boxes = K.cells(im, o["cols"], o["rows"], o.get("boxes"))
         if rec:
             pieces = [K.apply_edits(p, rec.get("ops", []), rec.get("adj")) for p in pieces]
         return im, pieces, boxes
     grid = (o["cols"], o["rows"]) if o["mode"] == "grid" else None
     pieces, boxes = K.cut(im, grid, o["size"], o["bg_mode"], o["obv"], o["pad"] / 100, boxes=o.get("boxes"))
-    if rec:                                 # обводка и тень расширяют кусок - снова под нужную сторону
-        pieces = [K.resize(K.apply_edits(p, rec.get("ops", []), rec.get("adj")), o["size"]) if o["size"]
-                  else K.apply_edits(p, rec.get("ops", []), rec.get("adj")) for p in pieces]
+    if rec:  # обводка и тень расширяют кусок - снова под нужную сторону
+        pieces = [
+            K.resize(K.apply_edits(p, rec.get("ops", []), rec.get("adj")), o["size"])
+            if o["size"]
+            else K.apply_edits(p, rec.get("ops", []), rec.get("adj"))
+            for p in pieces
+        ]
     return im, pieces, boxes
 
 
@@ -84,16 +103,41 @@ ROUTES = {
     "aa": ("11 Аватары/{pal}", whole(512)),
     "fx": ("09 Эффекты и частицы/{pal}", dict(GRID, rows=4)),
     "fr": ("10 Рамки и орнаменты/{pal}", whole(1920)),
-    "tx": ("02 Наклейки/{set}/{pal}", GRID),                    # наклейки с надписью и ярлыки
+    "tx": ("02 Наклейки/{set}/{pal}", GRID),  # наклейки с надписью и ярлыки
     "sh": ("06 Иллюстрации/Схемы", whole(1600)),
-    "ds": ("01 Фоны/Ночные сцены/{pal}", dict(whole(1920), mode="cells", cols=2, rows=2)),   # фоны листом 2x2
+    "ds": ("01 Фоны/Ночные сцены/{pal}", dict(whole(1920), mode="cells", cols=2, rows=2)),  # фоны листом 2x2
     "ls": ("01 Фоны/Светлые/{pal}", dict(whole(1920), mode="cells", cols=2, rows=2)),
-    "lg": ("05 Логотипы", dict(GRID, cols=3, rows=2, size=512, fmt="png")),                # логотипы листом 3x2
+    "lg": ("05 Логотипы", dict(GRID, cols=3, rows=2, size=512, fmt="png")),  # логотипы листом 3x2
     "gs": ("08 Градиенты/{pal}", dict(whole(1920), mode="cells", cols=2, rows=2)),
     "lo": ("05 Логотипы", whole(0, "ico")),
     "co": ("06 Иллюстрации/Обложки", whole(1920)),
 }
-STOP = set(["a", "an", "the", "of", "with", "and", "in", "on", "at", "to", "for", "from", "by", "under", "over", "near", "into", "its", "is", "no", "very", "that"])
+STOP = set(
+    [
+        "a",
+        "an",
+        "the",
+        "of",
+        "with",
+        "and",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "from",
+        "by",
+        "under",
+        "over",
+        "near",
+        "into",
+        "its",
+        "is",
+        "no",
+        "very",
+        "that",
+    ]
+)
 _prompts = {"mt": None, "pals": {}, "sets": {}}
 
 
@@ -114,15 +158,41 @@ def prompt_data():
             text = fh.read()
         pals = dict(re.findall(r'^\s*\["(\w+)","([^"]+)","', text, re.M))
         sets = {}
-        for m in re.finditer(r'\["([^"]+)",\s*(?:as\()?(sheet|zoo|poses|empties|scenes|captions|labels|backs|logos)\((\[\[.*?\]\]|\[.*?\])(?:,\s*\[(.*?)\])?',
-                             text, re.S):
+        for m in re.finditer(
+            r'\["([^"]+)",\s*(?:as\()?(sheet|zoo|poses|empties|scenes|captions|labels|backs|logos)\((\[\[.*?\]\]|\[.*?\])(?:,\s*\[(.*?)\])?',
+            text,
+            re.S,
+        ):
             title, fn, a, b = m.groups()
-            named = fn in ("poses", "empties", "scenes", "captions", "labels", "backs", "logos")        # у этих имена кусков заданы вторым списком
+            named = fn in (
+                "poses",
+                "empties",
+                "scenes",
+                "captions",
+                "labels",
+                "backs",
+                "logos",
+            )  # у этих имена кусков заданы вторым списком
             items = re.findall(r'"([^"]*)"', b if named and b else a)
             names = items if named else [js_slug(x) for x in items]
             key = set_name(title)
             sets[key] = names
-            sets[({"sheet": "ic", "zoo": "st", "poses": "po", "empties": "es", "scenes": "so", "captions": "tx", "labels": "tx", "backs": "ds", "logos": "lg"}[fn], key)] = names
+            sets[
+                (
+                    {
+                        "sheet": "ic",
+                        "zoo": "st",
+                        "poses": "po",
+                        "empties": "es",
+                        "scenes": "so",
+                        "captions": "tx",
+                        "labels": "tx",
+                        "backs": "ds",
+                        "logos": "lg",
+                    }[fn],
+                    key,
+                )
+            ] = names
         _prompts.update(mt=mt, pals=pals, sets=sets)
     return _prompts["pals"], _prompts["sets"]
 
@@ -159,7 +229,7 @@ def default_names(path, n, text=""):
             else:
                 stem = m.group(1)
     if not text and stem.count(",") == n - 1 and n > 1:
-        text = stem             # лист назван списком имён (кнопка «Имена» в Prompts.html) - берём их
+        text = stem  # лист назван списком имён (кнопка «Имена» в Prompts.html) - берём их
     listed = [clean_name(x) for x in text.split(",")] if "," in text else []
     prefix = clean_name(text) if text and not listed else stem
     out = []
@@ -171,7 +241,7 @@ def default_names(path, n, text=""):
     return out
 
 
-SQUEEZE = dict(q=0, target=0.99, kind="auto")     # сжатие при раскладке: качество на глаз
+SQUEEZE = dict(q=0, target=0.99, kind="auto")  # сжатие при раскладке: качество на глаз
 
 
 def enlarge(im, side):
@@ -189,10 +259,15 @@ def store(path, o, pieces, names, dest, squeeze=False):
     """Пишет картинки в раздел. Нетронутый файл нужного формата копируется без пережатия.
     squeeze - сразу сжать с подбором качества (по ядрам), чтобы раздел «Тяжёлые» не копился."""
     os.makedirs(dest, exist_ok=True)
-    if o["mode"] == "cells":                # с листа 2x2 каждый фон вчетверо меньше - увеличить при записи
+    if o["mode"] == "cells":  # с листа 2x2 каждый фон вчетверо меньше - увеличить при записи
         pieces = [enlarge(p, o.get("size", 0)) for p in pieces]
-    same = (o["mode"] == "whole" and o["bg_mode"] in ("auto", "keep") and len(pieces) == 1 and not o.get("recipe")
-            and os.path.splitext(path)[1].lower() == "." + o["fmt"])
+    same = (
+        o["mode"] == "whole"
+        and o["bg_mode"] in ("auto", "keep")
+        and len(pieces) == 1
+        and not o.get("recipe")
+        and os.path.splitext(path)[1].lower() == "." + o["fmt"]
+    )
     if same:
         same = K.size_of(path) == pieces[0].size
     packed = [None] * len(pieces)
@@ -200,9 +275,9 @@ def store(path, o, pieces, names, dest, squeeze=False):
         try:
             packed = [d for d, _i in procs().map(K.job_image, pieces, [dict(SQUEEZE, fmt=o["fmt"])] * len(pieces))]
         except Exception:
-            packed = [None] * len(pieces)        # не вышло по ядрам - сохраним как обычно
+            packed = [None] * len(pieces)  # не вышло по ядрам - сохраним как обычно
     saved = []
-    names = list(names) + [""] * (len(pieces) - len(names))       # имён меньше - куски не теряются
+    names = list(names) + [""] * (len(pieces) - len(names))  # имён меньше - куски не теряются
     try:
         for im, name, data in zip(pieces, names, packed):
             p = unique(os.path.join(dest, (clean_name(name) or "без имени") + "." + o["fmt"]))
@@ -215,7 +290,7 @@ def store(path, o, pieces, names, dest, squeeze=False):
                 K.save(im, p, o["fmt"])
             saved.append(p)
     except Exception as e:
-        e.saved = saved                 # что успело записаться - чтобы Ctrl+Z мог это убрать
+        e.saved = saved  # что успело записаться - чтобы Ctrl+Z мог это убрать
         raise
     return saved
 
@@ -239,7 +314,7 @@ def sort_files(items, sigs, keep_src, squeeze, say=None, tagger=None):
                 if sigs.find(pc):
                     continue
                 sg = K.signature(pc)
-                if any(K.same_sig(sg, x) for x in seen):        # тот же рисунок на соседнем листе пачки
+                if any(K.same_sig(sg, x) for x in seen):  # тот же рисунок на соседнем листе пачки
                     continue
                 seen.append(sg)
                 keep.append(i)

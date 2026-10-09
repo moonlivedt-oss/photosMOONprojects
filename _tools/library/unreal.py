@@ -165,8 +165,24 @@ THEMES = {
         "acg_per": 10,
     },
     "Дом - ткани и кожа": {
-        "tex": {"fabric", "leather", "cotton", "denim", "wool", "velvet", "fleece", "knitted", "satin", "suede",
-                "corduroy", "jacquard", "crepe", "hessian", "woven", "stretchy"},
+        "tex": {
+            "fabric",
+            "leather",
+            "cotton",
+            "denim",
+            "wool",
+            "velvet",
+            "fleece",
+            "knitted",
+            "satin",
+            "suede",
+            "corduroy",
+            "jacquard",
+            "crepe",
+            "hessian",
+            "woven",
+            "stretchy",
+        },
         "acg": ["Fabric", "Leather", "Wicker"],
         "acg_per": 16,
     },
@@ -423,7 +439,7 @@ def quaternius_colors(a):
     for pack in QUATERNIUS:
         prefix = f"quaternius-{pack}-"
         if a.get("id", "").startswith(prefix):
-            base = a["id"][len(prefix):]
+            base = a["id"][len(prefix) :]
             mtl = quaternius_mtl(pack, base)
             if not mtl:
                 return 0
@@ -652,8 +668,12 @@ HOME_SECTIONS = (
 HOME_OTHER = "Мелочи"
 # дописано после Quaternius: у него свои имена (Bookshelf, Houseplant, Curtains, Column)
 for _sec, _keys in HOME_SECTIONS:
-    _keys |= {"Шкафы и полки": {"bookshelf"}, "Декор": {"curtains", "fireplace"}, "Растения": {"houseplant"},
-              "Стены, двери, окна": {"column", "columns"}}.get(_sec, set())
+    _keys |= {
+        "Шкафы и полки": {"bookshelf"},
+        "Декор": {"curtains", "fireplace"},
+        "Растения": {"houseplant"},
+        "Стены, двери, окна": {"column", "columns"},
+    }.get(_sec, set())
 HOME_ORDER = (
     "Кровати",
     "Диваны",

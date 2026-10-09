@@ -89,7 +89,7 @@ class TestFbxColors(unittest.TestCase):
         out = bytearray(data[:27])
         for n in top:
             F._write_node(out, n, False, 0)
-        self.assertEqual(bytes(out), data[:len(out)])
+        self.assertEqual(bytes(out), data[: len(out)])
 
 
 if __name__ == "__main__":

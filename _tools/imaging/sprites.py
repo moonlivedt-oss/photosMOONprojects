@@ -1,4 +1,5 @@
 """Атласы, svg-спрайты, наборы значков программы и листы превью."""
+
 import json
 import os
 import re
@@ -43,8 +44,10 @@ def atlas(paths, cell=128, pad=2, cols=0):
 
 def atlas_files(sheet_name, frames, size):
     """JSON (как у TexturePacker: frames/meta) и CSS (класс на кадр) для атласа."""
-    js = {"frames": {k: {"frame": {"x": x, "y": y, "w": w, "h": h}} for k, (x, y, w, h) in frames.items()},
-          "meta": {"image": sheet_name, "size": {"w": size[0], "h": size[1]}, "scale": 1}}
+    js = {
+        "frames": {k: {"frame": {"x": x, "y": y, "w": w, "h": h}} for k, (x, y, w, h) in frames.items()},
+        "meta": {"image": sheet_name, "size": {"w": size[0], "h": size[1]}, "scale": 1},
+    }
     css = [f".sprite{{display:inline-block;background:url('{sheet_name}') no-repeat}}"]
     for k, (x, y, w, h) in frames.items():
         css.append(".sprite-%s{width:%dpx;height:%dpx;background-position:-%dpx -%dpx}" % (css_id(k), w, h, x, y))
@@ -95,7 +98,7 @@ def icon_set(im, folder, stem):
         ("favicon-32.png", "png", 32),
     ):
         p = os.path.join(folder, name)
-        if os.path.exists(p):              # не затирать: у нескольких картинок свой favicon
+        if os.path.exists(p):  # не затирать: у нескольких картинок свой favicon
             p = os.path.join(folder, stem + "-" + name)
         save(
             im.resize((side, side), Image.LANCZOS) if fmt == "png" else im,
@@ -124,9 +127,7 @@ def contact_sheet(paths, cell=220, cols=0, dark=True):
     pad, cap = 14, 26
     bg = (21, 21, 28, 255) if dark else (244, 243, 248, 255)
     fg = (232, 230, 240) if dark else (29, 28, 36)
-    sheet = Image.new(
-        "RGBA", (cols * (cell + pad) + pad, rows * (cell + cap + pad) + pad), bg
-    )
+    sheet = Image.new("RGBA", (cols * (cell + pad) + pad, rows * (cell + cap + pad) + pad), bg)
     d = ImageDraw.Draw(sheet)
     font = _font(14)
     for i, p in enumerate(paths):
@@ -139,9 +140,7 @@ def contact_sheet(paths, cell=220, cols=0, dark=True):
         try:
             im = load(p)
             im.thumbnail((cell - 16, cell - 16), Image.LANCZOS)
-            sheet.alpha_composite(
-                im, (x + (cell - im.width) // 2, y + (cell - im.height) // 2)
-            )
+            sheet.alpha_composite(im, (x + (cell - im.width) // 2, y + (cell - im.height) // 2))
         except Exception:
             pass
         name = os.path.splitext(os.path.basename(p))[0]

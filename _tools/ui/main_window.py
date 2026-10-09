@@ -1,4 +1,5 @@
 """Главное окно: вкладки, строка состояния, отмена (Ctrl+Z), приём файлов, папка генератора."""
+
 import os
 import shutil
 import sys
@@ -76,8 +77,8 @@ class Window(QMainWindow):
         # Ctrl+Z: [(подпись, шаги, id в журнале)]. Журнал общий с ИИ-помощником и переживает перезапуск.
         last = list(reversed(journal.entries(20, undone=False)))
         self.history = [(e["text"], e["steps"], e["id"]) for e in last]
-        self.who = {e["id"]: e["who"] for e in last if e["who"] != journal.WINDOW}     # id -> кто сделал, если не окно
-        self.jseen = journal.last_id()      # действия помощника новее этого - ещё не показаны
+        self.who = {e["id"]: e["who"] for e in last if e["who"] != journal.WINDOW}  # id -> кто сделал, если не окно
+        self.jseen = journal.last_id()  # действия помощника новее этого - ещё не показаны
         self.sigs = SigIndex()
         self.sem = SemIndex()
         self.tagger = Tagger(self.sem)
@@ -105,8 +106,10 @@ class Window(QMainWindow):
         corner = QWidget()
         ch = QHBoxLayout(corner)
         ch.setContentsMargins(0, 0, 8, 4)
-        for text, icon, fn, tip in (("Галерея", "Компас", self.open_gallery, "Вся библиотека в браузере"),
-                                    ("Промпты", "Заметка", self.open_prompts, "Промпты для генерации листов")):
+        for text, icon, fn, tip in (
+            ("Галерея", "Компас", self.open_gallery, "Вся библиотека в браузере"),
+            ("Промпты", "Заметка", self.open_prompts, "Промпты для генерации листов"),
+        ):
             b = QPushButton(lib_icon(icon), text, objectName="ghost")
             b.setToolTip(tip)
             b.clicked.connect(fn)
@@ -114,9 +117,12 @@ class Window(QMainWindow):
         # редкие проверки - одной кнопкой с меню, чтобы верхняя строка не была забита
         tools = QPushButton(lib_icon("toolbox"), "Инструменты", objectName="ghost")
         tm = QMenu(self)
-        for text, icon, fn in (("Найти дубли", "Лупа", self.dupes), ("Доктор библиотеки", "first-aid-kit", self.doctor),
-                               ("Чего нет в наборах", "checklist", self.missing),
-                               ("Вес разделов (Ctrl+I)", "zip-archive", self.show_weight)):
+        for text, icon, fn in (
+            ("Найти дубли", "Лупа", self.dupes),
+            ("Доктор библиотеки", "first-aid-kit", self.doctor),
+            ("Чего нет в наборах", "checklist", self.missing),
+            ("Вес разделов (Ctrl+I)", "zip-archive", self.show_weight),
+        ):
             tm.addAction(lib_icon(icon), text, fn)
         tm.addSeparator()
         tm.addAction(lib_icon("color-palette"), "Палитра из картинки...", lambda: self.lib.palette_from())
@@ -144,7 +150,7 @@ class Window(QMainWindow):
         self.undo_btn = QPushButton("Отменить", objectName="undo")
         self.undo_btn.clicked.connect(lambda: self.undo())
         self.undo_btn.hide()
-        self.redo = []                      # отменённое: [(подпись, шаги, сделанные переносы)] - для Ctrl+Y
+        self.redo = []  # отменённое: [(подпись, шаги, сделанные переносы)] - для Ctrl+Y
         self.hist_btn = QPushButton("История", objectName="flat")
         self.hist_menu = QMenu(self)
         self.hist_menu.aboutToShow.connect(self.history_menu)
@@ -179,24 +185,32 @@ class Window(QMainWindow):
         self.inbox_timer.timeout.connect(self.inbox.reload)
         self.watch = QFileSystemWatcher([INBOX], self)
         self.watch.directoryChanged.connect(lambda _p: self.inbox_timer.start())
-        self.saved_cfg = cfg_text(self.cfg)                         # настройки пишутся сами, если поменялись:
-        self.autosave = QTimer(self, interval=5000)                 # избранное не теряется, если окно упадёт
+        self.saved_cfg = cfg_text(self.cfg)  # настройки пишутся сами, если поменялись:
+        self.autosave = QTimer(self, interval=5000)  # избранное не теряется, если окно упадёт
         self.autosave.timeout.connect(self.save_settings)
         self.autosave.start()
-        self.gal = QTimer(self, singleShot=True, interval=1500)     # галерею и отпечатки пересобираем один раз на пачку правок
+        self.gal = QTimer(
+            self, singleShot=True, interval=1500
+        )  # галерею и отпечатки пересобираем один раз на пачку правок
         self.gal.timeout.connect(self.rebuild)
-        self.sizes = {}                                             # размеры файлов генератора на прошлом опросе
+        self.sizes = {}  # размеры файлов генератора на прошлом опросе
         self.poll = QTimer(self, interval=2000)
         self.poll.timeout.connect(self.check_gen)
         self.poll.timeout.connect(self.check_journal)
         self.poll.start()
 
-        for keys, fn in (("Ctrl+Z", lambda: self.undo()), ("Ctrl+Y", self.redo_last),
-                         ("Ctrl+Shift+Z", self.redo_last), ("Ctrl+V", self.paste), ("F1", self.show_help),
-                         ("Ctrl+1", lambda: self.tabs.setCurrentIndex(0)),
-                         ("Ctrl+2", lambda: self.tabs.setCurrentIndex(1)),
-                         ("Ctrl+3", lambda: self.tabs.setCurrentIndex(2)), ("F9", self.toggle_live),
-                         ("Ctrl+I", self.show_weight)):
+        for keys, fn in (
+            ("Ctrl+Z", lambda: self.undo()),
+            ("Ctrl+Y", self.redo_last),
+            ("Ctrl+Shift+Z", self.redo_last),
+            ("Ctrl+V", self.paste),
+            ("F1", self.show_help),
+            ("Ctrl+1", lambda: self.tabs.setCurrentIndex(0)),
+            ("Ctrl+2", lambda: self.tabs.setCurrentIndex(1)),
+            ("Ctrl+3", lambda: self.tabs.setCurrentIndex(2)),
+            ("F9", self.toggle_live),
+            ("Ctrl+I", self.show_weight),
+        ):
             key(keys, self, fn, local=False)
 
         self.show_gen()
@@ -227,7 +241,7 @@ class Window(QMainWindow):
             fresh = undo and jid and time.monotonic() - t < 3 and self.history and self.history[-1][2] == jid
             jid = jid if fresh else None
             act = ("Отменить", lambda: self.undo(ids={jid})) if jid else None
-            self.toast.say(text, 6000 if act else 3200, act)    # пузырь внизу; строка состояния - пока окно не показано
+            self.toast.say(text, 6000 if act else 3200, act)  # пузырь внизу; строка состояния - пока окно не показано
         else:
             self.statusBar().showMessage(text, 8000)
 
@@ -255,7 +269,7 @@ class Window(QMainWindow):
         """Галерея пересобирается в фоне: она открывает все картинки библиотеки, и в главном потоке
         окно замирало на пару секунд (Windows успевала показать белое «Не отвечает»)."""
         if getattr(self, "gal_busy", False):
-            self.gal.start()                    # прошлая сборка ещё идёт - попробуем позже
+            self.gal.start()  # прошлая сборка ещё идёт - попробуем позже
         else:
             self.gal_busy = True
             bg(K.build_gallery, lambda _r: setattr(self, "gal_busy", False))
@@ -265,6 +279,7 @@ class Window(QMainWindow):
     def update_stats(self):
         """Число и вес картинок - в фоне: обход 4000+ файлов в главном потоке подвешивал окно
         после каждого сохранения."""
+
         def work():
             n = size = hn = hsize = 0
             for f in K.images_in(LIB):
@@ -305,7 +320,7 @@ class Window(QMainWindow):
         self.jseen = max(self.jseen, jid or 0)
         self.last_push = (jid, time.monotonic())
         self.history = (self.history + [(text, steps, jid)])[-20:]
-        self.drop_redo()                    # новое действие - вернуть отменённое уже нельзя
+        self.drop_redo()  # новое действие - вернуть отменённое уже нельзя
         self.update_undo()
 
     def update_undo(self):
@@ -324,8 +339,10 @@ class Window(QMainWindow):
             m.addSeparator()
         for i, (text, _s, jid) in enumerate(reversed(self.history)):
             who = self.who.get(jid)
-            m.addAction(("Отменить: " if i == 0 else "Отменить до: ") + (f"[{who}] " if who else "") + text,
-                        lambda n=i + 1: self.undo(n))
+            m.addAction(
+                ("Отменить: " if i == 0 else "Отменить до: ") + (f"[{who}] " if who else "") + text,
+                lambda n=i + 1: self.undo(n),
+            )
         if not self.history and not self.redo:
             m.addAction("Действий пока нет").setEnabled(False)
 
@@ -350,8 +367,9 @@ class Window(QMainWindow):
             self.redo.append((text, steps, done, jid))
             texts.append(text)
         self.after_change()
-        self.say("Отменено: " + "; ".join(texts) + ("  (не получилось: %d)" % bad if bad else "")
-                 + "   Ctrl+Y - вернуть")
+        self.say(
+            "Отменено: " + "; ".join(texts) + ("  (не получилось: %d)" % bad if bad else "") + "   Ctrl+Y - вернуть"
+        )
 
     def undo_steps(self, steps):
         """Откатить шаги. Новые файлы уезжают в _sources/_undone (а не в корзину), чтобы Ctrl+Y
@@ -360,7 +378,7 @@ class Window(QMainWindow):
 
         def back_in_inbox(_src, dst):
             if os.path.dirname(dst) == INBOX:
-                self.inbox.no_auto.add(dst)         # вернулся во входящие - сам не раскладывать
+                self.inbox.no_auto.add(dst)  # вернулся во входящие - сам не раскладывать
 
         return journal.undo_steps(steps, LIB, PARK, back_in_inbox)
 
@@ -396,7 +414,7 @@ class Window(QMainWindow):
         """Избранное, метки и заметка едут вместе с файлом."""
         try:
             db.moved(os.path.relpath(src, LIB), os.path.relpath(dst, LIB))
-        except ValueError:                  # путь на другом диске - в базе его быть не может
+        except ValueError:  # путь на другом диске - в базе его быть не может
             pass
         except Exception as e:
             log_error(f"метки не переехали: {e}")
@@ -409,7 +427,7 @@ class Window(QMainWindow):
         except Exception as e:
             log_error(f"журнал: {e}")
             return
-        if gone:                            # помощник сам отменил своё - из истории окна убрать
+        if gone:  # помощник сам отменил своё - из истории окна убрать
             self.history = [h for h in self.history if h[2] not in gone]
         theirs = [e for e in reversed(new) if e["who"] != journal.WINDOW and not e["undone"]]
         if new:
@@ -423,7 +441,11 @@ class Window(QMainWindow):
         if theirs:
             last = theirs[-1]
             more = "  (и ещё %d)" % (len(theirs) - 1) if len(theirs) > 1 else ""
-            self.toast.say(f"{last['who']}: {last['text']}{more}", 6000, ("Отменить", lambda ids={e["id"] for e in theirs}: self.undo(ids=ids)))
+            self.toast.say(
+                f"{last['who']}: {last['text']}{more}",
+                6000,
+                ("Отменить", lambda ids={e["id"] for e in theirs}: self.undo(ids=ids)),
+            )
 
     # --- приём файлов
     def take(self, files):
@@ -433,7 +455,7 @@ class Window(QMainWindow):
                 try:
                     shutil.copy2(f, unique(os.path.join(INBOX, os.path.basename(f))))
                     n += 1
-                except OSError as e:            # файл занят генератором или нет прав - остальные всё равно берём
+                except OSError as e:  # файл занят генератором или нет прав - остальные всё равно берём
                     bad.append(f"{os.path.basename(f)}: {e.strerror or e}")
         if n:
             self.tabs.setCurrentIndex(0)
@@ -459,7 +481,7 @@ class Window(QMainWindow):
         self.say("В буфере нет картинки")
 
     def dragEnterEvent(self, e):
-        if e.mimeData().hasUrls() and e.source() is None:      # свои плитки обратно во входящие не принимаем
+        if e.mimeData().hasUrls() and e.source() is None:  # свои плитки обратно во входящие не принимаем
             e.acceptProposedAction()
             self.overlay.appear(True)
 
@@ -493,18 +515,24 @@ class Window(QMainWindow):
         d = self.cfg.get("gen_dir")
         self.gen_btn.setVisible(bool(d))  # кнопка видна, только когда слежка включена; выбрать - в «Инструментах»
         self.gen_btn.setText("Генератор: слежу" if d else "Папка генератора...")
-        self.gen_btn.setToolTip((f"Слежу за папкой: {d}\nНовые картинки сами попадают во входящие.\n"
-                                 "Щелчок - выбрать другую или отключить") if d else
-                                "Выберите папку, куда генератор сохраняет картинки - новые будут сами попадать во входящие")
-        self.inbox.gen_hint.setText((f"Слежу за папкой генератора: {d}") if d else
-                                    "Можно указать папку генератора (кнопка вверху) - новые картинки будут приходить сами")
+        self.gen_btn.setToolTip(
+            (f"Слежу за папкой: {d}\nНовые картинки сами попадают во входящие.\nЩелчок - выбрать другую или отключить")
+            if d
+            else "Выберите папку, куда генератор сохраняет картинки - новые будут сами попадать во входящие"
+        )
+        self.inbox.gen_hint.setText(
+            (f"Слежу за папкой генератора: {d}")
+            if d
+            else "Можно указать папку генератора (кнопка вверху) - новые картинки будут приходить сами"
+        )
         self.say("Слежу за папкой генератора: " + d if d else "Папка генератора не задана")
 
     def pick_gen(self):
-        d = QFileDialog.getExistingDirectory(self, "Папка, куда генератор сохраняет картинки (Отмена - не следить)",
-                                             self.cfg.get("gen_dir", ""))
+        d = QFileDialog.getExistingDirectory(
+            self, "Папка, куда генератор сохраняет картинки (Отмена - не следить)", self.cfg.get("gen_dir", "")
+        )
         self.cfg["gen_dir"] = os.path.normpath(d) if d else ""
-        self.cfg["gen_since"] = time.time()         # берём только то, что появится после выбора
+        self.cfg["gen_since"] = time.time()  # берём только то, что появится после выбора
         self.sizes = {}
         self.show_gen()
 
@@ -515,7 +543,7 @@ class Window(QMainWindow):
         since, newest, ready, seen = self.cfg.get("gen_since", time.time()), 0, [], {}
         try:
             names = os.listdir(d)
-        except OSError:                             # сетевая папка отвалилась - попробуем в следующий раз
+        except OSError:  # сетевая папка отвалилась - попробуем в следующий раз
             return
         for f in names:
             p = os.path.join(d, f)
@@ -527,15 +555,15 @@ class Window(QMainWindow):
                 continue
             if st.st_mtime <= since or not os.path.isfile(p):
                 continue
-            if self.sizes.get(p) == st.st_size and st.st_size:      # размер не растёт - файл дописан
+            if self.sizes.get(p) == st.st_size and st.st_size:  # размер не растёт - файл дописан
                 ready.append(p)
                 newest = max(newest, st.st_mtime)
             seen[p] = st.st_size
-        self.sizes = seen                           # старые записи не копятся
+        self.sizes = seen  # старые записи не копятся
         if ready:
             self.cfg["gen_since"] = newest
             if self.take(ready):
-                QApplication.alert(self)            # мигнуть на панели задач, если окно в фоне
+                QApplication.alert(self)  # мигнуть на панели задач, если окно в фоне
 
     # --- прочее
     def doctor(self):
@@ -593,7 +621,7 @@ class Window(QMainWindow):
         self.cfg["split_lib"] = self.lib.split.sizes()
         self.cfg["archive"] = self.inbox.keep.isChecked()
         self.lib.remember_section()
-        self.drop_redo()                    # после закрытия вернуть отменённое нельзя
+        self.drop_redo()  # после закрытия вернуть отменённое нельзя
         try:
             save_cfg(self.cfg)
         except OSError as ex:
@@ -619,6 +647,7 @@ def take_old_favs(cfg):
 
 def install_guard(app):
     """Без sys.excepthook PyQt6 роняет процесс на исключении в слоте - пишем в журнал и пузырём."""
+
     def hook(kind, err, tb):
         log_error("".join(traceback.format_exception(kind, err, tb)))
         try:
@@ -641,17 +670,22 @@ def main():
     cfg = load_cfg()  # тема и акцент - до первой отрисовки
     theme.apply(cfg.get("theme", "dark"), cfg.get("accent", "lavender"))
     app.setStyleSheet(theme.stylesheet())
-    for fx in (Qt.UIEffect.UI_AnimateMenu, Qt.UIEffect.UI_FadeMenu, Qt.UIEffect.UI_AnimateCombo,
-               Qt.UIEffect.UI_AnimateTooltip, Qt.UIEffect.UI_FadeTooltip):
+    for fx in (
+        Qt.UIEffect.UI_AnimateMenu,
+        Qt.UIEffect.UI_FadeMenu,
+        Qt.UIEffect.UI_AnimateCombo,
+        Qt.UIEffect.UI_AnimateTooltip,
+        Qt.UIEffect.UI_FadeTooltip,
+    ):
         app.setEffectEnabled(fx, True)
     Motion(app)
     w = Window()
     fade_in_window(w)
     w.show()
     code = app.exec()
-    finish_bg()                     # фоновые потоки - доделать или бросить
+    finish_bg()  # фоновые потоки - доделать или бросить
     db.close()
-    forget_pixmaps()                # затем картинки и окно, и только потом приложение
+    forget_pixmaps()  # затем картинки и окно, и только потом приложение
     sip.delete(w)
     del w
     sys.exit(code)
