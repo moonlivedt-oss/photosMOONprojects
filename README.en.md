@@ -10,18 +10,20 @@
 
 4x3 sheet cutting with preview, filing by section and palette, semantic search in Russian and English<br>
 tag and folder suggestions, smart folders, neural background removal and x4 upscaling<br>
-AI assistants (Claude, Cursor) search, view and edit pictures - every change shows up in the window and can be undone
+AI assistants (Claude, Cursor) search, view and edit pictures - every change shows up in the window and can be undone<br>
+an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D viewer
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
 ![version](https://img.shields.io/badge/version-2.3.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/tests-53%20ok-a6e3a1)
-![images](https://img.shields.io/badge/pictures-4160-89b4fa)
+![tests](https://img.shields.io/badge/tests-64%20ok-a6e3a1)
+![images](https://img.shields.io/badge/pictures-4163-89b4fa)
+![unreal](https://img.shields.io/badge/Unreal-CC0%20assets-313244)
 ![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
 ![license](https://img.shields.io/badge/code-MIT-green)
 
-<img src="_docs/screenshots/hero.webp" alt="Library window: section tree on the left, sticker tiles in the middle, a baby dragon preview with colors and a tag suggestion on the right" width="880">
+<img src="_docs/screenshots/hero.webp" alt="Library window: quick access cards and a section tree with colored counts on the left, fairy-tale sticker tiles with a pink section stripe in the middle, a large baby dragon with its colors and a tag suggestion on the right" width="880">
 
 <sub>One folder, PyQt6 window, Pillow and numpy core, semantic search on onnxruntime</sub>
 
@@ -36,11 +38,11 @@ py -3.14 -m pip install PyQt6 pillow numpy onnxruntime
 py -3.14 _tools/get_models.py      # neural models, ~460 MB, once (or by part: clip, bg, upscale)
 ```
 
-Then run **`Library.cmd`** - a window opens with two tabs: "Входящие" (Inbox) and "Библиотека" (Library).
+Then run **`Library.cmd`** - a window opens with three tabs: "Входящие" (Inbox), "Библиотека" (Library) and "Unreal".
 The interface is in Russian.
 
 ```bash
-_tools\run-tests.cmd                            # all tests (53 checks, no window)
+_tools\run-tests.cmd                            # all tests (64 checks, no window)
 py -3.14 _tools/cli.py gallery                  # rebuild Gallery.html - the whole library in a browser
 py -3.14 _tools/cli.py cut sheet.png --grid 4x3  # cut a sheet without the window
 ```
@@ -107,8 +109,45 @@ suggested, and everything is filed into the right section and palette.
 </div>
 
 <div align="center">
-<img src="_docs/screenshots/semantic.webp" alt="Semantic search for a cozy night street with lanterns: 17 night scenes" width="820">
-<br><sub>Semantic search: none of the query words are in the file names</sub>
+<img src="_docs/screenshots/semantic.webp" alt="Semantic search for a cozy night street with lanterns: a strip of five matching Unreal assets on top, 17 night scenes below" width="820">
+<br><sub>Semantic search: none of the query words are in the file names; matching Unreal assets on top</sub>
+</div>
+
+## Unreal Engine assets
+
+<div align="center">
+<img src="_docs/screenshots/unreal.webp" alt="Unreal tab: kind cards and home sections on the left, 43 chairs and armchairs as cards in the middle, the selected chair spinning in a live 3D view on the right" width="820">
+<br><sub>The "Unreal" tab: home models by purpose, live 3D on the right, drag a tile into the Content Browser</sub>
+</div>
+
+The **Unreal** tab (Ctrl+3) keeps 3D assets apart from the pictures, in `_Unreal/<kind>/<theme>/<name>/` (not in git):
+PBR textures (DirectX normal, packed ARM), HDRI skies, FBX models and 12 generated IES light profiles. Assets are
+CC0 from [Poly Haven](https://polyhaven.com), [ambientCG](https://ambientcg.com), [Kenney](https://kenney.nl) and
+[Quaternius](https://quaternius.com). The tab has semantic search, a Poly Haven catalog, collections, filters by
+polycount and color, re-download in 1K/2K/4K and a one-click import script for Unreal (`import_to_unreal.py`:
+texture settings and an `M_<name>` material).
+
+<div align="center">
+<img src="_docs/screenshots/viewer-texture.webp" alt="3D viewer: a mossy brick texture on a lit sphere, each map viewable separately" width="49%">
+<img src="_docs/screenshots/viewer-model.webp" alt="3D viewer: a wooden chair on a floor with a shadow" width="49%">
+<br><sub>3D viewer on Qt Quick 3D: texture on a sphere with every map separately; a model on a floor with a shadow</sub>
+</div>
+
+<div align="center">
+<img src="_docs/screenshots/room.webp" alt="Room draft: carpet floor, concrete walls, a bed, a bench, a table, candelabras and chairs at real scale" width="760">
+<br><sub>Room draft from a collection: real-scale furniture, floor and walls from downloaded textures, HDRI light</sub>
+</div>
+
+## Tools and themes
+
+The "Инструменты" (Tools) menu: duplicates, doctor, missing sets, folder weights, **palette from a picture** (and
+recoloring other pictures into it), **comparing two versions** (slider, difference, SSIM), **SVG tracing** with
+three variants side by side and a **light or dark theme** with five accents.
+
+<div align="center">
+<img src="_docs/screenshots/palette.webp" alt="Palette from a picture: a night lantern market sample and its six colors, twelve forest animals recolored into them" width="49%">
+<img src="_docs/screenshots/light.webp" alt="Light theme: the library with sea creature stickers on a light background" width="49%">
+<br><sub>Palette from a picture; the light theme</sub>
 </div>
 
 ---
@@ -186,8 +225,10 @@ action journal, search, tools for assistants); `_tools/mcp_server.py` - the MCP 
 
 ## Privacy
 
-The window **never goes online**: pictures, tags and semantic search are all computed locally.
-The network is needed once, for `get_models.py` to download the models from Hugging Face.
+Library pictures **never leave the computer**: tags, semantic search and edits are all computed locally.
+The network is used only for downloads: `get_models.py` fetches the models once (Hugging Face, GitHub), and the
+"Unreal" tab fetches assets from Poly Haven, ambientCG, Kenney and Quaternius' public Google Drive folders when you
+press its download buttons.
 The assistant server is local too and sends nothing by itself, but whatever an assistant views or reads
 goes to its model, like any file you show it.
 
