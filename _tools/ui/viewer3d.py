@@ -393,7 +393,10 @@ class Viewer3D(QDialog):
         scroll = QScrollArea()
         scroll.setWidget(panel)
         scroll.setWidgetResizable(True)
-        scroll.setMinimumWidth(320)
+        # не уже самой панели: иначе правый край (повтор, метки) обрезан - гориз. прокрутки нет
+        scroll.setMinimumWidth(
+            max(320, panel.minimumSizeHint().width() + scroll.verticalScrollBar().sizeHint().width())
+        )
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
