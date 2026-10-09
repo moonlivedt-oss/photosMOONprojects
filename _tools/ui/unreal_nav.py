@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QAbstractButton, QButtonGroup, QLabel, QSizePolicy, 
 
 from library import unreal as U
 from ui.common import ROLE, human
-from ui.theme import C
+from ui.theme import C, readable
 from ui.thumbnails import lib_icon, lib_pix
 from ui.widgets import make_tree, tree_item
 
@@ -81,7 +81,7 @@ THEME_ICON = {
 
 
 def kind_color(kind):
-    return KIND_LOOK.get(kind, KIND_LOOK[ALL])[2]
+    return readable(KIND_LOOK.get(kind, KIND_LOOK[ALL])[2])
 
 
 def theme_label(th):
@@ -135,7 +135,7 @@ class KindCard(QAbstractButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = QRectF(self.rect()).adjusted(1, 2, -1, -2)
-        col = QColor(self.color)
+        col = QColor(readable(self.color))  # в светлой теме пастель темнее
         if self.isChecked():
             fill = QColor(col)
             fill.setAlpha(46)

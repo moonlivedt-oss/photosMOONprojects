@@ -47,7 +47,7 @@ import imaging as K
 from library import db
 from library.sorting import PLANNED
 from ui.common import CLOSING, FAV, HEAVY, LIB, PIX, RECENT, ROLE, SETS, SMART, TAG, bg, clean_name
-from ui.theme import C
+from ui.theme import C, readable
 from ui.thumbnails import TileDelegate, lib_icon, lib_pix, remember, thumb_key, tile_image
 
 # ---------------------------------------------------------------- дерево разделов
@@ -118,7 +118,7 @@ def section_color(path):
         top = os.path.relpath(path, LIB).split(os.sep)[0]
     except ValueError:
         return C["acc"]
-    return SECTION_COLORS.get(top[:2], C["acc"])
+    return readable(SECTION_COLORS.get(top[:2], C["acc"]))
 
 
 def fill_tree(tree, planned=True, recent=False):

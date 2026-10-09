@@ -37,7 +37,13 @@ def backdrop(w, h, mode):
         return Image.new("RGBA", (w, h), (0, 0, 0, 255))
     y, x = np.mgrid[0:h, 0:w]
     odd = ((x // 8 + y // 8) % 2)[..., None] == 1
-    a = np.where(odd, np.uint8([36, 36, 49, 255]), np.uint8([27, 27, 38, 255])).astype(np.uint8)
+    # шахматка - в тон теме: в светлой тёмные квадраты под каждой картинкой выглядят дырами
+    c1, c2 = (
+        ([236, 234, 243, 255], [225, 222, 233, 255])
+        if CURRENT["theme"] == "light"
+        else ([36, 36, 49, 255], [27, 27, 38, 255])
+    )
+    a = np.where(odd, np.uint8(c1), np.uint8(c2)).astype(np.uint8)
     return Image.fromarray(a).copy()
 
 
@@ -161,7 +167,8 @@ def remember(key, pm):
 
 def thumb_key(path, side, mode):
     try:
-        return (path, os.path.getmtime(path), side, mode)
+        themed = CURRENT["theme"] if mode and mode not in ("light", "dark") else None  # шахматка зависит от темы
+        return (path, os.path.getmtime(path), side, mode, themed)
     except OSError:
         return None
 

@@ -62,6 +62,11 @@ def _mix(a, b, t):
     return "#%02x%02x%02x" % tuple(round(x + (y - x) * t) for x, y in zip(a, b))
 
 
+def readable(color):
+    """Пастельный цвет-метку (раздел, вид ассета) - читаемым на фоне темы: в светлой он темнее."""
+    return _mix(color, "#1e1c28", 0.42) if CURRENT["theme"] == "light" else color
+
+
 def apply(theme="dark", accent="lavender"):
     """Сменить тему и акцент (C - на месте: модули, импортировавшие C, видят новые цвета)."""
     global SOFT
