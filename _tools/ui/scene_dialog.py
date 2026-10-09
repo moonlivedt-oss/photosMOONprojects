@@ -113,9 +113,12 @@ class SceneDialog(QDialog):
         self.room_btn.clicked.connect(self.room)
         self.imp_btn = QPushButton(lib_icon("export"), "Импорт в Unreal...")
         self.imp_btn.clicked.connect(lambda: self.tab.import_assets(self.picked()))
+        self.pack_btn = QPushButton(lib_icon("zip-archive"), "Пакет...")
+        self.pack_btn.setToolTip("Файлы, скрипт импорта, авторы и лицензии - одной папкой или zip")
+        self.pack_btn.clicked.connect(lambda: self.tab.pack_assets(self.picked(), self.q.text().strip()[:60]))
         foot = QHBoxLayout()
         foot.addStretch(1)
-        for b in (self.save_btn, self.room_btn, self.imp_btn):
+        for b in (self.save_btn, self.room_btn, self.imp_btn, self.pack_btn):
             b.setEnabled(False)
             foot.addWidget(b)
         v = QVBoxLayout(self)
@@ -171,7 +174,7 @@ class SceneDialog(QDialog):
         )
         if not p["slots"]:
             self.info.setText("Для этой комнаты нет скачанных моделей - «Скачать ещё...», темы «Дом - ...»")
-        for b in (self.save_btn, self.room_btn, self.imp_btn):
+        for b in (self.save_btn, self.room_btn, self.imp_btn, self.pack_btn):
             b.setEnabled(bool(self.rows))
 
     def picked(self):

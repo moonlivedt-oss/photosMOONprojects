@@ -182,6 +182,49 @@ class TestImport(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestPack(unittest.TestCase):
+    def test_pack_folder_and_zip(self):
+        import json
+        import zipfile
+
+        from library import unreal_pack
+
+        tmp = tempfile.mkdtemp()
+        try:
+            d = os.path.join(tmp, "src", "oak")
+            os.makedirs(d)
+            open(os.path.join(d, "oak_diff_2k.jpg"), "wb").close()
+            a = {
+                "id": "oak",
+                "name": "Oak Floor",
+                "kind": "tex",
+                "dir": d,
+                "main": ["oak_diff_2k.jpg"],
+                "source": "Poly Haven",
+                "authors": ["Rico Cilliers"],
+                "url": "https://polyhaven.com/a/oak",
+                "license": "CC0 1.0",
+            }
+            folder = unreal_pack.pack([a], os.path.join(tmp, "out"), "Моя спальня")
+            names = set(os.listdir(folder))
+            self.assertTrue({"CREDITS.md", "manifest.json", "import_to_unreal.py", "Oak_Floor"} <= names)
+            with open(os.path.join(folder, "CREDITS.md"), encoding="utf-8") as fh:
+                credits = fh.read()
+            self.assertIn("Rico Cilliers", credits)
+            self.assertIn("CC0", credits)
+            with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as fh:
+                self.assertEqual(json.load(fh)["assets"][0]["id"], "oak")
+            arc = unreal_pack.pack([a], os.path.join(tmp, "out2"), "Моя спальня", zip_it=True)
+            with zipfile.ZipFile(arc) as zf:
+                self.assertTrue(any(n.endswith("CREDITS.md") for n in zf.namelist()))
+            cfg = {}
+            for _ in range(7):
+                unreal_pack.remember_use(cfg, [a], "D:/Proj")
+            self.assertEqual(cfg["ue_used"]["oak"], ["D:/Proj"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestFiles(unittest.TestCase):
     def test_inside(self):
         root = os.path.join("C:\\", "lib", "a")

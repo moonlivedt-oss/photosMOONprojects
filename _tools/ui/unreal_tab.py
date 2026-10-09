@@ -666,6 +666,9 @@ class UnrealTab(QWidget):
         lines.append(src)
         if a.get("tags"):
             lines.append("Метки: " + ", ".join(a["tags"][:10]))
+        used = self.cfg.get("ue_used", {}).get(a.get("id"), [])
+        if used:  # куда ассет уже уходил: копия, импорт, пакет
+            lines.append("Использовано в: " + "; ".join(os.path.basename(x.rstrip("/\\")) or x for x in used[-3:]))
         self.meta.setText("\n".join(lines))
         self.files.setText("Файлы: " + ", ".join(a.get("main", [])))
         self.how.setText(U.howto(a))
@@ -695,6 +698,9 @@ class UnrealTab(QWidget):
         if not dst:
             return
         self.cfg["ue_project"] = dst
+        from library.unreal_pack import remember_use
+
+        remember_use(self.cfg, assets, dst)
         for a in assets:
             shutil.copytree(
                 a["dir"],
@@ -730,6 +736,9 @@ class UnrealTab(QWidget):
                 lambda: self.remove_from_set(self.nav.theme[len(SET) :], sel),
             )
         m.addAction(lib_icon("export"), "Импорт в Unreal (скрипт с материалами)...", self.import_ue)
+        m.addAction(
+            lib_icon("zip-archive"), "Пакет для проекта (файлы, авторы, скрипт)...", lambda: self.pack_assets(sel)
+        )
         if any(x.get("kind") == "model" for x in sel):
             m.addAction(lib_icon("house"), "Собрать комнату из выбранного", lambda: self.room(sel, "Выбранное"))
         m.addSeparator()
@@ -784,6 +793,39 @@ class UnrealTab(QWidget):
             self.describe()
         self.win.say(f"3D-просмотр освещается небом «{a.get('name', '')}»")
 
+    def pack_assets(self, assets, title=None):
+        """Пакет для проекта: файлы, import_to_unreal.py, CREDITS.md и manifest.json одной папкой (или zip)."""
+        from PyQt6.QtWidgets import QInputDialog, QMessageBox
+
+        from library import unreal_pack
+
+        if not assets:
+            return
+        name, ok = QInputDialog.getText(
+            self, "Пакет для проекта", "Название пакета (станет именем папки):", text=title or assets[0].get("name", "")
+        )
+        if not ok or not name.strip():
+            return
+        dst = QFileDialog.getExistingDirectory(self, "Куда положить пакет", self.cfg.get("ue_pack_dir", ""))
+        if not dst:
+            return
+        self.cfg["ue_pack_dir"] = dst
+        zip_it = (
+            QMessageBox.question(self, "Пакет для проекта", "Упаковать ещё и в zip-архив (удобно передать)?")
+            == QMessageBox.StandardButton.Yes
+        )
+
+        def done(res):
+            if isinstance(res, Exception):
+                self.win.say(f"Пакет не собран: {res}")
+                return
+            unreal_pack.remember_use(self.cfg, assets, dst)
+            reveal(res)
+            self.win.say(f"Пакет готов: {os.path.basename(res)} - ассетов {len(assets)}, авторы в CREDITS.md")
+            self.describe()
+
+        bg(lambda: unreal_pack.pack(assets, dst, name.strip(), zip_it), done)
+
     def import_ue(self):
         self.import_assets(self.current())
 
@@ -800,6 +842,9 @@ class UnrealTab(QWidget):
         if not dst:
             return
         self.cfg["ue_import_dir"] = dst
+        from library.unreal_pack import remember_use
+
+        remember_use(self.cfg, cur, dst)
 
         def done(res):
             if isinstance(res, Exception):
