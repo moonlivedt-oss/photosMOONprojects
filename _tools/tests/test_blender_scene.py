@@ -43,6 +43,20 @@ class BlenderScene(unittest.TestCase):
         self.assertEqual(j["textures"], [])  # пол ушёл в комнату, а не на шар
         self.assertTrue(j["hdri"].endswith("sky.hdr"))
 
+    def test_room_tiles_on_walls_and_pictures(self):
+        sofa = self.asset("Sofa", "model", ["sofa.fbx"])
+        frame = self.asset("Hanging Picture Frame 01", "model", ["frame.fbx"])
+        floor = self.asset("Parquet", "tex", ["p_diff_2k.jpg"], "Дом - полы")
+        tiles = self.asset("Interior Tiles", "tex", ["t_diff_2k.jpg"], "Дом - плитка и камень")
+        extra = self.asset("Fabric", "tex", ["f_diff_2k.jpg"], "Дом - ткани и кожа")
+        j = B.jobs([sofa, frame, floor, tiles, extra], room=True)
+        self.assertEqual(j["floor"]["name"], "Parquet")
+        self.assertEqual(j["wall"]["name"], "Interior Tiles")  # плитка - на стены, а не шаром в комнату
+        self.assertEqual(j["textures"], [])
+        on = {m["name"]: m["on_wall"] for m in j["models"]}
+        self.assertTrue(on["Hanging Picture Frame 01"])
+        self.assertFalse(on["Sofa"])
+
     def test_row_jobs_and_script(self):
         chair = self.asset("Chair", "model", ["chair.fbx"])
         tex = self.asset("Brick", "tex", ["brick_diff_1k.jpg"])

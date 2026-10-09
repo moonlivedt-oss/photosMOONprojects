@@ -62,6 +62,15 @@ class ScenePlan(unittest.TestCase):
         self.assertNotEqual(p["wall"][0]["name"], p["floor"][0]["name"])  # стены - не тем же, что пол
         self.assertEqual(len(P.chosen(p)), len(p["slots"]) + 3)
 
+    def test_studio_light_first(self):
+        items = [
+            asset("Oak Bed", section="Кровати"),
+            asset("Oak Fireplace", kind="hdri", theme="Интерьер"),  # «по описанию» - но свет тёплый
+            asset("Soft Box", kind="hdri", theme="Студия"),
+        ]
+        p = P.plan(Sem(), items, "oak bedroom", lambda a: a["section"])
+        self.assertEqual([a["name"] for a in p["hdri"]], ["Soft Box", "Oak Fireplace"])
+
     def test_mixed_style_when_own_is_scarce(self):
         items = [asset("Plunger", section="Ванная")] + [
             asset(n, source="Quaternius", theme="Дом - Quaternius low-poly", section="Ванная")

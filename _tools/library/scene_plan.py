@@ -147,7 +147,12 @@ def plan(sem, items, query, section_of, low_poly=None, room=None):
         "slots": slots,
         "floor": floor,
         "wall": [a for a in ranked(a for a in tex if a.get("theme") in WALL_THEMES) if a["dir"] != floor_dir][:12],
-        "hdri": ranked(a for a in items if a.get("kind") == "hdri")[:12],
+        # свет комнаты - сначала студийный: показывает материалы как есть («уютная» иначе брала фото
+        # камина, и вся сцена выходила оранжевой); подходящие по описанию небеса - заменами
+        "hdri": (
+            ranked(a for a in items if a.get("kind") == "hdri" and a.get("theme") == "Студия")
+            + ranked(a for a in items if a.get("kind") == "hdri" and a.get("theme") != "Студия")
+        )[:12],
     }
 
 

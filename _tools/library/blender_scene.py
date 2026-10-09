@@ -64,6 +64,17 @@ def _main_file(a, exts):
     return ""
 
 
+WALL_WORDS = ("frame", "picture", "painting", "mirror", "poster", "wall decoration", "картина", "зеркало")
+
+
+def on_wall(a):
+    """Картины, рамки, зеркала - на заднюю стену на высоту глаз, а не лёжа на полу."""
+    words = " ".join([a.get("name", ""), *a.get("categories", []), *a.get("tags", [])[:6]]).lower()
+    return any(w in words for w in WALL_WORDS) and "table" not in words
+
+
+FLOOR_THEMES = ("Дом - полы", "Дом - плитка и камень")
+WALL_THEMES = ("Дом - стены", "Дом - плитка и камень")
 HANG_WORDS = ("chandelier", "pendant", "ceiling", "люстра")
 
 
@@ -93,13 +104,17 @@ def jobs(assets, room=False, floor=None, wall=None, hdri=None):
                     "y": -it["z"] / 100,
                     "size": it["size"] / 100,
                     "hang": hangs(a),
+                    "on_wall": on_wall(a),
                 }
             )
-        floor = floor or next((t for t in texs if "пол" in t.get("theme", "").lower()), None)
-        wall = wall or next((t for t in texs if "стен" in t.get("theme", "").lower() and t is not floor), None)
+        # пол - текстура пола, плитки или камня; стены - следующая (тема у плитки - «плитка и камень»,
+        # по слову «стены» её не найти); остальные текстуры в комнату шарами не ставятся
+        floor = floor or next((t for t in texs if t.get("theme") in FLOOR_THEMES), None) or (texs[0] if texs else None)
+        wall = wall or next((t for t in texs if t is not floor and t.get("theme") in WALL_THEMES), None)
+        wall = wall or next((t for t in texs if t is not floor), None)
         out["floor"] = {"name": floor["name"], **_maps(floor)} if floor else None
         out["wall"] = {"name": wall["name"], **_maps(wall)} if wall else None
-        texs = [t for t in texs if t is not floor and t is not wall]
+        texs = []
     else:
         x = 0.0
         for a in models:
@@ -244,7 +259,11 @@ for m in J["models"]:
     bpy.context.view_layer.update()
     lo, hi = bounds(objs)
     z = (CEIL - 0.05 - hi.z) if m.get("hang") and J["room"] else -lo.z  # люстра - под потолком
-    empty.location += Vector((m["x"] - (lo.x + hi.x) / 2, m["y"] - (lo.y + hi.y) / 2, z))
+    y = m["y"] - (lo.y + hi.y) / 2
+    if m.get("on_wall") and J["room"]:  # картина - на задней стене, центр на 1.5 м
+        y = J["room"]["d"] / 2 - 0.03 - hi.y
+        z = 1.5 - (lo.z + hi.z) / 2
+    empty.location += Vector((m["x"] - (lo.x + hi.x) / 2, y, z))
 for t in J["textures"]:
     bpy.ops.mesh.primitive_uv_sphere_add(radius=0.45, location=(t["x"], t["y"], 0.45), segments=64, ring_count=32)
     s = bpy.context.active_object
