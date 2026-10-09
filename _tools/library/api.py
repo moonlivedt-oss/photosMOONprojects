@@ -1160,3 +1160,39 @@ def index():
     if sem.ok:
         sem.refresh()
     return dict(signatures=len(sigs.data), semantic=len(sem.data), new_semantic=len(sem.data) - before)
+
+
+# ---------------------------------------------------------------- версии картинки
+@tool(
+    "versions",
+    "Прошлые версии картинки (после правки и сжатия оригиналы лежат в _sources): дата, вид, путь.",
+    {"path": {"type": "string"}},
+    ["path"],
+)
+def versions(path):
+    from library import versions as V
+
+    p = images(path)[0]
+    return {"path": rel(p), "versions": [dict(v, path=rel(v["path"])) for v in V.versions(p)]}
+
+
+@tool(
+    "restore_version",
+    "Вернуть прошлую версию картинки (путь версии - из versions). Текущая сама станет версией; undo отменит.",
+    {"path": {"type": "string"}, "version": {"type": "string"}},
+    ["path", "version"],
+    write=True,
+)
+def restore_version(path, version):
+    from library import versions as V
+
+    p = images(path)[0]
+    v = absolute(version)
+    if not any(os.path.normcase(x["path"]) == os.path.normcase(v) for x in V.versions(p)):
+        raise ApiError("Это не версия этой картинки - список: versions.")
+    new, steps = V.restore(p, v)
+    return dict(path=rel(new)) | record(f"Возвращена версия: {os.path.basename(new)}", steps)
+
+
+# операции вкладки «Unreal» - отдельным модулем, в тот же список
+from library import api_unreal as _api_unreal  # noqa: E402, F401

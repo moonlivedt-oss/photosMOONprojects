@@ -82,6 +82,39 @@ class Api(unittest.TestCase):
         with self.assertRaises(api.ApiError):
             api.call("move", {"paths": [f"{SEC}/red-planet.png"], "folder": "_sources"})
 
+    def test_unreal_tools_registered(self):
+        for name in (
+            "ue_overview",
+            "ue_search",
+            "ue_view",
+            "ue_info",
+            "ue_plan_room",
+            "ue_collection",
+            "ue_download",
+            "ue_pack",
+            "ue_import",
+            "ue_blender",
+            "versions",
+            "restore_version",
+        ):
+            self.assertIn(name, api.TOOLS, name)
+        self.assertTrue(api.TOOLS["ue_import"]["write"])
+        self.assertFalse(api.TOOLS["ue_search"]["write"])
+
+    def test_versions_tool(self):
+        cur = self.path(f"{SEC}/red-planet.png")
+        old = self.path(f"_sources/edit 2026-01-01/{SEC}/red-planet.png")
+        os.makedirs(os.path.dirname(old))
+        dot((10, 10, 200, 255)).save(old)
+        got = api.call("versions", {"path": f"{SEC}/red-planet.png"})["versions"]
+        self.assertEqual(len(got), 1)
+        res = api.call("restore_version", {"path": f"{SEC}/red-planet.png", "version": got[0]["path"]})
+        self.assertTrue(os.path.exists(cur))
+        with self.assertRaises(api.ApiError):  # чужой файл - не версия
+            api.call("restore_version", {"path": f"{SEC}/red-planet.png", "version": f"{SEC}/blue-moon.png"})
+        api.call("undo", {"id": res["journal_id"]})  # отмена возврата - снова прежняя картинка
+        self.assertTrue(os.path.exists(cur))
+
     def test_service_folders_read_only(self):
         os.makedirs(self.path("_docs/screenshots"))
         dot((200, 200, 40, 255)).save(self.path("_docs/screenshots/logo.png"))
