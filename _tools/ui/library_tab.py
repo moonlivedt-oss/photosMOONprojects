@@ -72,6 +72,7 @@ from ui.thumbnails import (
     swatch,
     thumb,
     thumb_key,
+    tile,
     tile_image,
     to_qimage,
 )
@@ -927,7 +928,12 @@ class LibTab(QWidget):
         self.ue_strip.clear()
         for a in found:
             prev = os.path.join(a["dir"], "preview.webp")
-            it = QListWidgetItem(QIcon(thumb(prev, 96)) if os.path.exists(prev) else QIcon(), a.get("name", ""))
+            # квадратом: высокое превью (фонарь) иначе сдвигает подпись ниже соседних
+            try:
+                icon = QIcon(tile(K.load(prev), 96))
+            except Exception:  # нет превью или битое - плитка без картинки
+                icon = QIcon()
+            it = QListWidgetItem(icon, a.get("name", ""))
             it.setData(ROLE, a)
             it.setToolTip(f"{a.get('name', '')}, {a.get('theme', '')} - открыть во вкладке Unreal")
             self.ue_strip.addItem(it)
