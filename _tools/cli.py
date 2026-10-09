@@ -7,6 +7,7 @@ py -3.14 cli.py convert FILES/DIRS [--to webp|avif|png|jpg|ico] [--max 1920] [--
 py -3.14 cli.py dupes [DIR]
 py -3.14 cli.py gallery
 py -3.14 cli.py unreal                       # ассеты Unreal: что скачано, темы
+py -3.14 cli.py repair [fix|backup|list|restore latest]   # проверка и восстановление базы и настроек
 py -3.14 cli.py unreal get tex "Город" --count 6 --res 2k     # tex | hdri | model | ies
 py -3.14 cli.py api                          # операции для ИИ-помощников и скриптов (JSON)
 py -3.14 cli.py api search '{"query": "ночной город"}'
@@ -17,6 +18,7 @@ import argparse
 import os
 import shutil
 import sys
+import time
 
 import numpy as np
 from PIL import Image
@@ -246,6 +248,34 @@ def cmd_unreal(a):
     print("Темы:", ", ".join(U.THEMES))
 
 
+def cmd_repair(a):
+    """Проверка и восстановление без окна: если окно не запускается."""
+    from library import safety
+
+    if a.action == "list":
+        for d, t, has in safety.backups():
+            print(time.strftime("%d.%m.%Y %H:%M", time.localtime(t)), os.path.basename(d), "|", ", ".join(has))
+        return
+    if a.action == "backup":
+        print("Копия:", safety.backup() or "копировать нечего")
+        return
+    if a.action == "restore":
+        found = [d for d, _t, _h in safety.backups() if a.name in (None, "latest") or a.name in os.path.basename(d)]
+        if not found:
+            sys.exit("нет такой копии - список: cli.py repair list")
+        print("Возвращено из", os.path.basename(found[0]) + ":", ", ".join(safety.restore(found[0])))
+        return
+    rows = safety.check()
+    for r in rows:
+        print(("  ок      " if r["ok"] else "  ПРОБЛЕМА ") + f"{r['name']}: {r['text']}")
+    if a.action == "fix":
+        for r in rows:
+            if r["fix"]:
+                print("  ->", safety.fix(r["fix"]))
+    elif any(r["fix"] for r in rows):
+        print("Починить: py -3.14 _tools/cli.py repair fix")
+
+
 def main():
     p = argparse.ArgumentParser(description="Инструменты библиотеки картинок")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -294,6 +324,9 @@ def main():
     ue.add_argument("theme", nargs="?", help="тема или «все»")
     ue.add_argument("--count", type=int, default=4)
     ue.add_argument("--res", default="2k", choices=["1k", "2k", "4k"])
+    rp = sub.add_parser("repair", help="проверка и восстановление: база, настройки, резервные копии")
+    rp.add_argument("action", nargs="?", default="check", choices=["check", "fix", "backup", "list", "restore"])
+    rp.add_argument("name", nargs="?", help="для restore: часть имени копии или latest")
     a = p.parse_args()
     {
         "cut": cmd_cut,
@@ -304,6 +337,7 @@ def main():
         "nobg": cmd_nobg,
         "api": cmd_api,
         "unreal": cmd_unreal,
+        "repair": cmd_repair,
     }[a.cmd](a)
 
 

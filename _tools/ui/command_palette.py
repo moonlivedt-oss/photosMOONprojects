@@ -25,6 +25,7 @@ def commands(win):
         ("Оформление: тема и акцент", "тема светлая тёмная цвет акцент дизайн", "color-palette", win.theme_dialog),
         ("ИИ-помощники", "claude cursor mcp агенты подключить", "sparkles", win.agents),
         ("Справка", "помощь клавиши f1", "question-mark-bubble", win.show_help),
+        ("Проверка и восстановление", "копия бэкап починить сбой база настройки вернуть", "first-aid-kit", win.safety),
         ("Галерея в браузере", "gallery html", "globe", win.open_gallery),
         ("Промпты", "prompts генерация", "clipboard", win.open_prompts),
         ("Найти дубли", "одинаковые повторы", "magnifying-glass", win.dupes),

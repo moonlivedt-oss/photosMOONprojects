@@ -131,6 +131,7 @@ class Window(QMainWindow):
         tm.addAction(lib_icon("drawing_pen"), "Векторизация в SVG...", lambda: self.lib.vectorize())
         tm.addSeparator()
         tm.addAction(lib_icon("sparkles"), "Оформление: тема и акцент...", self.theme_dialog)
+        tm.addAction(lib_icon("first-aid-kit"), "Проверка и восстановление...", self.safety)
         tm.addAction(lib_icon("eye"), "Папка генератора...", self.pick_gen)
         tools.setMenu(tm)
         tools.setToolTip("Дубли, доктор, чего нет, вес разделов, папка генератора")
@@ -309,6 +310,8 @@ class Window(QMainWindow):
         bg(work, done)
 
     def save_settings(self):
+        if getattr(self, "cfg_frozen", False):  # идёт восстановление из копии - не затирать её
+            return
         text = cfg_text(self.cfg)
         if text != self.saved_cfg:
             try:
@@ -499,6 +502,36 @@ class Window(QMainWindow):
         self.take([u.toLocalFile() for u in e.mimeData().urls()])
 
     # --- папка генератора: новые картинки сами копируются во входящие
+    def safety(self):
+        from ui.safety_dialog import SafetyDialog
+
+        SafetyDialog(self).exec()
+
+    def guard_start(self, crashes):
+        """После показа окна: ежедневная копия и проверка базы в фоне; сказать о прошлом сбое."""
+        from library import safety
+
+        def done(res):
+            if isinstance(res, Exception):
+                log_error(f"резервная копия не сделана: {res!r}")
+                return
+            if not res:
+                self.say("База повреждена - откройте «Инструменты» -> «Проверка и восстановление»")
+
+        bg(lambda: (safety.daily_backup(), safety.db_ok(db.DB) if os.path.exists(db.DB) else True)[1], done)
+        if crashes == 1:
+            self.toast.say(
+                "Прошлый запуск закрылся со сбоем. Подробности - в журнале ошибок",
+                9000,
+                ("Проверить", self.safety),
+            )
+        elif crashes >= 2:
+            self.toast.say(
+                "Окно несколько раз подряд закрылось со сбоем: включён безопасный режим (живой 3D выключен)",
+                12000,
+                ("Проверить", self.safety),
+            )
+
     def palette(self):
         from ui.command_palette import CommandPalette
 
@@ -636,7 +669,8 @@ class Window(QMainWindow):
         self.lib.remember_section()
         self.drop_redo()  # после закрытия вернуть отменённое нельзя
         try:
-            save_cfg(self.cfg)
+            if not getattr(self, "cfg_frozen", False):  # после восстановления из копии - не затирать её
+                save_cfg(self.cfg)
         except OSError as ex:
             log_error(f"настройки не записались: {ex}")
         if self.gal.isActive():
@@ -678,9 +712,17 @@ def main():
     app = QApplication(sys.argv)
     install_guard(app)
     relay()
+    from library import safety
     from ui import theme
 
+    crashes = safety.start_run()
     cfg = load_cfg()  # тема и акцент - до первой отрисовки
+    if crashes >= 2:  # безопасный режим: самое хрупкое (живой 3D на видеокарте) - выключить
+        cfg["ue_live"] = False
+        try:
+            save_cfg(cfg)
+        except OSError:
+            pass
     theme.apply(cfg.get("theme", "dark"), cfg.get("accent", "lavender"))
     app.setStyleSheet(theme.stylesheet())
     for fx in (
@@ -695,7 +737,10 @@ def main():
     w = Window()
     fade_in_window(w)
     w.show()
+    guard = w.guard_start  # не через w в лямбде: ниже w удаляется (del w)
+    QTimer.singleShot(2500, lambda: guard(crashes))
     code = app.exec()
+    safety.end_run()
     finish_bg()  # фоновые потоки - доделать или бросить
     db.close()
     forget_pixmaps()  # затем картинки и окно, и только потом приложение
