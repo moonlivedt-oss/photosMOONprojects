@@ -7,7 +7,7 @@ import time
 
 from PIL import Image
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QMimeData, QRectF, QStringListModel, Qt, QTimer, QUrl, pyqtSignal
+from PyQt6.QtCore import QEvent, QMimeData, QRectF, QSize, QStringListModel, Qt, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -50,6 +50,7 @@ from ui.common import (
     SUB,
     TAG,
     THUMB,
+    TINT,
     bg,
     clean_name,
     human,
@@ -74,6 +75,7 @@ from ui.thumbnails import (
     tile_image,
     to_qimage,
 )
+from ui.unreal_tiles import ASSET as ue_ASSET
 from ui.widgets import (
     DestDialog,
     LibList,
@@ -83,6 +85,7 @@ from ui.widgets import (
     forget_counts,
     key,
     make_tree,
+    section_color,
     select_path,
 )
 
@@ -272,7 +275,7 @@ class Preview(QWidget):
         self.show_meta([])
         self.pic.set_pixmap(cover)
         self.name.setText(os.path.basename(s["path"]))
-        self.where.setText("{}   ·   двойной щелчок - открыть".format(os.path.relpath(os.path.dirname(s["path"]), LIB)))
+        self.where.setText("{}, двойной щелчок - открыть".format(os.path.relpath(os.path.dirname(s["path"]), LIB)))
         self.set_chips(["%s: %d" % (f, n) for f, n, _p in s["pals"]][:8])
 
     def show_paths(self, paths, mode):
@@ -615,7 +618,7 @@ class LibTab(QWidget):
         self.qt.timeout.connect(self.show_files)
         self.q.textChanged.connect(lambda *_: self.qt.start())
         if win.sem.ok:
-            self.q.setPlaceholderText("Поиск по всей библиотеке  (Ctrl+F)  ·  можно бросить сюда картинку")
+            self.q.setPlaceholderText("Поиск по всей библиотеке  (Ctrl+F), можно бросить сюда картинку")
             self.q.installEventFilter(self)
         self.sem = QPushButton(lib_icon("crystal-ball-stand"), "", objectName="tool", checkable=True)
         self.sem.setToolTip("Поиск по смыслу (Ctrl+M): «кот в космосе», «уютная ночная улица»")
@@ -673,11 +676,65 @@ class LibTab(QWidget):
         rv.setContentsMargins(0, 0, 0, 0)
         rv.addLayout(bar)
         rv.addWidget(self.title)
+        # общий поиск: подходящие по смыслу ассеты Unreal - полосой над картинками
+        self.ue_box = QWidget()
+        ub = QVBoxLayout(self.ue_box)
+        ub.setContentsMargins(0, 0, 0, 4)
+        self.ue_lbl = QLabel(objectName="faint")
+        self.ue_strip = QListWidget()
+        self.ue_strip.setViewMode(QListWidget.ViewMode.IconMode)
+        self.ue_strip.setFlow(QListWidget.Flow.LeftToRight)
+        self.ue_strip.setWrapping(False)
+        self.ue_strip.setMovement(QListWidget.Movement.Static)
+        self.ue_strip.setIconSize(QSize(84, 84))
+        self.ue_strip.setGridSize(QSize(112, 122))
+        self.ue_strip.setFixedHeight(146)
+        self.ue_strip.setHorizontalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self.ue_strip.itemClicked.connect(self.open_ue)
+        ub.addWidget(self.ue_lbl)
+        ub.addWidget(self.ue_strip)
+        self.ue_box.hide()
+        self.ue_t = QTimer(self, singleShot=True, interval=450)
+        self.ue_t.timeout.connect(self.update_ue_strip)
+        self.q.textChanged.connect(lambda *_: self.ue_t.start())
+        rv.addWidget(self.ue_box)
         rv.addWidget(self.list, 1)
         rv.addWidget(self.info)
         self.preview = Preview(self)
+        # слева: карточки быстрого доступа (как виды во вкладке Unreal) и дерево разделов
+        from ui.unreal_nav import KindCard
+
+        left = QWidget()
+        lv = QVBoxLayout(left)
+        lv.setContentsMargins(0, 0, 0, 0)
+        lv.setSpacing(4)
+        lv.addWidget(QLabel("БЫСТРЫЙ ДОСТУП", objectName="faint"))
+        grid = QGridLayout()
+        grid.setSpacing(4)
+        self.quick = {}
+        for i, (text, role, icon, color, hint) in enumerate(
+            (
+                ("Недавние", RECENT, "hourglass", "#6cb8ff", "последние сохранённые картинки"),
+                ("Избранное", FAV, "star", "#ff8ac9", "отмечено звездой (Ctrl+D)"),
+                ("Наборы", SETS, "color-palette", "#a897ff", "папки с палитрами - одной обложкой"),
+                ("Тяжёлые", HEAVY, "zip-archive", "#f0a35e", "тяжелее 500 КБ - можно сжать"),
+            )
+        ):
+            c = KindCard(role, (text, icon, color), hint)
+            c.set_sub(
+                {RECENT: "последние сохранённые", FAV: "отмечено звездой", SETS: "по палитрам", HEAVY: "можно сжать"}[
+                    role
+                ]
+            )
+            c.clicked.connect(lambda _c=False, r=role: self.show_section(r))
+            self.quick[role] = c
+            grid.addWidget(c, i, 0)
+        lv.addLayout(grid)
+        lv.addSpacing(6)
+        lv.addWidget(self.tree, 1)
+        self.tree.currentItemChanged.connect(self.sync_quick)
         self.split = QSplitter()
-        for w in (self.tree, mid, self.preview):
+        for w in (left, mid, self.preview):
             self.split.addWidget(w)
         self.split.setStretchFactor(1, 1)
         sizes = list(self.cfg.get("split_lib", [250, 720, 300]))
@@ -839,6 +896,83 @@ class LibTab(QWidget):
         it = self.tree.currentItem()
         if it and it.data(0, ROLE):
             self.cfg["lib_section"] = it.data(0, ROLE)
+
+    def sync_quick(self, it, _prev=None):
+        role = it.data(0, ROLE) if it else None
+        for r, c in self.quick.items():
+            c.setChecked(r == role)
+
+    # ------------------------------------------------------------ общий поиск с ассетами Unreal
+    def update_ue_strip(self):
+        text = self.q.text().strip()
+        ue = getattr(self.win, "unreal", None)
+        if not text or ue is None:
+            self.ue_box.hide()
+            return
+        if not ue.items:  # вкладку Unreal ещё не открывали - список ассетов подгрузится и полоса обновится
+            if not getattr(self, "ue_loading", False):
+                self.ue_loading = True
+                ue.refresh()
+                QTimer.singleShot(1500, lambda: (setattr(self, "ue_loading", False), self.update_ue_strip()))
+            return
+        if ue.sem is not None:
+            found = [a for a, _s in ue.sem.rank(text, ue.items)][:16]
+        else:
+            words = text.lower().split()
+            found = [
+                a
+                for a in ue.items
+                if all(w in (a.get("name", "") + " " + " ".join(a.get("tags", []))).lower() for w in words)
+            ][:16]
+        self.ue_strip.clear()
+        for a in found:
+            prev = os.path.join(a["dir"], "preview.webp")
+            it = QListWidgetItem(QIcon(thumb(prev, 96)) if os.path.exists(prev) else QIcon(), a.get("name", ""))
+            it.setData(ROLE, a)
+            it.setToolTip(f"{a.get('name', '')}, {a.get('theme', '')} - открыть во вкладке Unreal")
+            self.ue_strip.addItem(it)
+        self.ue_lbl.setText(f"АССЕТЫ UNREAL ПО ЗАПРОСУ: {len(found)}  -  щелчок открывает во вкладке Unreal")
+        self.ue_box.setVisible(bool(found))
+
+    def open_ue(self, it):
+        a = it.data(ROLE)
+        ue = self.win.unreal
+        self.win.tabs.setCurrentIndex(2)
+        ue.q.setText(self.q.text())
+        ue.show_assets()
+        for i in range(ue.list.count()):
+            if ue.list.item(i).data(ue_ASSET)["dir"] == a["dir"]:
+                ue.list.setCurrentRow(i)
+                ue.list.scrollToItem(ue.list.item(i))
+                break
+
+    # ------------------------------------------------------------ инструменты: палитра, сравнение, svg
+    def palette_from(self, source=None, targets=None):
+        from ui.tools_dialogs import PaletteDialog
+
+        targets = self.paths() if targets is None else targets
+        self.pal_dlg = PaletteDialog(self.win, targets, source)
+        self.pal_dlg.show()
+
+    def compare(self, paths=None):
+        from ui.tools_dialogs import CompareDialog
+
+        paths = paths or self.paths()
+        if len(paths) != 2:
+            self.win.say("Для сравнения выберите ровно две картинки (Ctrl+щелчок)")
+            return
+        self.cmp_dlg = CompareDialog(self.win, paths[0], paths[1])
+        self.cmp_dlg.show()
+
+    def vectorize(self, paths=None):
+        from ui.tools_dialogs import VectorDialog
+
+        paths = [p for p in (paths or self.paths()) if not p.lower().endswith(".svg")]
+        if not paths:
+            self.win.say("Выберите картинки для перевода в SVG")
+            return
+        self.vec_dlg = VectorDialog(self.win, paths)
+        self.vec_dlg.show()
 
     def show_section(self, role):
         self.q.clear()
@@ -1057,6 +1191,7 @@ class LibTab(QWidget):
             item.setData(STAR, rel in fav)
             item.setData(SUB, self.caption(p, base, ext, how))
             item.setData(EXT, ext[1:].upper())
+            item.setData(TINT, section_color(p))
             item.setToolTip(rel)
             if thumb_key(p, THUMB, mode) in _thumbs or p.lower().endswith(".svg"):
                 item.setData(PIX, thumb(p, THUMB, mode))
@@ -1083,7 +1218,7 @@ class LibTab(QWidget):
                 parts.append(human(os.path.getsize(p)))
             except OSError:
                 pass
-        return "  ·  ".join(parts)
+        return ", ".join(parts)
 
     def show_title(self, root, words, code, n, text="", sem=False, smart=None):
         """Заголовок над плитками и подсказка, если показывать нечего."""
@@ -1148,7 +1283,7 @@ class LibTab(QWidget):
         for i, s in enumerate(sets):
             item = QListWidgetItem(os.path.basename(s["path"]))
             item.setData(ROLE, s["path"])
-            item.setData(SUB, "%s  ·  %d шт." % (plural(len(s["pals"]), "палитра", "палитры", "палитр"), s["count"]))
+            item.setData(SUB, "%s, %d шт." % (plural(len(s["pals"]), "палитра", "палитры", "палитр"), s["count"]))
             item.setToolTip(os.path.relpath(s["path"], LIB) + "\n" + ", ".join(f for f, _n, _p in s["pals"]))
             key = ("set", s["path"], s["mt"])
             if key in self.covers:
@@ -1206,6 +1341,22 @@ class LibTab(QWidget):
         if not self.paths():
             return
         m = QMenu(self)
+        sel = self.paths()
+        tools = m.addMenu(lib_icon("toolbox"), "Инструменты")
+        if len(sel) == 2:
+            tools.addAction(lib_icon("magnifying-glass"), "Сравнить эти две", lambda: self.compare(sel))
+        tools.addAction(
+            lib_icon("color-palette"),
+            "Палитра из этой картинки (перекрасить другие)...",
+            lambda: self.palette_from(sel[0], []),
+        )
+        tools.addAction(
+            lib_icon("color-palette"),
+            "Перекрасить выбранные в палитру картинки...",
+            lambda: self.palette_from(None, sel),
+        )
+        tools.addAction(lib_icon("drawing_pen"), "Векторизация в SVG (три варианта)...", lambda: self.vectorize(sel))
+        m.addSeparator()
         m.addAction("Открыть\tEnter", self.open_file)
         m.addAction("Быстрый просмотр\tПробел", self.look)
         m.addAction("Показать в проводнике", self.reveal)
@@ -1403,8 +1554,9 @@ class LibTab(QWidget):
         order = {p: i for i, p in enumerate(self.all_shown())}
         sel = sorted(sel, key=lambda p: order.get(p, 0))
         common = os.path.commonprefix([os.path.splitext(os.path.basename(p))[0] for p in sel]).rstrip(" _-")
-        name, ok = QInputDialog.getText(self, "Переименовать: %d шт." % len(sel),
-                                        "Общее имя (номера добавятся сами):", text=common)
+        name, ok = QInputDialog.getText(
+            self, "Переименовать: %d шт." % len(sel), "Общее имя (номера добавятся сами):", text=common
+        )
         name = clean_name(name)
         if not ok or not name:
             return

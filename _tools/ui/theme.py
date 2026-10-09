@@ -1,11 +1,12 @@
-"""Тёмная тема окна: цвета (C), стили (QSS) и svg-стрелки для них.
-Цвета заданы один раз в C: и стили, и рисовальщики плиток берут их отсюда."""
+"""Оформление окна: цвета (C), стили (QSS) и svg-стрелки для них. Темы - тёмная и светлая, акцент - на выбор.
+Цвета заданы один раз в C: и стили, и рисовальщики плиток берут их отсюда; apply() меняет C на месте,
+поэтому после смены темы достаточно пересобрать стили и перерисовать окно."""
 import os
 import re
 
 from ui.common import UI
 
-C = dict(
+DARK = dict(
     bg0="#0d0d13",          # окно
     bg1="#14141c",          # панели
     bg2="#1b1b26",          # поля, карточки
@@ -15,23 +16,82 @@ C = dict(
     text="#eceaf6",
     dim="#8e8ba6",
     faint="#5d5b70",
-    acc="#a897ff",          # главный акцент
-    acc2="#ff8ac9",         # второй конец градиента
     teal="#5ee0d0",         # третье пятно живого фона
-    accd="#2f2950",         # выделение (приглушённый акцент)
     ink="#120f1f",          # текст на акцентной кнопке
+    selt="#ffffff",         # текст выделенной строки
+    arrow="#b9b6c8",
 )
+LIGHT = dict(
+    bg0="#eeedf3",
+    bg1="#fbfbfd",
+    bg2="#f2f1f7",
+    bg3="#e7e4f0",
+    line="#dedbe8",
+    line2="#c9c4d8",
+    text="#1e1c28",
+    dim="#5c586e",
+    faint="#8d899e",
+    teal="#4cc3b5",
+    ink="#ffffff",
+    selt="#1e1c28",
+    arrow="#6b6780",
+)
+THEMES = {"dark": ("Тёмная", DARK), "light": ("Светлая", LIGHT)}
+# акцент: главный цвет и второй конец градиента
+ACCENTS = {
+    "lavender": ("Лаванда", "#a897ff", "#ff8ac9"),
+    "mint": ("Мята", "#3fcf9f", "#4fb5e8"),
+    "sunset": ("Закат", "#ff8a5c", "#ff5f8f"),
+    "sky": ("Небо", "#5b9dff", "#9b7bff"),
+    "gold": ("Золото", "#e0a93a", "#ef6f5c"),
+}
+C = {}
 GRAD = "qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 $acc,stop:1 $acc2)"
-SOFT = "qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba(168,151,255,0.30),stop:1 rgba(255,138,201,0.10))"
+SOFT = ""
+CURRENT = {"theme": "dark", "accent": "lavender"}
+
+
+def _rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _mix(a, b, t):
+    a, b = _rgb(a), _rgb(b)
+    return "#%02x%02x%02x" % tuple(round(x + (y - x) * t) for x, y in zip(a, b))
+
+
+def apply(theme="dark", accent="lavender"):
+    """Сменить тему и акцент (C - на месте: модули, импортировавшие C, видят новые цвета)."""
+    global SOFT
+    theme = theme if theme in THEMES else "dark"
+    accent = accent if accent in ACCENTS else "lavender"
+    CURRENT.update(theme=theme, accent=accent)
+    base = THEMES[theme][1]
+    _name, acc, acc2 = ACCENTS[accent]
+    C.clear()
+    C.update(base)
+    C["acc"], C["acc2"] = acc, acc2
+    C["accd"] = _mix(base["bg2"], acc, 0.32 if theme == "dark" else 0.28)   # выделение
+    if theme == "light":
+        C["ink"] = "#ffffff" if accent in ("sky", "lavender") else "#1e1c28"
+    r, g, b = _rgb(acc)
+    r2, g2, b2 = _rgb(acc2)
+    k = (0.30, 0.10) if theme == "dark" else (0.22, 0.08)
+    SOFT = (f"qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba({r},{g},{b},{k[0]}),"
+            f"stop:1 rgba({r2},{g2},{b2},{k[1]}))")
+
+
+apply()
 
 SVG = {
-    "down": '<path d="M2.5 4l3.5 3.5 3.5-3.5" fill="none" stroke="#b9b6c8" stroke-width="1.6" '
+    "down": '<path d="M2.5 4l3.5 3.5 3.5-3.5" fill="none" stroke="$arrow" stroke-width="1.6" '
             'stroke-linecap="round" stroke-linejoin="round"/>',
-    "up": '<path d="M2.5 8l3.5-3.5 3.5 3.5" fill="none" stroke="#b9b6c8" stroke-width="1.6" '
+    "up": '<path d="M2.5 8l3.5-3.5 3.5 3.5" fill="none" stroke="$arrow" stroke-width="1.6" '
           'stroke-linecap="round" stroke-linejoin="round"/>',
-    "right": '<path d="M4.5 2.5l3.5 3.5-3.5 3.5" fill="none" stroke="#8a879a" stroke-width="1.6" '
+    "right": '<path d="M4.5 2.5l3.5 3.5-3.5 3.5" fill="none" stroke="$faint" stroke-width="1.6" '
              'stroke-linecap="round" stroke-linejoin="round"/>',
-    "check": '<path d="M2.6 6.3l2.3 2.3 4.5-5" fill="none" stroke="#120f1f" stroke-width="1.9" '
+    "check": '<path d="M2.6 6.3l2.3 2.3 4.5-5" fill="none" stroke="$ink" stroke-width="1.9" '
              'stroke-linecap="round" stroke-linejoin="round"/>',
 }
 
@@ -49,7 +109,7 @@ QWidget#panel{background:$bg1;border:1px solid $line;border-radius:14px}
 QScrollArea{background:transparent;border:0}
 QScrollArea>QWidget>QWidget{background:transparent}
 QGroupBox{background:$bg1;border:1px solid $line;border-radius:14px;margin-top:14px;padding:12px 8px 8px 8px}
-QGroupBox::title{subcontrol-origin:margin;left:14px;top:2px;color:$dim;font-weight:600}
+QGroupBox::title{subcontrol-origin:margin;left:14px;top:2px;color:$faint;font-size:8pt;font-weight:700;letter-spacing:1px}
 QFrame#drop{border:2px dashed $line2;border-radius:18px;background:$bg1}
 
 /* поля ввода */
@@ -76,7 +136,7 @@ QPushButton:hover{background:$bg3;border-color:$acc}
 QPushButton:pressed{background:$accd}
 QPushButton:disabled{color:$faint;border-color:$line;background:$bg1}
 QPushButton#primary{background:$grad;color:$ink;font-weight:700;border:0;padding:9px 14px}
-QPushButton#primary:hover{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #bcafff,stop:1 #ffa3d6)}
+QPushButton#primary:hover{background:$grad}
 QPushButton#primary:disabled{background:$accd;color:$faint}
 QPushButton#flat,QPushButton#ghost{background:transparent;border-color:transparent;color:$dim}
 QPushButton#flat{padding:3px 8px}
@@ -85,7 +145,7 @@ QPushButton#tool{padding:7px 9px;border-radius:10px}
 QPushButton#undo{background:$accd;border-color:$acc;padding:2px 10px;border-radius:8px}
 QWidget#seg{background:$bg2;border:1px solid $line;border-radius:12px}
 QWidget#seg QPushButton#flat{padding:4px 10px;border-radius:8px}
-QWidget#seg QPushButton#flat:checked{background:$accd;color:#ffffff;border-color:$acc}
+QWidget#seg QPushButton#flat:checked{background:$accd;color:$selt;border-color:$acc}
 
 /* галочки */
 QCheckBox{spacing:8px}
@@ -98,7 +158,7 @@ QTabWidget::pane{border:0}
 QTabBar{background:transparent}
 QTabBar::tab{padding:7px 18px;margin:8px 3px 6px 3px;background:transparent;border-radius:10px;color:$dim}
 QTabBar::tab:hover{color:$text;background:rgba(255,255,255,0.05)}
-QTabBar::tab:selected{background:transparent;color:#ffffff;font-weight:600}
+QTabBar::tab:selected{background:transparent;color:$selt;font-weight:600}
 QTabBar::tab:selected:hover{background:transparent}
 
 /* строки списков и дерева */
@@ -107,8 +167,8 @@ QTreeWidget::item{padding:5px 2px}
 QTreeWidget::item:first{border-top-left-radius:8px;border-bottom-left-radius:8px}
 QTreeWidget::item:last{border-top-right-radius:8px;border-bottom-right-radius:8px;padding-right:8px}
 QListWidget::item:hover,QTreeWidget::item:hover{background:$bg3}
-QListWidget::item:selected{background:$soft;color:#ffffff}
-QTreeWidget::item:selected{background:$accd;color:#ffffff}
+QListWidget::item:selected{background:$soft;color:$selt}
+QTreeWidget::item:selected{background:$accd;color:$selt}
 QTreeView::branch,QTreeView::branch:selected,QTreeView::branch:hover{background:$bg1}
 QTreeView::branch:has-children:closed{image:url(@UI/right.svg)}
 QTreeView::branch:has-children:open{image:url(@UI/down.svg)}
@@ -140,14 +200,14 @@ QLabel#big{font-size:12pt;font-weight:600}
 QLabel#head{font-size:13pt;font-weight:700}
 QLabel#chip{background:$bg3;border-radius:8px;padding:3px 9px;color:$text;font-size:9pt}
 QPushButton#chip{background:$bg3;border:1px solid $line;border-radius:8px;padding:2px 9px;color:$text;font-size:9pt}
-QPushButton#chip:hover{border-color:$acc;color:#ffffff}
+QPushButton#chip:hover{border-color:$acc;color:$selt}
 QPushButton#chip:disabled{color:$dim;background:transparent}
 QLabel#pic{background:$bg2;border:1px solid $line;border-radius:12px}
-QLabel#overlay{background:rgba(13,13,19,230);border:3px dashed $acc;border-radius:22px;color:$text;font-size:17pt;font-weight:700}
+QLabel#overlay{background:$bg0;border:3px dashed $acc;border-radius:22px;color:$text;font-size:17pt;font-weight:700}
 
 /* таблицы */
 QTableWidget{background:$bg1;border:1px solid $line;border-radius:14px;gridline-color:$line;outline:0}
-QTableWidget::item:selected{background:$accd;color:#ffffff;border:1px solid $acc}
+QTableWidget::item:selected{background:$accd;color:$selt;border:1px solid $acc}
 QHeaderView{background:$bg1}
 QHeaderView::section{background:$bg2;color:$dim;border:0;border-right:1px solid $line;border-bottom:1px solid $line;padding:3px 6px}
 QTableCornerButton::section{background:$bg2;border:0}
@@ -172,6 +232,11 @@ def build_qss():
     return re.sub(r"\$(\w+)", lambda m: C[m.group(1)], text)
 
 
+def stylesheet():
+    """Стили с путём к стрелкам - для app.setStyleSheet (и при смене темы)."""
+    return build_qss().replace("@UI", ui_files())
+
+
 QSS = build_qss()
 
 
@@ -179,6 +244,7 @@ def ui_files():
     """Пишет svg-стрелки для стилей (один раз) и возвращает путь к ним в виде для QSS."""
     os.makedirs(UI, exist_ok=True)
     for name, body in SVG.items():
+        body = re.sub(r"\$(\w+)", lambda m: C[m.group(1)], body)  # стрелки - цветом текущей темы
         text = f'<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12">{body}</svg>'
         p = os.path.join(UI, name + ".svg")
         try:

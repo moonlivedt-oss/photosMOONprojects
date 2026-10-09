@@ -61,8 +61,8 @@ from ui.library_tab import LibTab
 from ui.missing import MissingDialog
 from ui.semantic import SemIndex
 from ui.signatures import SigIndex
-from ui.theme import QSS, ui_files
 from ui.thumbnails import forget_pixmaps, lib_icon, trim_thumbs
+from ui.unreal_tab import UnrealTab
 from ui.weight import WeightDialog
 from ui.widgets import fill_tree, forget_counts, key
 
@@ -96,6 +96,8 @@ class Window(QMainWindow):
         self.lib = LibTab(self)
         self.tabs.addTab(self.inbox, lib_icon("Задачи"), "Входящие")
         self.tabs.addTab(self.lib, lib_icon("Книга"), "Библиотека")
+        self.unreal = UnrealTab(self)
+        self.tabs.addTab(self.unreal, lib_icon("game-cartridge"), "Unreal")
         self.inbox.reload()
         self.setCentralWidget(self.tabs)
         PageFade(self.tabs)
@@ -104,16 +106,28 @@ class Window(QMainWindow):
         ch = QHBoxLayout(corner)
         ch.setContentsMargins(0, 0, 8, 4)
         for text, icon, fn, tip in (("Галерея", "Компас", self.open_gallery, "Вся библиотека в браузере"),
-                                    ("Промпты", "Заметка", self.open_prompts, ""),
-                                    ("Найти дубли", "Лупа", self.dupes, "Одинаковые картинки уедут в «_duplicates»"),
-                                    ("Доктор", "first-aid-kit", self.doctor,
-                                     "Проверить библиотеку: пустые, обрезанные, с остатками фона и каймой"),
-                                    ("Чего нет", "checklist", self.missing,
-                                     "Наборы из Prompts.html: каких палитр и картинок не хватает")):
+                                    ("Промпты", "Заметка", self.open_prompts, "Промпты для генерации листов")):
             b = QPushButton(lib_icon(icon), text, objectName="ghost")
             b.setToolTip(tip)
             b.clicked.connect(fn)
             ch.addWidget(b)
+        # редкие проверки - одной кнопкой с меню, чтобы верхняя строка не была забита
+        tools = QPushButton(lib_icon("toolbox"), "Инструменты", objectName="ghost")
+        tm = QMenu(self)
+        for text, icon, fn in (("Найти дубли", "Лупа", self.dupes), ("Доктор библиотеки", "first-aid-kit", self.doctor),
+                               ("Чего нет в наборах", "checklist", self.missing),
+                               ("Вес разделов (Ctrl+I)", "zip-archive", self.show_weight)):
+            tm.addAction(lib_icon(icon), text, fn)
+        tm.addSeparator()
+        tm.addAction(lib_icon("color-palette"), "Палитра из картинки...", lambda: self.lib.palette_from())
+        tm.addAction(lib_icon("magnifying-glass"), "Сравнить две картинки...", lambda: self.lib.compare())
+        tm.addAction(lib_icon("drawing_pen"), "Векторизация в SVG...", lambda: self.lib.vectorize())
+        tm.addSeparator()
+        tm.addAction(lib_icon("sparkles"), "Оформление: тема и акцент...", self.theme_dialog)
+        tm.addAction(lib_icon("eye"), "Папка генератора...", self.pick_gen)
+        tools.setMenu(tm)
+        tools.setToolTip("Дубли, доктор, чего нет, вес разделов, папка генератора")
+        ch.addWidget(tools)
         ai = QPushButton(lib_icon("sparkles"), "ИИ-помощники", objectName="ghost")
         ai.setToolTip("Claude, Cursor и другие помощники: подключить, что им можно, что они сделали")
         ai.clicked.connect(self.agents)
@@ -180,7 +194,8 @@ class Window(QMainWindow):
         for keys, fn in (("Ctrl+Z", lambda: self.undo()), ("Ctrl+Y", self.redo_last),
                          ("Ctrl+Shift+Z", self.redo_last), ("Ctrl+V", self.paste), ("F1", self.show_help),
                          ("Ctrl+1", lambda: self.tabs.setCurrentIndex(0)),
-                         ("Ctrl+2", lambda: self.tabs.setCurrentIndex(1)), ("F9", self.toggle_live),
+                         ("Ctrl+2", lambda: self.tabs.setCurrentIndex(1)),
+                         ("Ctrl+3", lambda: self.tabs.setCurrentIndex(2)), ("F9", self.toggle_live),
                          ("Ctrl+I", self.show_weight)):
             key(keys, self, fn, local=False)
 
@@ -225,6 +240,8 @@ class Window(QMainWindow):
     def tab_changed(self, i):
         if i == 1:
             self.lib.refresh()
+        elif i == 2:
+            self.unreal.refresh()
         else:
             self.inbox.reload()
 
@@ -454,8 +471,27 @@ class Window(QMainWindow):
         self.take([u.toLocalFile() for u in e.mimeData().urls()])
 
     # --- папка генератора: новые картинки сами копируются во входящие
+    def theme_dialog(self):
+        from ui.tools_dialogs import ThemeDialog
+
+        ThemeDialog(self).exec()
+
+    def apply_theme(self):
+        """Сменить тему на лету: цвета C меняются на месте, стили пересобираются, фон и плитки перерисовываются."""
+        from ui import theme
+
+        theme.apply(self.cfg.get("theme", "dark"), self.cfg.get("accent", "lavender"))
+        QApplication.instance().setStyleSheet(theme.stylesheet())
+        self.aurora.cache = None
+        fill_tree(self.inbox.tree)
+        self.lib.refresh()
+        self.unreal.nav.fill_themes()
+        for w in QApplication.instance().allWidgets():
+            w.update()
+
     def show_gen(self):
         d = self.cfg.get("gen_dir")
+        self.gen_btn.setVisible(bool(d))  # кнопка видна, только когда слежка включена; выбрать - в «Инструментах»
         self.gen_btn.setText("Генератор: слежу" if d else "Папка генератора...")
         self.gen_btn.setToolTip((f"Слежу за папкой: {d}\nНовые картинки сами попадают во входящие.\n"
                                  "Щелчок - выбрать другую или отключить") if d else
@@ -600,7 +636,11 @@ def main():
     app = QApplication(sys.argv)
     install_guard(app)
     relay()
-    app.setStyleSheet(QSS.replace("@UI", ui_files()))
+    from ui import theme
+
+    cfg = load_cfg()  # тема и акцент - до первой отрисовки
+    theme.apply(cfg.get("theme", "dark"), cfg.get("accent", "lavender"))
+    app.setStyleSheet(theme.stylesheet())
     for fx in (Qt.UIEffect.UI_AnimateMenu, Qt.UIEffect.UI_FadeMenu, Qt.UIEffect.UI_AnimateCombo,
                Qt.UIEffect.UI_AnimateTooltip, Qt.UIEffect.UI_FadeTooltip):
         app.setEffectEnabled(fx, True)

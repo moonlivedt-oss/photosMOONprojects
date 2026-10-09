@@ -180,7 +180,7 @@ class MissingDialog(QDialog):
         for r, i in enumerate(rows):
             c = self.cards[i]
             vh = QTableWidgetItem(c["title"])
-            vh.setToolTip("{}  ·  {}".format(c["sec"], c["title"]))
+            vh.setToolTip("{}, {}".format(c["sec"], c["title"]))
             t.setVerticalHeaderItem(r, vh)
             for j, (pid, name, _f, _cols) in enumerate(pals):
                 got, total = self.stat.get((i, pid), (0, 1))
@@ -196,7 +196,7 @@ class MissingDialog(QDialog):
                 if pid == c["pal"]:
                     it.setFont(bold)
                     if not got:
-                        it.setText("·")
+                        it.setText("-")
                 it.setToolTip("%s - %s: %d из %d%s" % (c["title"], name, got, total,
                                                       "   (задуманная палитра)" if pid == c["pal"] else ""))
                 t.setItem(r, j, it)
@@ -219,7 +219,7 @@ class MissingDialog(QDialog):
         card, pal = self.cards[self.shown[r]], self.pals[c]
         self.cur = (self.shown[r], card, pal)
         got, total = self.stat.get((self.shown[r], pal[0]), (0, 1))
-        self.title.setText("{}  ·  {}".format(card["title"], pal[1]))
+        self.title.setText("{}, {}".format(card["title"], pal[1]))
         d = prompts.dest(card, pal[0])
         self.info.setText("%s\nСделано: %d из %d%s" % (os.path.relpath(d, LIB) if d else "", got, total,
                                                        "   (задуманная палитра)" if pal[0] == card["pal"] else ""))

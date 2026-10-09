@@ -96,16 +96,31 @@ def header(tree, text):
     return it
 
 
+# цвет раздела библиотеки - как цвет вида у ассетов Unreal: черта на плитках, числа в дереве
+SECTION_COLORS = {"01": "#6cb8ff", "02": "#ff8ac9", "03": "#f0a35e", "04": "#a897ff", "05": "#ffd166",
+                  "06": "#5ee0d0", "07": "#7ee0a0", "08": "#c9a0ff", "09": "#ffb86c", "10": "#ff7b7b",
+                  "11": "#8fd3ff"}
+
+
+def section_color(path):
+    try:
+        top = os.path.relpath(path, LIB).split(os.sep)[0]
+    except ValueError:
+        return C["acc"]
+    return SECTION_COLORS.get(top[:2], C["acc"])
+
+
 def fill_tree(tree, planned=True, recent=False):
     keep = tree.currentItem().data(0, ROLE) if tree.currentItem() else None
     tree.clear()
     folder, star, plus = lib_icon("folder"), lib_icon("folder-star"), lib_icon("plus-circle")
 
     if recent:
-        header(tree, "БЫСТРЫЙ ДОСТУП")
+        # быстрый доступ - карточками над деревом (QuickCards); строки остаются скрытыми: выбор раздела
+        # по-прежнему идёт через дерево (show_section, «назад», запоминание раздела)
         for text, role, icon in (("Недавние", RECENT, "hourglass"), ("Избранное", FAV, "star"),
                                  ("Наборы", SETS, "color-palette"), ("Тяжёлые", HEAVY, "zip-archive")):
-            tree_item(tree, text, role, lib_icon(icon))
+            tree_item(tree, text, role, lib_icon(icon)).setHidden(True)
         try:
             tags = db.all_tags().most_common(40)
         except Exception:
@@ -132,6 +147,7 @@ def fill_tree(tree, planned=True, recent=False):
     def add(parent, path, depth):
         it = tree_item(parent, os.path.basename(path), path, star if depth == 1 else folder, counts.get(path, 0))
         it.setToolTip(0, os.path.relpath(path, LIB))
+        it.setForeground(1, QColor(section_color(path)))
         if depth < 3:
             for d in sorted(os.listdir(path)):
                 sub = os.path.join(path, d)

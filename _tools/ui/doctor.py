@@ -122,7 +122,7 @@ class DoctorDialog(QDialog):
             for c in codes:
                 counts[c] = counts.get(c, 0) + 1
         self.head.setText("Найдено: %d из %d" % (len(self.found), total) if self.found else "Всё в порядке")
-        self.sub.setText("   ·   ".join("%s: %d" % (NAMES[c], counts[c]) for c, _n in K.PROBLEMS if c in counts)
+        self.sub.setText(", ".join("%s: %d" % (NAMES[c], counts[c]) for c, _n in K.PROBLEMS if c in counts)
                          or "Проверено %d картинок - проблем нет." % total)
         cur = self.kind.currentData()
         self.kind.blockSignals(True)

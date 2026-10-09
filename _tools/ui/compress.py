@@ -50,6 +50,7 @@ class Compare(QWidget):
     def __init__(self):
         super().__init__()
         self.a = self.b = None
+        self.labels = ("Было", "Стало")  # подписи половин; одна картинка (a is b) - без шторки
         self.split, self.zoom, self.off, self.pan = 0.5, 0.0, QPointF(0, 0), None
         self.setMinimumSize(380, 300)
         self.setCursor(Qt.CursorShape.SplitHCursor)
@@ -98,6 +99,10 @@ class Compare(QWidget):
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, self.scale() < 2)
         p.fillRect(r, QBrush(self.chk))
         x = self.width() * self.split
+        if self.b is self.a:  # одна картинка (например, карта разницы) - без шторки и подписей
+            p.drawPixmap(r, self.a, QRectF(self.a.rect()))
+            p.end()
+            return
         if self.b:
             p.drawPixmap(r, self.b, QRectF(self.b.rect()))
         p.save()
@@ -108,7 +113,7 @@ class Compare(QWidget):
         p.drawLine(QPointF(x, 0), QPointF(x, self.height()))
         p.setBrush(QColor("#9d8cff"))
         p.drawEllipse(QPointF(x, self.height() / 2), 7, 7)
-        for text, left in (("Было", True), ("Стало", False)):
+        for text, left in ((self.labels[0], True), (self.labels[1], False)):
             fm = p.fontMetrics()
             w = fm.horizontalAdvance(text) + 14
             box = QRectF(x - w - 8 if left else x + 8, 8, w, 22)
@@ -347,7 +352,7 @@ class Progress(QWidget):
 
     def step(self, i, n, name, before, after, path):
         self.target = i / max(1, n)
-        self.line1 = "Сжимаю %d из %d   ·   %s" % (i + 1, n, name)
+        self.line1 = "Сжимаю %d из %d, %s" % (i + 1, n, name)
         self.line2 = f"Уже сэкономлено {human(before - after)}" if before > after else ""
         try:
             self.pm = thumb(path, 256)
@@ -367,7 +372,7 @@ class Progress(QWidget):
             self.line2 = ""
         skipped = ", ".join("%s: %d" % kv for kv in r["skipped"].items())
         if skipped:
-            self.line2 = (self.line2 + "   ·   " if self.line2 else "") + "пропущено (" + skipped + ")"
+            self.line2 = (self.line2 + ", " if self.line2 else "") + "пропущено (" + skipped + ")"
         if r["done"]:                                   # искры из кольца
             for _k in range(46):
                 a = random.uniform(0, 2 * math.pi)

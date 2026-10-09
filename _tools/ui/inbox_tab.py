@@ -325,7 +325,7 @@ class InboxTab(QWidget):
         self.files.itemDoubleClicked.connect(lambda it: os.startfile(it.data(ROLE)))
         add = QPushButton(lib_icon("plus-circle"), "Добавить файлы...")
         add.clicked.connect(self.add_files)
-        left = QWidget()
+        left = self.left = QWidget()
         lv = QVBoxLayout(left)
         lv.setContentsMargins(0, 0, 0, 0)
         self.count = QLabel("ЛИСТЫ", objectName="faint")
@@ -448,7 +448,7 @@ class InboxTab(QWidget):
         for c in (self.preset, self.mode, self.bg_mode):          # длинные пункты не раздвигают правую панель
             c.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
             c.setMinimumContentsLength(14)
-        box1 = QGroupBox("Нарезка")
+        box1 = QGroupBox("НАРЕЗКА")
         box1.setLayout(form)
 
         self.tree = make_tree()
@@ -494,7 +494,7 @@ class InboxTab(QWidget):
         b2 = QVBoxLayout()
         for w in (self.route_lbl, self.where_btn, self.tree, newdir, self.auto, self.keep, self.squeeze, self.auto_tags, self.save_btn, self.all_btn):
             b2.addWidget(w)
-        box2 = QGroupBox("Куда")
+        box2 = QGroupBox("КУДА")
         box2.setLayout(b2)
         right = QWidget()
         rv = QVBoxLayout(right)
@@ -694,9 +694,10 @@ class InboxTab(QWidget):
         else:
             self.pick(None)
         self.stack.setCurrentIndex(1 if n else 0)
-        self.count.setText("ЛИСТЫ  ·  %d" % n if n else "ЛИСТОВ НЕТ")
+        self.count.setText("ЛИСТЫ: %d" % n if n else "ЛИСТОВ НЕТ")
         self.all_btn.setEnabled(n > 1 and not self.auto_busy)
-        self.win.tabs.setTabText(0, "Входящие (%d)" % n)
+        self.win.tabs.setTabText(0, "Входящие  %d" % n if n else "Входящие")
+        self.left.setVisible(bool(n))  # пустая колонка листов не занимает место
         if self.auto.isChecked() and n:
             self.auto_timer.start()
 
@@ -996,8 +997,8 @@ class InboxTab(QWidget):
             self.title.setText(name if len(name) <= 60 else name[:57] + "...")
             text = "Отмечено %d из %d" % (len(self.checked()), len(self.pieces))      # главное - в начале, хвост может не влезть
             if self.dupe:
-                text += "   ·   уже есть: %d" % len(self.dupe)
-            self.info.setText(text + "   ·   лист %d × %d" % (self.im.width, self.im.height))
+                text += ", уже есть: %d" % len(self.dupe)
+            self.info.setText(text + ", лист %d × %d" % (self.im.width, self.im.height))
         self.update_save()
 
     def set_checks(self, items, on):

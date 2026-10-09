@@ -219,7 +219,7 @@ class WeightDialog(QDialog):
         tops = [v for k, v in res.items() if os.path.dirname(k) == LIB]
         total, heavy = sum(v[0] for v in tops), sum(v[2] for v in tops)
         saved = sum(self.win.cfg.get("saved", {}).values())
-        self.sub.setText("Всего %s в %d файлах   ·   тяжёлых %s   ·   %s" % (
+        self.sub.setText("Всего %s в %d файлах, тяжёлых %s, %s" % (
             human(total), sum(v[1] for v in tops), human(heavy) if heavy else "нет",
             "сжатием уже сэкономлено " + human(saved) if saved else "сжатием пока ничего не экономили"))
         self.enter(self.root)

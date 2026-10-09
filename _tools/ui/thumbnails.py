@@ -22,7 +22,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QStyle, QStyledItemDelegate
 
 import imaging as K
-from ui.common import DUPE, EXT, HERE, LIB, PIX, STAR, SUB
+from ui.common import DUPE, EXT, HERE, LIB, PIX, ROLE, STAR, SUB, TINT
 from ui.theme import C
 
 
@@ -265,28 +265,36 @@ class TileDelegate(QStyledItemDelegate):
         sel = bool(option.state & QStyle.StateFlag.State_Selected)
         r = QRectF(option.rect).adjusted(5, 5 - 2 * h, -5, -5 - 2 * h)      # наведённая чуть всплывает
 
+        tint = index.data(TINT)
+        acc = QColor(tint or C["acc"])            # цвет раздела (как цвет вида у ассетов Unreal)
         if h > 0.01 or sel:                  # мягкая тень под карточкой
             k = max(h, 0.6 if sel else 0)
             p.setPen(Qt.PenStyle.NoPen)
             for i in range(1, 7):
                 p.setBrush(QColor(0, 0, 0, int(22 * k * (1 - i / 7))))
                 p.drawRoundedRect(r.adjusted(-i, -i + 4, i, i + 4), 14 + i, 14 + i)
-            glow = QColor(C["acc"])
-            glow.setAlpha(int(30 * k))
+            glow = QColor(acc)
+            glow.setAlpha(int(45 * k))
             p.setBrush(glow)
             p.drawRoundedRect(r.adjusted(-2, -2, 2, 2), 16, 16)
 
-        base, top = QColor(C["bg2"]), QColor(C["bg3"])
-        fill = QColor(C["accd"]) if sel else mix(base, top, h)
-        p.setBrush(fill)
+        base = QColor(C["bg2"])
+        fg = QLinearGradient(r.topLeft(), r.bottomLeft())  # сверху - лёгкий отсвет цвета раздела
+        fg.setColorAt(0, mix(base, acc, 0.07 + 0.10 * h + (0.14 if sel else 0)))
+        fg.setColorAt(1, mix(base, QColor(C["bg1"]), 0.5))
+        p.setBrush(QBrush(fg))
         if sel:
             g = QLinearGradient(r.topLeft(), r.bottomRight())
-            g.setColorAt(0, QColor(C["acc"]))
-            g.setColorAt(1, QColor(C["acc2"]))
+            g.setColorAt(0, acc)
+            g.setColorAt(1, mix(acc, QColor(C["acc2"]), 0.5))
             p.setPen(QPen(QBrush(g), 2))
         else:
-            p.setPen(QPen(mix(QColor(C["line"]), QColor(C["acc"]), h * 0.7), 1))
+            p.setPen(QPen(mix(QColor(C["line"]), acc, 0.15 + h * 0.6), 1))
         p.drawRoundedRect(r, 14, 14)
+        if tint:                                 # цветная черта сверху - какого вида ассет
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(tint))
+            p.drawRoundedRect(QRectF(r.x() + 18, r.y() + 1.5, r.width() - 36, 3.5), 1.75, 1.75)
 
         side = r.width() - 2 * self.PAD
         box = QRectF(r.x() + self.PAD, r.y() + self.PAD, side, side)
@@ -330,21 +338,29 @@ class TileDelegate(QStyledItemDelegate):
                 p.drawPixmap(c.adjusted(4, 4, -4, -4), star, QRectF(star.rect()))
 
         ext = index.data(EXT)
-        if ext and h > 0.05:                     # формат - плашкой при наведении
+        if ext:                                  # формат - всегда, бледно; при наведении ярче и с весом
+            label = ext
+            if h > 0.05:
+                path = index.data(ROLE)
+                try:
+                    kb = os.path.getsize(path) / 1024 if path else 0
+                    label = f"{ext}  {kb / 1024:.1f} МБ" if kb >= 1024 else f"{ext}  {max(1, round(kb))} КБ"
+                except OSError:
+                    pass
             p.setFont(self.f3)
-            tw = p.fontMetrics().horizontalAdvance(ext) + 12
+            tw = p.fontMetrics().horizontalAdvance(label) + 12
             pill = QRectF(box.right() - tw - 5, box.y() + 5, tw, 18)
-            p.setOpacity(h)
+            p.setOpacity(0.55 + 0.45 * h)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(13, 13, 19, 210))
             p.drawRoundedRect(pill, 9, 9)
-            p.setPen(QColor(C["text"]))
-            p.drawText(pill, Qt.AlignmentFlag.AlignCenter, ext)
+            p.setPen(acc if h > 0.05 else QColor(C["text"]))
+            p.drawText(pill, Qt.AlignmentFlag.AlignCenter, label)
             p.setOpacity(1)
 
         text = QRect(int(r.x()) + 10, int(box.bottom()) + 7, int(r.width()) - 20, 18)
         p.setFont(self.f1)
-        p.setPen(QColor("#ffffff" if sel else C["text"]))
+        p.setPen(QColor(C["selt"] if sel else C["text"]))
         name = p.fontMetrics().elidedText(index.data(Qt.ItemDataRole.DisplayRole) or "",
                                           Qt.TextElideMode.ElideMiddle, text.width())
         p.drawText(text, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter, name)
@@ -480,7 +496,7 @@ class PieceDelegate(QStyledItemDelegate):
             p.drawText(pill, Qt.AlignmentFlag.AlignCenter, num)
 
         p.setFont(self.f1)
-        p.setPen(QColor("#ffffff" if sel else C["text"] if on else C["faint"]))
+        p.setPen(QColor(C["selt"] if sel else C["text"] if on else C["faint"]))
         nr = self.name_rect(option)
         name = p.fontMetrics().elidedText(index.data(Qt.ItemDataRole.DisplayRole) or "",
                                           Qt.TextElideMode.ElideMiddle, nr.width())

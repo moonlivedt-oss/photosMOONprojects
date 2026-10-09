@@ -39,6 +39,7 @@ SUB = Qt.ItemDataRole.UserRole + 2                 # вторая строка �
 STAR = Qt.ItemDataRole.UserRole + 3                # в избранном
 EXT = Qt.ItemDataRole.UserRole + 4                 # формат (плашка при наведении)
 DUPE = Qt.ItemDataRole.UserRole + 5                # кусок уже есть в библиотеке (путь похожего)
+TINT = Qt.ItemDataRole.UserRole + 6                # цвет-метка плитки (вид ассета Unreal)
 RECENT = "::recent"                                 # виртуальные разделы вкладки библиотеки
 FAV = "::fav"
 HEAVY = "::heavy"
