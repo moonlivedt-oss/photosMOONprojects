@@ -500,17 +500,43 @@ class Viewer3D(QDialog):
 
     # ------------------------------------------------------------ примерка текстуры на модель
     def fill_tryon(self):
-        if self.tryon.count():
+        """Список для примерки: сначала подходящие этой модели (ткань для дивана, дерево для стола - по смыслу),
+        потом все текстуры. Пересобирается для каждой модели."""
+        model = self.asset or {}
+        if self.tryon.count() and self.tryon.property("for") == model.get("dir"):
             return
+        self.tryon.setProperty("for", model.get("dir"))
         self.tryon.blockSignals(True)
+        self.tryon.clear()
         self.tryon.addItem(lib_icon("dice_3D"), "Родные материалы", None)
         order = ("Дом - ткани и кожа", "Дом - полы", "Дом - стены", "Дом - плитка и камень")
         tex = [a for a in self.tab.items if a.get("kind") == "tex"]
         tex.sort(key=lambda a: (order.index(a["theme"]) if a.get("theme") in order else 9, a.get("name", "")))
-        for a in tex:
+        fit = []
+        sem = getattr(self.tab, "sem", None)
+        if sem is not None and tex:
+            from library import unreal_sem
+
+            try:
+                fit = unreal_sem.materials_for(sem, model.get("section") or U.home_section(model), tex)
+            except Exception as e:
+                log_error("viewer3d tryon: %r" % e)
+
+        def add(a, suffix=""):
             prev = os.path.join(a["dir"], "preview.webp")
             icon = QIcon(thumb(prev, 48)) if os.path.exists(prev) else QIcon()
-            self.tryon.addItem(icon, a.get("name", ""), a)
+            self.tryon.addItem(icon, a.get("name", "") + suffix, a)
+
+        for a in fit:
+            add(a, "  - подходит")
+        if fit:
+            self.tryon.insertSeparator(self.tryon.count())
+        for a in tex:
+            add(a)
+        self.tryon.setToolTip(
+            "Надеть скачанную текстуру на всю модель. Сначала - подходящие ей по смыслу"
+            + (f" ({model.get('section')})" if model.get("section") else "")
+        )
         self.tryon.blockSignals(False)
 
     def apply_tryon(self):

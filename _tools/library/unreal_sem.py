@@ -194,3 +194,41 @@ def classify(sem, items, prompts=SECTION_PROMPTS, margin=MARGIN):
     top = np.sort(s, 1)
     best = s.argmax(1)
     return {a["dir"]: names[best[i]] for i, (a, _v) in enumerate(have) if top[i, -1] - top[i, -2] >= margin}
+
+
+# из чего обычно делают вещь такого раздела: запросы к поиску по смыслу по текстурам (проверено: «fabric
+# upholstery» поднимает ткани и букле, «wood for a table» - дерево, «ceramic bathroom tiles» - плитку и мрамор)
+MATERIALS = {
+    "Диваны": ("fabric upholstery", "leather"),
+    "Стулья и кресла": ("wood", "fabric upholstery", "leather"),
+    "Столы": ("wood for a table", "marble"),
+    "Кровати": ("fabric bedding", "wood"),
+    "Шкафы и полки": ("wood", "painted wood"),
+    "Кухня и посуда": ("ceramic", "metal", "wood"),
+    "Ванная": ("ceramic bathroom tiles", "marble"),
+    "Свет": ("metal", "fabric lampshade", "wood"),  # стекла среди текстур нет - поиск подставлял бы мрамор
+    "Техника": ("plastic", "metal"),
+    "Декор": ("ceramic", "brass metal", "stone"),
+    "Растения": ("ceramic", "wood"),
+    "Инструменты": ("metal", "wood"),
+    "Хозяйство и уборка": ("plastic", "metal", "wicker"),
+    "Спорт и хобби": ("leather", "wood", "fabric"),
+    "Одежда и аксессуары": ("fabric", "leather"),
+    "Стены, двери, окна": ("wood", "painted plaster"),
+}
+DEFAULT_MATERIALS = ("wood", "fabric", "metal")
+
+
+def materials_for(sem, section, textures, top=8):
+    """Текстуры, которые подходят вещи этого раздела: по очереди из каждого материала (ткань, кожа, ткань...),
+    без повторов. -> [ассет текстуры]."""
+    lists = [[a for a, _s in sem.rank(q, textures)] for q in MATERIALS.get(section, DEFAULT_MATERIALS)]
+    out, seen = [], set()
+    for i in range(max((len(x) for x in lists), default=0)):
+        for lst in lists:
+            if i < len(lst) and lst[i]["dir"] not in seen:
+                seen.add(lst[i]["dir"])
+                out.append(lst[i])
+                if len(out) >= top:
+                    return out
+    return out

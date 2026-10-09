@@ -117,6 +117,22 @@ class TestHomeSections(unittest.TestCase):
         self.assertEqual(got, {"a": "Свет"})
 
 
+class TestMaterials(unittest.TestCase):
+    def test_round_robin_without_repeats(self):
+        from library import unreal_sem as S
+
+        tex = {n: {"name": n, "dir": n} for n in ("linen", "velvet", "leather", "oak")}
+
+        class Sem:
+            def rank(self, q, items):
+                found = {"fabric upholstery": ["linen", "velvet", "leather"], "leather": ["leather", "linen"]}[q]
+                return [(tex[n], 1.0) for n in found]
+
+        got = S.materials_for(Sem(), "Диваны", list(tex.values()), top=3)
+        self.assertEqual([a["name"] for a in got], ["linen", "leather", "velvet"])  # ткань, кожа, ткань
+        self.assertIn("Диваны", S.MATERIALS)
+
+
 class TestCatalog(unittest.TestCase):
     def test_guess_theme(self):
         self.assertEqual(
