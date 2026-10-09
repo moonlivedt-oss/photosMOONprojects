@@ -7,6 +7,7 @@
 сразу и отменяет Ctrl+Z, помощник отменяет сам (undo). Удалённое помощником не стирается, а лежит
 в _sources/_deleted. В настройках окна доступ на запись можно выключить (ai_write)."""
 
+import contextvars
 import io
 import os
 import shutil
@@ -57,6 +58,9 @@ def tool(name, desc, props=None, required=(), write=False):
     return deco
 
 
+_writing = contextvars.ContextVar("writing", default=False)  # идёт операция записи (см. images)
+
+
 def write_allowed():
     return C.load_cfg().get("ai_write", True)
 
@@ -79,7 +83,11 @@ def call(name, args=None):
     missing = [k for k in t["schema"]["required"] if k not in args]
     if missing:
         raise ApiError(f"Не хватает параметров: {', '.join(missing)}.")
-    return t["fn"](**args)
+    token = _writing.set(t["write"])
+    try:
+        return t["fn"](**args)
+    finally:
+        _writing.reset(token)
 
 
 # ---------------------------------------------------------------- пути
@@ -116,6 +124,8 @@ def absolute(path, must_exist=True, inside=True):
 
 
 def images(paths, limit=200):
+    """Картинки библиотеки. Операции записи не трогают служебные папки (_tools, _docs, _sources...):
+    смотреть их можно, менять, переносить и убирать - нет."""
     if isinstance(paths, str):
         paths = [paths]
     if not paths:
@@ -126,6 +136,8 @@ def images(paths, limit=200):
     for p in out:
         if not os.path.isfile(p) or not p.lower().endswith(K.EXT):
             raise ApiError(f"«{rel(p)}» - не картинка.")
+        if _writing.get() and rel(p).split("/")[0].startswith("_"):
+            raise ApiError(f"«{rel(p)}» - в служебной папке: её картинки можно смотреть, но не менять.")
     return out
 
 

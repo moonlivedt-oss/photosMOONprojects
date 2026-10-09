@@ -82,6 +82,21 @@ class Api(unittest.TestCase):
         with self.assertRaises(api.ApiError):
             api.call("move", {"paths": [f"{SEC}/red-planet.png"], "folder": "_sources"})
 
+    def test_service_folders_read_only(self):
+        os.makedirs(self.path("_docs/screenshots"))
+        dot((200, 200, 40, 255)).save(self.path("_docs/screenshots/logo.png"))
+        self.assertIn("_docs", api.call("info", {"path": "_docs/screenshots/logo.png"})["path"])  # смотреть можно
+        logo = "_docs/screenshots/logo.png"
+        for name, args in (
+            ("trash", {"paths": [logo]}),
+            ("tag", {"paths": [logo], "add": ["x"]}),
+            ("rename", {"path": logo, "new_name": "x"}),
+        ):
+            with self.assertRaises(api.ApiError, msg=name) as e:
+                api.call(name, args)
+            self.assertIn("служебной", str(e.exception))
+        self.assertTrue(os.path.exists(self.path("_docs/screenshots/logo.png")))
+
     def test_tags_undo(self):
         p = f"{SEC}/red-planet.png"
         r = api.call("tag", {"paths": [p], "add": ["Космос", "#планета"]})
