@@ -76,7 +76,6 @@ from ui.thumbnails import (
     tile_image,
     to_qimage,
 )
-from ui.unreal_tiles import ASSET as ue_ASSET
 from ui.widgets import (
     DestDialog,
     LibList,
@@ -131,54 +130,59 @@ class Preview(QWidget):
         self.note_timer.timeout.connect(lambda: self.tab.save_note(self.note.toPlainText()))
         self.note.textChanged.connect(lambda: self.note_timer.start() if not self.loading_meta else None)
         self.loading_meta = False
-        g = QGridLayout()
-        g.setSpacing(6)
+        # главное действие - крупно, остальное - строкой значков, редкое - в «Ещё»
         self.btns = []
-        for i, (text, icon, fn, tip) in enumerate(
-            (
-                ("Открыть", "image-file", tab.open_file, "Enter или двойной щелчок по плитке"),
-                ("В проводнике", "folder", tab.reveal, ""),
-                ("Копировать", "camera", tab.copy_image, "Ctrl+Shift+C - картинка вставляется в любой редактор"),
-                ("Путь", "clipboard", tab.copy_path, "Ctrl+C - копировать путь к файлу"),
-                ("В избранное", "star", tab.toggle_fav, "Ctrl+D"),
-                ("Похожие", "magnifying-glass", tab.find_similar, "Найти похожие по рисунку и пропорциям"),
-                (
-                    "Выгрузить...",
-                    "upload-arrow",
-                    tab.export,
-                    "Ctrl+E - копии нужного формата и размера в папку проекта",
-                ),
-                ("Просмотр", "eye", tab.look, "Пробел - на всё окно, стрелки листают"),
-            )
-        ):
-            b = QPushButton(lib_icon(icon), text)
-            b.setToolTip(tip)
-            b.clicked.connect(fn)
-            g.addWidget(b, i // 2, i % 2)
-            self.btns.append(b)
-        tools = QHBoxLayout()
-        tools.setSpacing(6)
-        for text, icon, fn, tip in (
-            ("Редактировать", "paint-brush", tab.edit, "Ctrl+R"),
-            ("Сжать и конвертировать", "zip-archive", tab.compress, "Ctrl+K"),
-            ("Переименовать", "quill-pen", tab.rename, "F2"),
-            ("Перенести в раздел", "folder", tab.move, ""),
-        ):
+
+        def tool(text, icon, fn, tip=""):
             b = QPushButton(lib_icon(icon), "", objectName="tool")
             b.setToolTip(text + (f"  ({tip})" if tip else ""))
             b.clicked.connect(fn)
-            tools.addWidget(b)
             self.btns.append(b)
+            return b
+
+        main = QHBoxLayout()
+        main.setSpacing(6)
+        self.export_btn = QPushButton(lib_icon("upload-arrow"), "Выгрузить в проект...", objectName="primary")
+        self.export_btn.setToolTip("Ctrl+E - копии нужного формата и размера в папку проекта")
+        self.export_btn.clicked.connect(tab.export)
+        self.btns.append(self.export_btn)
+        self.look_btn = QPushButton(lib_icon("eye"), "Просмотр")
+        self.look_btn.setToolTip("Пробел - на всё окно, стрелки листают")
+        self.look_btn.clicked.connect(tab.look)
+        self.btns.append(self.look_btn)
+        main.addWidget(self.export_btn, 1)
+        main.addWidget(self.look_btn)
+        tools = QHBoxLayout()
+        tools.setSpacing(4)
+        self.open_btn = tool("Открыть", "image-file", tab.open_file, "Enter или двойной щелчок по плитке")
+        self.fav_btn = tool("В избранное", "star", tab.toggle_fav, "Ctrl+D")
+        self.similar_btn = tool("Похожие по рисунку и пропорциям", "magnifying-glass", tab.find_similar)
+        for b in (
+            self.open_btn,
+            tool("Показать в проводнике", "folder", tab.reveal),
+            tool("Копировать картинку", "camera", tab.copy_image, "Ctrl+Shift+C"),
+            tool("Копировать путь", "clipboard", tab.copy_path, "Ctrl+C"),
+            self.fav_btn,
+            self.similar_btn,
+            tool("Редактировать", "paint-brush", tab.edit, "Ctrl+R"),
+            tool("Сжать и конвертировать", "zip-archive", tab.compress, "Ctrl+K"),
+        ):
+            tools.addWidget(b)
         tools.addStretch(1)
-        b = QPushButton(lib_icon("trash-bin"), " В корзину", objectName="ghost")
-        b.setToolTip("Del - вернуть можно из корзины Windows")
-        b.clicked.connect(tab.trash)
-        tools.addWidget(b)
-        self.btns.append(b)
+        more = QPushButton(lib_icon("menuGrid"), "Ещё", objectName="ghost")
+        mm = QMenu(self)
+        self.rename_act = mm.addAction(lib_icon("quill-pen"), "Переименовать\tF2", tab.rename)
+        mm.addAction(lib_icon("folder"), "Перенести в раздел...", tab.move)
+        mm.addSeparator()
+        mm.addAction(lib_icon("trash-bin"), "В корзину\tDel", tab.trash)
+        more.setMenu(mm)
+        more.setToolTip("Переименовать, перенести, в корзину")
+        self.btns.append(more)
+        tools.addWidget(more)
         v = QVBoxLayout(self)
         v.setContentsMargins(12, 12, 12, 12)
         v.setSpacing(8)
-        v.addWidget(self.pic, 1)
+        v.addWidget(self.pic, 3)
         v.addSpacing(4)
         v.addWidget(self.name)
         v.addWidget(self.where)
@@ -192,8 +196,10 @@ class Preview(QWidget):
         v.addWidget(self.hints)
         v.addWidget(self.note)
         v.addSpacing(4)
-        v.addLayout(g)
+        v.addLayout(main)
         v.addLayout(tools)
+        v.addStretch(1)  # картинка не выше своих пропорций - свободное место уходит вниз
+        self.pic.fit_aspect = True
         self.show_paths([], "chk")
 
     @staticmethod
@@ -284,10 +290,12 @@ class Preview(QWidget):
         self.show_used(paths[0] if len(paths) == 1 else None)
         for b in self.btns:
             b.setEnabled(bool(paths))
-        for i in (0, 5, 10):  # открыть, похожие, переименовать - только по одной
-            self.btns[i].setEnabled(len(paths) == 1)
+        for b in (self.open_btn, self.similar_btn):  # только по одной
+            b.setEnabled(len(paths) == 1)
+        self.rename_act.setEnabled(bool(paths))  # несколько - одно имя с номерами
         fav = db.favs() if paths else ()
-        self.btns[4].setText("Из избранного" if paths and os.path.relpath(paths[0], LIB) in fav else "В избранное")
+        on = bool(paths) and os.path.relpath(paths[0], LIB) in fav
+        self.fav_btn.setToolTip("Убрать из избранного  (Ctrl+D)" if on else "В избранное  (Ctrl+D)")
         self.show_colors(paths[0] if len(paths) == 1 else None)
         mode = None if mode == "chk" else mode  # прозрачное - прямо на свечении, без шахматки
         if not paths:
@@ -941,16 +949,24 @@ class LibTab(QWidget):
         self.ue_box.setVisible(bool(found))
 
     def open_ue(self, it):
-        a = it.data(ROLE)
-        ue = self.win.unreal
-        self.win.tabs.setCurrentIndex(2)
-        ue.q.setText(self.q.text())
-        ue.show_assets()
-        for i in range(ue.list.count()):
-            if ue.list.item(i).data(ue_ASSET)["dir"] == a["dir"]:
-                ue.list.setCurrentRow(i)
-                ue.list.scrollToItem(ue.list.item(i))
-                break
+        self.win.unreal.go_to(it.data(ROLE), self.q.text())
+
+    def go_to(self, folder, path=None, tries=12):
+        """Показать раздел и (если задан) выбрать в нём картинку - для общего поиска (Ctrl+P)."""
+        if tries == 12:
+            self.win.tabs.setCurrentIndex(1)
+            self.q.clear()
+            select_path(self.tree, folder)
+        if not path:
+            return
+        for i in range(self.list.count()):
+            if os.path.normcase(self.list.item(i).data(ROLE) or "") == os.path.normcase(path):
+                self.list.clearSelection()
+                self.list.setCurrentRow(i)
+                self.list.scrollToItem(self.list.item(i))
+                return
+        if tries:  # плитки раздела ещё грузятся
+            QTimer.singleShot(150, lambda: self.go_to(folder, path, tries - 1))
 
     # ------------------------------------------------------------ инструменты: палитра, сравнение, svg
     def palette_from(self, source=None, targets=None):
@@ -1264,7 +1280,15 @@ class LibTab(QWidget):
             self.list.empty = "Тяжёлых файлов нет - всё уже сжато."
         else:
             self.list.empty = "В этом разделе пока пусто.\nКартинки сюда попадают из вкладки «Входящие»."
-        self.list.empty_icon = "magnifying-glass" if words or code else "star" if root == FAV else "folder"
+        self.list.empty_icon = (  # пустой экран - маскот библиотеки по случаю
+            "mascot:Поиск"
+            if words or code
+            else "mascot:Привет"
+            if root == FAV
+            else "mascot:Победа"
+            if root == HEAVY
+            else "mascot:Думает"
+        )
         self.list.viewport().update()
 
     def paths(self):

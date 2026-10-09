@@ -302,12 +302,27 @@ class PicView(QWidget):
         self.zoomable, self.zoom, self.off, self.pan = False, 1.0, QPointF(0, 0), None  # увеличение (просмотр)
         self.setMinimumSize(200, 200)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.fit_aspect = False  # высота по пропорциям картинки: квадрат не стоит в высокой пустой рамке
+
+    def fit_height(self):
+        if not self.fit_aspect:
+            return
+        if self.pm is None or self.pm.width() <= 0:
+            self.setMaximumHeight(320)
+            return
+        k = self.pm.height() / self.pm.width()
+        self.setMaximumHeight(max(200, int((self.width() - 24) * min(k, 1.6)) + 24))
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self.fit_height()
 
     def set_pixmap(self, pm):
         pm = pm if pm and not pm.isNull() else None
         if pm is self.pm:
             return
         self.old, self.old_glow, self.pm = self.pm, self.glow, pm
+        self.fit_height()
         self.zoom, self.off = 1.0, QPointF(0, 0)
         self.fade.stop()
         self.t = 0.0
@@ -592,15 +607,17 @@ class LibList(QListWidget):
             p = QPainter(self.viewport())
             p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
             vr = self.viewport().rect()
-            ic = lib_pix(self.empty_icon, 96)
-            y = vr.center().y() - 70
+            mascot = self.empty_icon.startswith("mascot:")  # маскот - крупнее и не бледный
+            ic = lib_pix(self.empty_icon, 256 if mascot else 96)
+            side = 150 if mascot else 80
+            y = vr.center().y() - side // 2 - 50
             if not ic.isNull():
-                p.setOpacity(0.55)
-                p.drawPixmap(QRectF(vr.center().x() - 40, y, 80, 80), ic, QRectF(ic.rect()))
+                p.setOpacity(1 if mascot else 0.55)
+                p.drawPixmap(QRectF(vr.center().x() - side / 2, y, side, side), ic, QRectF(ic.rect()))
                 p.setOpacity(1)
             p.setPen(QColor(C["dim"]))
             p.drawText(
-                QRectF(vr.x() + 30, y + 96, vr.width() - 60, 80),
+                QRectF(vr.x() + 30, y + side + 16, vr.width() - 60, 80),
                 Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
                 self.empty,
             )
