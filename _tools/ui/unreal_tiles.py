@@ -197,11 +197,16 @@ class AssetDelegate(QStyledItemDelegate):
         # плашки: вид слева сверху, разрешение справа, вес снизу при наведении
         ph_ = 20
         dark = QColor(13, 13, 19, 205)
-        kicon = lib_pix(icon_name, 40)
-        kw = pill_width(p, label, self.f3, True, ph_)
-        tag_bg = QColor(col)
-        tag_bg.setAlpha(225)
-        pill(p, QRectF(box.x() + 6, box.y() + 6, kw, ph_), label, QColor("#14121c"), tag_bg, self.f3, kicon)
+        one_kind = getattr(self.view, "one_kind", False)
+        if not one_kind:  # вид на каждой карточке нужен, только когда виды вперемешку
+            kicon = lib_pix(icon_name, 40)
+            kw = pill_width(p, label, self.f3, True, ph_)
+            tag_bg = QColor(col)
+            tag_bg.setAlpha(225)
+            pill(p, QRectF(box.x() + 6, box.y() + 6, kw, ph_), label, QColor("#14121c"), tag_bg, self.f3, kicon)
+        elif d.get("size"):  # раздел одного вида - на месте ярлыка вес, он полезнее
+            w = pill_width(p, d["size"], self.f3, False)
+            pill(p, QRectF(box.x() + 6, box.y() + 6, w, ph_), d["size"], QColor(C["text"]), dark, self.f3)
         x_right = box.right() - 6
         if d.get("res"):
             w = pill_width(p, d["res"], self.f3, False)
@@ -232,7 +237,7 @@ class AssetDelegate(QStyledItemDelegate):
             pill(
                 p, QRectF(box.x() + 6, box.bottom() - ph_ - 6, w, ph_), t, QColor("#0f1a12"), QColor("#7ee0a0"), self.f3
             )
-        if d.get("size") and h > 0.05:
+        if d.get("size") and h > 0.05 and not one_kind:
             p.setOpacity(h)
             w = pill_width(p, d["size"], self.f3, False)
             pill(

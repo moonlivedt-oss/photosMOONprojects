@@ -35,7 +35,7 @@ from library.unreal_extra import added
 from ui.common import ROLE, THUMB, bg, human, in_main, log_error, reveal
 from ui.thumbnails import lib_icon, swatch, thumb
 from ui.unreal_catalog import CatalogDialog
-from ui.unreal_nav import FAV, HOME_PREFIX, KIND_LOOK, SET, SETS, THEME_ICON, Nav, kind_color, theme_label
+from ui.unreal_nav import ALL, FAV, HOME_PREFIX, KIND_LOOK, SET, SETS, THEME_ICON, Nav, kind_color, theme_label
 from ui.unreal_tiles import ASSET, CARD, CardList, card_of
 from ui.viewer3d import CAN_VIEW, MiniView, Viewer3D, studio_probe
 from ui.widgets import PicView, key
@@ -156,7 +156,7 @@ class UnrealTab(QWidget):
         self.list.itemDoubleClicked.connect(lambda it: self.view3d(it.data(ASSET)))
         self.viewer = None
         self.list.empty = "Здесь пусто - нажмите «Скачать ещё...»"
-        self.list.empty_icon = "download"
+        self.list.empty_icon = "mascot:С карточками"
 
         bar = QHBoxLayout()
         bar.addWidget(self.q, 1)
@@ -471,6 +471,7 @@ class UnrealTab(QWidget):
         self.info.setText(f"{len(lst)} шт., {human(size)}")
         self.list.clear()
         self.list.reset_anim()
+        self.list.one_kind = len({a.get("kind") for a in lst}) == 1
         favs = self.favs()
         todo = []
         for i, a in enumerate(lst):
@@ -789,6 +790,22 @@ class UnrealTab(QWidget):
             self.dl_lbl.show()
         else:
             self.dl_lbl.hide()
+
+    def go_to(self, a, query="", again=True):
+        """Открыть вкладку на ассете: из полосы в поиске библиотеки и из общего поиска (Ctrl+P)."""
+        self.win.tabs.setCurrentIndex(2)
+        self.leave_special(quiet=True)
+        self.q.setText(query)
+        self.show_assets()
+        for i in range(self.list.count()):
+            if self.list.item(i).data(ASSET)["dir"] == a["dir"]:
+                self.list.setCurrentRow(i)
+                self.list.scrollToItem(self.list.item(i))
+                return
+        if again:  # ассет скрыт выбранным видом или темой - показать всё и найти ещё раз
+            self.nav.kind, self.nav.theme = ALL, None
+            self.nav.set_items(self.items, self.favs())
+            self.go_to(a, "", again=False)
 
     def show_downloads(self):
         for d in (getattr(self, "get_dlg", None), getattr(self, "cat_dlg", None)):
