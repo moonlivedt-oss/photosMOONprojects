@@ -97,5 +97,28 @@ class TestCatalog(unittest.TestCase):
             U.refetch({"source": "Kenney", "kind": "model", "id": "x", "name": "x", "dir": "."}, "2k")
 
 
+class TestFiles(unittest.TestCase):
+    def test_inside(self):
+        root = os.path.join("C:\\", "lib", "a")
+        self.assertEqual(U.inside(root, "textures/x.jpg"), os.path.join(root, "textures", "x.jpg"))
+        for bad in ("../x.jpg", "textures/../../x.jpg", "C:/Windows/x.dll", "/etc/x", ""):
+            with self.assertRaises(OSError, msg=bad):
+                U.inside(root, bad)
+
+    def test_put_in_place_replaces(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            dst, new = os.path.join(tmp, "Chair"), os.path.join(tmp, "Chair.part")
+            os.makedirs(dst)
+            os.makedirs(new)
+            open(os.path.join(dst, "old.fbx"), "w").close()
+            open(os.path.join(new, "new.fbx"), "w").close()
+            U.put_in_place(new, dst)
+            self.assertEqual(sorted(os.listdir(tmp)), ["Chair"])  # ни .part, ни .old не осталось
+            self.assertEqual(os.listdir(dst), ["new.fbx"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

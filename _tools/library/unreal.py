@@ -743,7 +743,7 @@ def assets(root=ROOT):
     if not os.path.isdir(root):
         return out
     for d, dirs, files in os.walk(root):
-        dirs[:] = sorted(x for x in dirs if not x.endswith(".part"))
+        dirs[:] = sorted(x for x in dirs if not x.endswith((".part", ".old")))  # недокачанное и заменённое
         if "asset.json" in files:
             try:
                 with open(os.path.join(d, "asset.json"), encoding="utf-8") as fh:
@@ -807,12 +807,29 @@ def fetch(cand, kind, theme, res="2k", progress=None, stop=None, dst=None, repla
             raise OSError("не скачались: " + ", ".join(lost[:3]))
         meta["size"] = folder_size(tmp)
         K.write_atomic(os.path.join(tmp, "asset.json"), json.dumps(meta, ensure_ascii=False, indent=1), "utf-8")
-        shutil.rmtree(dst, ignore_errors=True)
-        os.replace(tmp, dst)
+        put_in_place(tmp, dst)
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
     return dst
+
+
+def put_in_place(tmp, dst):
+    """Готовую папку - на место dst. Старая (перекачка) сначала отодвигается и стирается только после
+    замены: если её файл занят (открыт в 3D-просмотре), старый ассет остаётся целым, а не наполовину стёртым."""
+    old = None
+    if os.path.exists(dst):
+        old = dst + ".old"
+        shutil.rmtree(old, ignore_errors=True)
+        os.replace(dst, old)
+    try:
+        os.replace(tmp, dst)
+    except BaseException:
+        if old:
+            os.replace(old, dst)
+        raise
+    if old:
+        shutil.rmtree(old, ignore_errors=True)
 
 
 def pick(fmt_map, prefer):
@@ -830,6 +847,14 @@ def save_preview(data, dst, side=512):
     im.save(os.path.join(dst, "preview.webp"), quality=88)
 
 
+def inside(root, rel):
+    """root/rel, но не выше root: имена файлов приходят с сервера (include у FBX, имена на Google Drive)."""
+    parts = [x for x in rel.replace("\\", "/").split("/") if x not in ("", ".")]
+    if not parts or ".." in parts or rel.startswith(("/", "\\")) or ":" in rel:
+        raise OSError("подозрительное имя файла от сервера: " + rel)
+    return os.path.join(root, *parts)
+
+
 def run_files(jobs, dst, progress, stop, start=0.0, span=1.0):
     """jobs = [(относительный путь, {url,size,md5})] - скачать подряд, общий ход в progress."""
     total = sum(j[1].get("size", 0) for j in jobs) or 1
@@ -841,7 +866,7 @@ def run_files(jobs, dst, progress, stop, start=0.0, span=1.0):
             if progress:
                 progress(start + span * (base + got) / total, name)
 
-        download(f["url"], os.path.join(dst, *rel.split("/")), f.get("size", 0), f.get("md5"), tick, stop)
+        download(f["url"], inside(dst, rel), f.get("size", 0), f.get("md5"), tick, stop)
         done += f.get("size", 0)
 
 

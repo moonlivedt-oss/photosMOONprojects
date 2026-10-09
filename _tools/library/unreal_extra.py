@@ -76,7 +76,7 @@ def check(items=None):
     for d, dirs, _files in os.walk(ROOT):
         for x in list(dirs):
             # *.part - недокачанное; свежая папка может качаться прямо сейчас - её не трогать
-            if x.endswith(".part") and time.time() - os.path.getmtime(os.path.join(d, x)) > 3600:
+            if x.endswith((".part", ".old")) and time.time() - os.path.getmtime(os.path.join(d, x)) > 3600:
                 shutil.rmtree(os.path.join(d, x), ignore_errors=True)
                 dirs.remove(x)
                 out.append((None, f"убрана недокачанная папка {x}"))
