@@ -161,6 +161,8 @@ def search_text():
 
 def moved(a, b):
     """Файл переехал или переименован - метки и заметка едут с ним."""
+    if a == b:  # иначе DELETE ниже сотрёт метки самого файла
+        return
     with _lock:
         c = conn()
         with c:

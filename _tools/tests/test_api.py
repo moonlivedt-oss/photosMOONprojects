@@ -268,6 +268,75 @@ class Api(unittest.TestCase):
         self.assertEqual(json.loads(r["content"][0]["text"])["images"], 3)
         self.assertIsNone(mcp_server.handle(api, {"method": "notifications/initialized"}))
 
+    def test_rename_to_same_name_keeps_tags(self):
+        r = f"{SEC}/red-planet.png"
+        api.call("tag", {"paths": [r], "add": ["планета"]})
+        api.call("rename", {"path": r, "new_name": "red-planet"})
+        self.assertEqual(db.tags_of(api.key(self.path(r))), ["планета"])
+
+    def test_convert_replace_keeps_tags_and_undo_returns_them(self):
+        r = f"{SEC}/red-planet.png"
+        api.call("tag", {"paths": [r], "add": ["планета"]})
+        api.call("favorite", {"paths": [r]})
+        api.call("note", {"path": r, "text": "для сайта"})
+        res = api.call("convert", {"paths": [r], "format": "webp", "replace": True})
+        new = api.key(self.path(f"{SEC}/red-planet.webp"))
+        self.assertTrue(os.path.exists(self.path(f"{SEC}/red-planet.webp")))
+        self.assertEqual(db.tags_of(new), ["планета"])
+        self.assertIn(new, db.favs())
+        self.assertEqual(db.note_of(new), "для сайта")
+        api.call("undo", {"id": res["journal_id"]})
+        old = api.key(self.path(r))
+        self.assertTrue(os.path.exists(self.path(r)))
+        self.assertEqual(db.tags_of(old), ["планета"])
+        self.assertIn(old, db.favs())
+        self.assertEqual(db.note_of(old), "для сайта")
+
+    def test_trash_failure_keeps_tags(self):
+        from unittest import mock
+
+        r = f"{SEC}/red-planet.png"
+        api.call("tag", {"paths": [r], "add": ["планета"]})
+        with mock.patch.object(api.shutil, "move", side_effect=PermissionError(13, "занят")):
+            res = api.call("trash", {"paths": [r]})
+        self.assertEqual(res["removed"], 0)
+        self.assertIn("errors", res)
+        self.assertEqual(db.tags_of(api.key(self.path(r))), ["планета"])
+
+    def test_read_only_allows_previews_but_not_export(self):
+        C.save_cfg({"ai_write": False})
+        r = f"{SEC}/red-planet.png"
+        pic = api.call("edit", {"paths": [r], "ops": [{"op": "flip", "dir": "h"}]})
+        self.assertIsInstance(pic, api.Picture)
+        with self.assertRaises(api.ApiError):
+            api.call("edit", {"paths": [r], "ops": [{"op": "flip", "dir": "h"}], "mode": "replace"})
+        with self.assertRaises(api.ApiError):
+            api.call("export", {"paths": [r], "dest": os.path.join(self.lib, "out")})
+        self.assertFalse(os.path.exists(os.path.join(self.lib, "out")))
+
+    def test_failed_undo_stays_undoable(self):
+        r = f"{SEC}/red-planet.png"
+        res = api.call("move", {"paths": [r], "folder": "02 Наклейки/Другое"})
+        os.remove(self.path("02 Наклейки/Другое/red-planet.png"))  # файл увели мимо журнала
+        with self.assertRaises(api.ApiError):
+            api.call("undo", {"id": res["journal_id"]})
+        self.assertFalse(journal.get(res["journal_id"])["undone"])
+
+    def test_import_checks_all_files_first(self):
+        good = os.path.join(self.lib, "good.png")
+        dot((1, 2, 3, 255)).save(good)
+        with self.assertRaises(api.ApiError):
+            api.call("import_images", {"files": [good, os.path.join(self.lib, "нет.png")]})
+        self.assertEqual(C.inbox_files(), [])
+
+    def test_mcp_marks_destructive_tools(self):
+        import mcp_server
+
+        hints = {t["name"]: t["annotations"] for t in mcp_server.tool_list(api)}
+        self.assertTrue(hints["trash"]["destructiveHint"])
+        self.assertFalse(hints["tag"]["destructiveHint"])
+        self.assertFalse(hints["export"]["readOnlyHint"])
+
 
 if __name__ == "__main__":
     unittest.main()

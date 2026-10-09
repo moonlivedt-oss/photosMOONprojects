@@ -11,6 +11,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 
 from library import unreal_import
@@ -121,14 +122,27 @@ def enable_python(project):
 
 def editor_running(project=None):
     """Открыт ли редактор Unreal (с этим проектом, если удаётся узнать)."""
-    try:
-        out = subprocess.run(
-            ["wmic", "process", "where", "name='UnrealEditor.exe'", "get", "CommandLine"],
+    try:  # wmic в новых Windows 11 убран - командные строки процессов даёт PowerShell
+        r = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "[Console]::OutputEncoding = [Text.Encoding]::UTF8; "  # путь «Документы» - не кракозябрами
+                "Get-CimInstance Win32_Process -Filter \"Name='UnrealEditor.exe'\" | "
+                "ForEach-Object { 'UnrealEditor ' + $_.CommandLine }",
+            ],
             capture_output=True,
             text=True,
-            timeout=15,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        ).stdout
+        )
+        if r.returncode != 0:
+            raise OSError(r.stderr)
+        out = r.stdout
     except Exception:
         try:
             out = subprocess.run(
@@ -185,6 +199,11 @@ def import_into(assets, project, engine_dir=None, log=None, timeout=1800):
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         imported, errors = [], []
+        # чтение вывода ждёт конца Unreal: завис молча - сторож снимает его по времени
+        hung = []
+        watchdog = threading.Timer(timeout, lambda: (hung.append(True), p.kill()))
+        watchdog.daemon = True
+        watchdog.start()
         t0 = time.time()
         for line in p.stdout:
             fh.write(line)
@@ -198,7 +217,10 @@ def import_into(assets, project, engine_dir=None, log=None, timeout=1800):
             elif log and time.time() - t0 > 2 and "LogInit" in line:
                 log("Unreal запускается...")
                 t0 = time.time()
-        p.wait(timeout=timeout)
+        p.wait()
+        watchdog.cancel()
+        if hung:
+            errors.append(f"Unreal не ответил за {timeout // 60} мин - остановлен")
     return {
         "ok": p.returncode == 0 and not errors and len(imported) == len(assets),
         "imported": imported,

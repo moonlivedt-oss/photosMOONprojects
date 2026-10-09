@@ -45,12 +45,17 @@ class Picture:
         return buf.getvalue()
 
 
-def tool(name, desc, props=None, required=(), write=False):
+def tool(name, desc, props=None, required=(), write=False, preview=None, destructive=False):
+    """write - меняет библиотеку или диск; preview(args) -> True, если этот вызов только показывает
+    (тогда он разрешён и в режиме «Только чтение»); destructive - может заменить или убрать файлы."""
+
     def deco(fn):
         TOOLS[name] = dict(
             fn=fn,
             desc=desc,
             write=write,
+            preview=preview,
+            destructive=destructive,
             schema={"type": "object", "properties": props or {}, "required": list(required)},
         )
         return fn
@@ -70,11 +75,6 @@ def call(name, args=None):
     t = TOOLS.get(name)
     if not t:
         raise ApiError(f"Нет операции «{name}». Список - tools.")
-    if t["write"] and not write_allowed():
-        raise ApiError(
-            "Изменять библиотеку помощникам запрещено в окне (ИИ-помощники -> «Только чтение»). "
-            "Искать и смотреть можно."
-        )
     args = dict(args or {})
     known = t["schema"]["properties"]
     extra = [k for k in args if k not in known]
@@ -83,7 +83,13 @@ def call(name, args=None):
     missing = [k for k in t["schema"]["required"] if k not in args]
     if missing:
         raise ApiError(f"Не хватает параметров: {', '.join(missing)}.")
-    token = _writing.set(t["write"])
+    writing = bool(t["write"]) and not (t["preview"] and t["preview"](args))
+    if writing and not write_allowed():
+        raise ApiError(
+            "Изменять библиотеку помощникам запрещено в окне (ИИ-помощники -> «Только чтение»). "
+            "Искать и смотреть можно."
+        )
+    token = _writing.set(writing)
     try:
         return t["fn"](**args)
     finally:
@@ -597,6 +603,8 @@ def rename(path, new_name):
     if not name:
         raise ApiError("Пустое имя.")
     dst = os.path.join(os.path.dirname(p), name + os.path.splitext(p)[1])
+    if dst == p:
+        return dict(path=rel(p), note="Имя то же - ничего не менялось.")
     if os.path.exists(dst) and dst.lower() != p.lower():
         raise ApiError(f"«{rel(dst)}» уже есть. Выберите другое имя.")
     os.rename(p, dst)
@@ -635,19 +643,29 @@ def move(paths, folder):
     {"paths": {"type": "array", "items": {"type": "string"}}},
     ["paths"],
     write=True,
+    destructive=True,
 )
 def trash(paths):
     ps = images(paths, 500)
     day = os.path.join(C.DELETED, time.strftime("%Y-%m-%d"))
     steps = []
+    bad = []
     for p in ps:
         r = rel(p)
         dst = C.unique(os.path.join(day, r.replace("/", os.sep)))
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        steps += journal.forget_steps(key(p))
-        shutil.move(p, dst)
+        try:
+            shutil.move(p, dst)  # сначала файл: не вышло - метки остаются при нём
+        except OSError as e:
+            bad.append(f"{r}: {e.strerror or e}")
+            continue
         steps.append(["move", p, dst])
-    return dict(removed=len(ps)) | record(f"Убрано: {len(ps)} шт.", steps)
+        steps += journal.forget_steps(key(p))
+    n = sum(1 for s in steps if s[0] == "move")
+    out = dict(removed=n) | record(f"Убрано: {n} шт.", steps)
+    if bad:
+        out["errors"] = bad
+    return out
 
 
 @tool(
@@ -663,16 +681,27 @@ def trash(paths):
 def import_images(files, folder=None):
     dest = folder_path(folder, create=True) if folder else C.INBOX
     os.makedirs(dest, exist_ok=True)
-    steps, out = [], []
-    for f in files:
+    srcs = []
+    for f in files:  # сначала проверить все: ошибка на середине не оставит копий без записи в журнале
         src = absolute(f, inside=False)
         if not os.path.isfile(src) or not C.is_image(os.path.basename(src)):
             raise ApiError(f"«{f}» - не картинка.")
+        srcs.append(src)
+    steps, out = [], []
+    bad = []
+    for src in srcs:
         dst = C.unique(os.path.join(dest, os.path.basename(src)))
-        shutil.copy2(src, dst)
+        try:
+            shutil.copy2(src, dst)
+        except OSError as e:  # файл занят или нет места - остальные всё равно берём
+            bad.append(f"{os.path.basename(src)}: {e.strerror or e}")
+            continue
         steps.append(["new", dst])
         out.append(rel(dst))
-    return dict(imported=out) | record(f"Добавлено: {len(out)} шт. в «{rel(dest)}»", steps)
+    res = dict(imported=out) | record(f"Добавлено: {len(out)} шт. в «{rel(dest)}»", steps)
+    if bad:
+        res["errors"] = bad
+    return res
 
 
 # ---------------------------------------------------------------- правка
@@ -744,9 +773,6 @@ def save_recipe(ps, ops, adj, mode, folder, title):
         )
     target = folder_path(folder, create=True) if folder else None
     steps, done, bad = batch.save_edits(ps, ops or [], adj or {}, mode == "copy", lambda _v: None, target)
-    for old, new in done:
-        if mode == "replace" and old != new:
-            db.moved(key(old), key(new))
     res = dict(saved=[rel(n) for _o, n in done], errors=bad)
     if mode == "replace":
         res["originals"] = "_sources/edit <дата> (undo вернёт)"
@@ -774,6 +800,8 @@ MODE = {
     },
     ["paths"],
     write=True,
+    preview=lambda a: a.get("mode", "preview") == "preview",
+    destructive=True,
 )
 def edit(paths, adj=None, ops=None, mode="preview", folder=None):
     return save_recipe(images(paths, 500), ops, adj, mode, folder, "Правка")
@@ -785,6 +813,8 @@ def edit(paths, adj=None, ops=None, mode="preview", folder=None):
     {"paths": {"type": "array", "items": {"type": "string"}}, "mode": dict(MODE, default="copy")},
     ["paths"],
     write=True,
+    preview=lambda a: a.get("mode") == "preview",
+    destructive=True,
 )
 def remove_background(paths, mode="copy"):
     op = {"op": "nobg_ai"} if neural.bg_available() else {"op": "nobg"}
@@ -803,6 +833,8 @@ def remove_background(paths, mode="copy"):
     },
     ["paths"],
     write=True,
+    preview=lambda a: a.get("mode") == "preview",
+    destructive=True,
 )
 def upscale(paths, factor=2, kind="auto", mode="copy"):
     return save_recipe(
@@ -823,6 +855,7 @@ def upscale(paths, factor=2, kind="auto", mode="copy"):
     },
     ["paths", "format"],
     write=True,
+    destructive=True,
 )
 def convert(paths, format, max_side=0, budget_kb=0, replace=False):  # noqa: A002
     ps = [p for p in images(paths, 1000) if not p.lower().endswith(".svg") and not K.is_animated(p)]
@@ -861,6 +894,7 @@ def convert(paths, format, max_side=0, budget_kb=0, replace=False):  # noqa: A00
         "trim": {"type": "boolean", "default": False},
     },
     ["paths", "dest"],
+    write=True,
 )
 def export(paths, dest, preset=None, format="", size=0, fit="fit", retina=False, budget_kb=0, trim=False):  # noqa: A002
     ps = images(paths, 2000)
@@ -929,6 +963,7 @@ def inbox():
     },
     ["path"],
     write=True,
+    preview=lambda a: bool(a.get("preview")),
 )
 def cut_sheet(
     path,
@@ -1000,7 +1035,12 @@ def cut_sheet(
         raise ApiError("Куда класть? Задайте folder (например «04 Иконки/Космос»).")
     dest = folder_path(folder, create=True) if folder else r["dest"]
     pick = [i for i in range(len(pieces)) if not have[i] and (not only or i + 1 in only)]
-    saved = sorting.store(p, o, [pieces[i] for i in pick], [names[i] if i < len(names) else "" for i in pick], dest)
+    try:
+        saved = sorting.store(p, o, [pieces[i] for i in pick], [names[i] if i < len(names) else "" for i in pick], dest)
+    except Exception as e:  # что успело записаться - в журнал, чтобы undo это убрало
+        part = getattr(e, "saved", [])
+        rec = record(f"Нарезано (с ошибкой): {len(part)} шт. в «{rel(dest)}»", [["new", s] for s in part])
+        raise ApiError(f"Нарезка прервалась: {e}. Записано {len(part)} шт. {rec.get('undo', '')}") from e
     steps = [["new", s] for s in saved]
     if tags:
         db.set_tags([key(s) for s in saved], tags, "add")
@@ -1143,7 +1183,9 @@ def undo(id=None):  # noqa: A002
         if e["undone"]:
             raise ApiError(f"Действие {id} уже отменено.")
     park = os.path.join(C.DELETED, time.strftime("%Y-%m-%d"), "отменено")
-    _done, bad = journal.undo_steps(e["steps"], C.LIB, park)
+    done, bad = journal.undo_steps(e["steps"], C.LIB, park)
+    if bad and not done:  # не вышло ничего - действие остаётся неотменённым, можно повторить
+        raise ApiError(f"Не получилось отменить «{e['text']}»: файлы перенесены или заняты ({bad} шаг.).")
     journal.mark(e["id"])
     return dict(undone=e["text"], id=e["id"], failed_steps=bad)
 
@@ -1182,6 +1224,7 @@ def versions(path):
     {"path": {"type": "string"}, "version": {"type": "string"}},
     ["path", "version"],
     write=True,
+    destructive=True,
 )
 def restore_version(path, version):
     from library import versions as V

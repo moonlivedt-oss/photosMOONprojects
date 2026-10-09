@@ -34,6 +34,14 @@ def record(who, text, steps):
             return cur.lastrowid
 
 
+def set_steps(jid, steps):
+    """Дописать действие (заметка набирается по буквам - одна запись на всю правку, а не на каждую паузу)."""
+    with db._lock:
+        c = db.conn()
+        with c:
+            c.execute("UPDATE journal SET steps=? WHERE id=?", (json.dumps(steps, ensure_ascii=False), jid))
+
+
 def _row(r):
     return dict(id=r[0], t=r[1], who=r[2], text=r[3], steps=json.loads(r[4] or "[]"), undone=bool(r[5]))
 
@@ -94,6 +102,27 @@ def forget_steps(rel):
         out.append(["note", rel, note, ""])
     if fav:
         out.append(["fav", rel, True, False])
+    return out
+
+
+def follow(old, new, lib):
+    """Картинка сменила файл (другой формат после правки или сжатия): метки, заметка и избранное -
+    за ней. -> шаги, чтобы отмена вернула их старому файлу."""
+    try:
+        a, b = os.path.relpath(old, lib), os.path.relpath(new, lib)
+    except ValueError:  # другой диск
+        return []
+    if a == b or a.startswith("..") or b.startswith(".."):
+        return []
+    tags, note, fav = db.tags_of(a), db.note_of(a), a in db.favs()
+    db.moved(a, b)
+    out = []
+    if tags:
+        out += [["tags", a, tags, []], ["tags", b, [], tags]]
+    if note:
+        out += [["note", a, note, ""], ["note", b, "", note]]
+    if fav:
+        out += [["fav", a, True, False], ["fav", b, False, True]]
     return out
 
 

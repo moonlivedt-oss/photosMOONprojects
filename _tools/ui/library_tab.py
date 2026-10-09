@@ -1784,6 +1784,7 @@ class LibTab(QWidget):
         rels = [os.path.relpath(p, LIB) for p in sel]
         new = {db.clean_tag(t) for t in text.split(",")} - {""}
         before = set(db.all_tags())
+        was = {r: db.tags_of(r) for r in rels}
         if len(rels) == 1:
             if set(db.tags_of(rels[0])) == new:
                 return
@@ -1796,7 +1797,10 @@ class LibTab(QWidget):
                 return
             db.set_tags(rels, common - new, "remove")
             db.set_tags(rels, new - common, "add")
-        self.win.say("Метки: %s" % (", ".join(sorted(new)) or "убраны"))
+        steps = [["tags", r, was[r], now] for r in rels if (now := db.tags_of(r)) != was[r]]
+        text = "Метки: %s" % (", ".join(sorted(new)) or "убраны")
+        self.win.push(text, steps)  # Ctrl+Z вернёт метки как были
+        self.win.say(text, undo=bool(steps))
         if set(db.all_tags()) != before:  # новая или исчезнувшая метка - дерево слева обновить
             self.tree.blockSignals(True)
             fill_tree(self.tree, planned=False, recent=True)
@@ -1805,7 +1809,12 @@ class LibTab(QWidget):
     def save_note(self, text):
         sel = self.paths()
         if len(sel) == 1:
-            db.set_note(os.path.relpath(sel[0], LIB), text)
+            rel = os.path.relpath(sel[0], LIB)
+            before = db.note_of(rel)
+            if before == text or (not before and not text.strip()):
+                return
+            db.set_note(rel, text)
+            self.win.push_note(rel, before, text)
 
     def copy_color(self, hexv):
         QApplication.clipboard().setText(hexv)

@@ -25,9 +25,25 @@ remove_background, upscale, convert, cut_sheet. Перед правкой - edit
 undo, а пользователь видит ваши действия в окне и может отменить их сам."""
 
 
+_out = None  # настоящий stdout - только для ответов протокола (см. guard_stdout)
+
+
+def guard_stdout():
+    """Канал протокола - только для JSON. Всё остальное (print в модулях, предупреждения onnxruntime,
+    вывод Blender и других дочерних программ) уходит в stderr, иначе клиент получит мусор и оборвёт связь."""
+    global _out
+    _out = os.fdopen(os.dup(sys.stdout.fileno()), "wb", buffering=0)
+    os.dup2(sys.stderr.fileno(), sys.stdout.fileno())  # и для дочерних процессов: они наследуют дескриптор 1
+    sys.stdout = sys.stderr
+
+
 def send(msg):
-    sys.stdout.buffer.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8"))
-    sys.stdout.buffer.flush()
+    data = (json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8")
+    if _out is None:
+        sys.stdout.buffer.write(data)
+        sys.stdout.buffer.flush()
+    else:
+        _out.write(data)
 
 
 def tool_list(api):
@@ -38,7 +54,7 @@ def tool_list(api):
                 name=name,
                 description=t["desc"],
                 inputSchema=t["schema"],
-                annotations=dict(readOnlyHint=not t["write"], destructiveHint=False, openWorldHint=False),
+                annotations=dict(readOnlyHint=not t["write"], destructiveHint=t["destructive"], openWorldHint=False),
             )
         )
     return out
@@ -86,6 +102,7 @@ def handle(api, msg):
 
 
 def main():
+    guard_stdout()
     from library import api  # после sys.path; дочерние процессы (сжатие по ядрам) сюда не заходят
 
     for line in sys.stdin.buffer:

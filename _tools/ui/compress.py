@@ -891,12 +891,6 @@ class CompressDialog(QDialog):
         steps, r = res
         remember_savings(self.tab.cfg, r)
         text = report_text(r)
-        src = None
-        for st in steps:
-            if st[0] == "move":
-                src = st[1]
-            elif src and os.path.splitext(st[1])[0] == os.path.splitext(src)[0]:
-                self.win.moved(src, st[1])  # избранное - за новым файлом
         self.steps = steps
         if steps:
             self.win.push("Сжатие: %d шт." % r["done"], steps)

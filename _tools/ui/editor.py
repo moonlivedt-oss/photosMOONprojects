@@ -1647,10 +1647,6 @@ class EditDialog(QDialog):
                     self.steps_lbl.setText(f"Не сохранилось: {res}")
                 return
             steps, made, bad = res
-            if how == "replace":
-                for old, new in made:
-                    if old != new:
-                        self.win.moved(old, new)  # избранное и метки - за файлом, если сменился формат
             what = {"replace": "Правка", "copy": "Копии правки", "palette": "Перекрашено"}[how]
             text = "%s: %d шт." % (what, len(made)) + ("   не вышло: %d" % len(bad) if bad else "")
             if target:

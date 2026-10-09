@@ -332,6 +332,17 @@ class Window(QMainWindow):
         self.drop_redo()  # новое действие - вернуть отменённое уже нельзя
         self.update_undo()
 
+    def push_note(self, rel, before, after):
+        """Заметка: пока её правят подряд, это одно действие - Ctrl+Z вернёт текст до начала правки."""
+        h = self.history[-1] if self.history else None
+        s = h[1] if h else None
+        if s and len(s) == 1 and s[0][0] == "note" and s[0][1] == rel and h[2] and h[2] > 0 and not self.redo:
+            steps = [["note", rel, s[0][2], after]]
+            self.history[-1] = (h[0], steps, h[2])
+            journal.set_steps(h[2], steps)
+            return
+        self.push("Заметка: " + os.path.splitext(os.path.basename(rel))[0], [["note", rel, before, after]])
+
     def update_undo(self):
         self.undo_btn.setVisible(bool(self.history))
         self.hist_btn.setVisible(bool(self.history or self.redo))
@@ -457,7 +468,8 @@ class Window(QMainWindow):
             )
 
     # --- приём файлов
-    def take(self, files):
+    def take(self, files, failed=None):
+        """Копирует картинки во входящие. failed - список, куда сложить не скопированные пути."""
         n, bad = 0, []
         for f in files:
             if os.path.isfile(f) and is_image(os.path.basename(f)) and os.path.dirname(os.path.abspath(f)) != INBOX:
@@ -466,6 +478,8 @@ class Window(QMainWindow):
                     n += 1
                 except OSError as e:  # файл занят генератором или нет прав - остальные всё равно берём
                     bad.append(f"{os.path.basename(f)}: {e.strerror or e}")
+                    if failed is not None:
+                        failed.append(f)
         if n:
             self.tabs.setCurrentIndex(0)
             self.inbox.reload()
@@ -586,7 +600,8 @@ class Window(QMainWindow):
         d = self.cfg.get("gen_dir")
         if not d or not os.path.isdir(d):
             return
-        since, newest, ready, seen = self.cfg.get("gen_since", time.time()), 0, [], {}
+        since, ready, seen = self.cfg.get("gen_since", time.time()), [], {}
+        taken = getattr(self, "gen_taken", {})  # уже взятые, но новее застрявшего - второй раз не брать
         try:
             names = os.listdir(d)
         except OSError:  # сетевая папка отвалилась - попробуем в следующий раз
@@ -599,17 +614,23 @@ class Window(QMainWindow):
                 st = os.stat(p)
             except OSError:
                 continue
-            if st.st_mtime <= since or not os.path.isfile(p):
+            if st.st_mtime <= since or taken.get(p) == st.st_mtime or not os.path.isfile(p):
                 continue
             if self.sizes.get(p) == st.st_size and st.st_size:  # размер не растёт - файл дописан
-                ready.append(p)
-                newest = max(newest, st.st_mtime)
+                ready.append((p, st.st_mtime))
             seen[p] = st.st_size
         self.sizes = seen  # старые записи не копятся
         if ready:
-            self.cfg["gen_since"] = newest
-            if self.take(ready):
+            failed = []
+            if self.take([p for p, _t in ready], failed):
                 QApplication.alert(self)  # мигнуть на панели задач, если окно в фоне
+            # граница сдвигается только до первого не скопированного: занятый файл возьмём в следующий раз
+            stuck = [t for p, t in ready if p in failed]
+            done = [t for p, t in ready if p not in failed and (not stuck or t < min(stuck))]
+            if done:
+                self.cfg["gen_since"] = since = max(done)
+            taken.update((p, t) for p, t in ready if p not in failed)
+            self.gen_taken = {p: t for p, t in taken.items() if t > since}
 
     # --- прочее
     def doctor(self):
@@ -640,9 +661,25 @@ class Window(QMainWindow):
             self.show_help(NEW if seen or self.cfg.get("size") else "С чего начать")
 
     def open_gallery(self):
+        """Галерея свежая - открыть сразу; иначе собрать в фоне (1-2 с на большой библиотеке) и открыть."""
+        page = os.path.join(LIB, "Gallery.html")
+
+        def show(res=None):
+            self.gal_busy = False
+            if isinstance(res, Exception):
+                log_error(f"галерея не собралась: {res!r}")
+            QDesktopServices.openUrl(QUrl.fromLocalFile(page))
+
+        if getattr(self, "gal_busy", False):  # сборка уже идёт - открыть, когда закончится
+            QTimer.singleShot(300, self.open_gallery)
+            return
+        if not self.gal.isActive() and os.path.exists(page):
+            show()
+            return
         self.gal.stop()
-        K.build_gallery()
-        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.join(LIB, "Gallery.html")))
+        self.gal_busy = True
+        self.say("Собираю галерею...")
+        bg(K.build_gallery, show)
 
     def open_prompts(self):
         QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.join(LIB, "Prompts.html")))

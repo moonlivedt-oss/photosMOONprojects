@@ -10,7 +10,7 @@ import time
 
 import imaging as K
 import library.common as C
-from library import db
+from library import journal
 
 KINDS = (("edit ", "правка"), ("compress ", "сжатие"))
 
@@ -60,18 +60,11 @@ def restore(path, version):
     stem = os.path.splitext(path)[0]
     new = stem + os.path.splitext(version)[1].lower()
     steps = []
-    old_rel = os.path.relpath(path, C.LIB)
-    tags, fav = db.tags_of(old_rel), old_rel in db.favs()
     shutil.move(path, keep)
     steps.append(["move", path, keep])
     if os.path.exists(new):  # другой файл с тем же именем и форматом версии - не затирать
         new = C.unique(new)
     shutil.copy2(version, new)
     steps.append(["new", new])
-    new_rel = os.path.relpath(new, C.LIB)
-    if new_rel != old_rel:  # формат сменился - метки и избранное за картинкой
-        db.moved(old_rel, new_rel)
-        steps += [["tags", old_rel, tags, []], ["tags", new_rel, [], tags]]
-        if fav:
-            steps += [["fav", old_rel, True, False], ["fav", new_rel, False, True]]
+    steps += journal.follow(path, new, C.LIB)  # формат сменился - метки, заметка и избранное за картинкой
     return new, steps

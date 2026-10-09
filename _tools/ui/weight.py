@@ -5,12 +5,15 @@ import os
 import time
 
 from PyQt6 import sip
-from PyQt6.QtCore import QRectF, Qt, QTimer
+from PyQt6.QtCore import QFile, QRectF, Qt, QTimer
 from PyQt6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
     QDialog,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -18,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 import imaging as K
+from library import cleanup
 from ui.common import HEAVY_KB, LIB, bg, human
 from ui.theme import C
 
@@ -208,7 +212,11 @@ class WeightDialog(QDialog):
             b.setEnabled(False)
         close = QPushButton("Закрыть")
         close.clicked.connect(self.accept)
+        old = QPushButton("Старые оригиналы...", objectName="ghost")
+        old.setToolTip("Что копится в _sources (оригиналы до правки и сжатия, листы, удалённое) и что можно убрать")
+        old.clicked.connect(lambda: SourcesDialog(self.win).exec())
         foot = QHBoxLayout()
+        foot.addWidget(old)
         foot.addWidget(self.info, 1)
         foot.addWidget(self.open_btn)
         foot.addWidget(self.comp_btn)
@@ -295,3 +303,101 @@ class WeightDialog(QDialog):
         if self.row and self.row["heavy_paths"]:
             self.win.lib.compress(list(self.row["heavy_paths"]))
             self.refresh()
+
+
+class SourcesDialog(QDialog):
+    """Чистка _sources: виды с весом, «старше N дней», перенос в корзину Windows (оттуда можно вернуть)."""
+
+    AGES = ((30, "старше 30 дней"), (60, "старше 60 дней"), (90, "старше 90 дней"), (180, "старше полугода"))
+
+    def __init__(self, win):
+        super().__init__(win)
+        self.win, self.files = win, []
+        self.setWindowTitle("Старые оригиналы")
+        self.resize(560, 420)
+        head = QLabel("Старые оригиналы", objectName="title")
+        self.sub = QLabel("Считаю...", objectName="dim", wordWrap=True)
+        self.age = QComboBox()
+        for d, text in self.AGES:
+            self.age.addItem(text, d)
+        self.age.setCurrentIndex(1)
+        self.age.currentIndexChanged.connect(self.update_total)
+        self.boxes = {}
+        rows = QVBoxLayout()
+        for kind, title, hint in cleanup.KINDS:
+            b = QCheckBox(title)
+            b.setChecked(kind in cleanup.DEFAULT)
+            b.setToolTip(hint)
+            b.toggled.connect(self.update_total)
+            self.boxes[kind] = b
+            rows.addWidget(b)
+        self.total = QLabel(objectName="dim", wordWrap=True)
+        self.go = QPushButton("В корзину", objectName="primary")
+        self.go.clicked.connect(self.clean)
+        self.go.setEnabled(False)
+        close = QPushButton("Закрыть")
+        close.clicked.connect(self.reject)
+        foot = QHBoxLayout()
+        foot.addWidget(self.total, 1)
+        foot.addWidget(self.go)
+        foot.addWidget(close)
+        lay = QVBoxLayout(self)
+        lay.addWidget(head)
+        lay.addWidget(self.sub)
+        lay.addWidget(self.age)
+        lay.addLayout(rows)
+        lay.addStretch(1)
+        lay.addLayout(foot)
+        bg(cleanup.scan, self.scanned)
+
+    def scanned(self, res):
+        if sip.isdeleted(self):
+            return
+        if isinstance(res, Exception):
+            self.sub.setText(f"Не получилось: {res}")
+            return
+        self.files = res
+        s = cleanup.summary(res)
+        for kind, title, _h in cleanup.KINDS:
+            b, n = s.get(kind, (0, 0))
+            self.boxes[kind].setText(f"{title}: {n} шт., {human(b)}" if n else f"{title}: нет")
+            self.boxes[kind].setEnabled(bool(n))
+        self.sub.setText(
+            "Всего в _sources %s. Правка и сжатие откладывают сюда оригиналы - это версии картинок для отката. "
+            "Убранное уходит в корзину Windows, вернуть можно оттуда." % human(sum(v[0] for v in s.values()))
+        )
+        self.update_total()
+
+    def chosen(self):
+        kinds = [k for k, b in self.boxes.items() if b.isChecked() and b.isEnabled()]
+        return cleanup.pick(self.files, kinds, self.age.currentData())
+
+    def update_total(self):
+        pick = self.chosen()
+        self.go.setEnabled(bool(pick))
+        self.total.setText(
+            "Уйдёт в корзину: %d шт., освободится %s" % (len(pick), human(sum(f[2] for f in pick)))
+            if pick
+            else "Под условия ничего не попадает"
+        )
+
+    def clean(self):
+        pick = self.chosen()
+        if not pick:
+            return
+        ok = QMessageBox.question(
+            self,
+            "Старые оригиналы",
+            "Перенести в корзину Windows %d файлов (%s)?\nОткат к этим версиям станет невозможен, "
+            "но из корзины их можно вернуть." % (len(pick), human(sum(f[2] for f in pick))),
+        )
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+        bad = sum(1 for p, *_r in pick if not QFile.moveToTrash(p))
+        cleanup.drop_empty_dirs()
+        self.win.say(
+            "Старые оригиналы: в корзину %d шт." % (len(pick) - bad) + ("   не вышло: %d" % bad if bad else "")
+        )
+        self.go.setEnabled(False)
+        self.sub.setText("Считаю...")
+        bg(cleanup.scan, self.scanned)

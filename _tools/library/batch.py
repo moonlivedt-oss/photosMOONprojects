@@ -8,6 +8,7 @@ import time
 
 import imaging as K
 import library.common as C
+from library import journal
 from library.common import parallel, unique
 
 
@@ -80,9 +81,9 @@ def compress_files(paths, o, report):
             steps.append(("move", p, keep))
             if os.path.exists(new):
                 new = unique(new)
-            with open(new, "wb") as fh:
-                fh.write(data)
+            K.write_atomic(new, data)
             steps.append(("new", new))
+            steps += journal.follow(p, new, C.LIB)  # формат сменился - метки и избранное за картинкой
             done += 1
             before += was
             after += len(data)
@@ -161,6 +162,8 @@ def save_edits(paths, ops, adj, copy, report, target=None):
                     new = unique(new)
             K.write_atomic(new, data)
             steps.append(("new", new))
+            if not copy and not target:
+                steps += journal.follow(p, new, C.LIB)
             done.append((p, new))
         except Exception as e:
             bad.append(f"{os.path.basename(p)}: {e}")
