@@ -251,7 +251,9 @@ class Nav(QWidget):
         self.changed.emit()
 
     def sets(self):
-        return self.cfg.setdefault("ue_sets", {})
+        from library import unreal_sets
+
+        return unreal_sets.load(self.cfg)  # общий файл: подборки ИИ-помощника видны сразу
 
     def fill_sets(self):
         """Вместо тем - подборки."""

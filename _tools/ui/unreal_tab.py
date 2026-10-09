@@ -806,21 +806,17 @@ class UnrealTab(QWidget):
             name = name.strip()
             if not ok or not name:
                 return
-        lst = self.nav.sets().setdefault(name, [])
-        n = 0
-        for a in assets:
-            if a.get("id") not in lst:
-                lst.append(a.get("id"))
-                n += 1
+        from library import unreal_sets
+
+        n = unreal_sets.add(name, [a.get("id") for a in assets])  # общий файл: его видят и ИИ-помощники
         self.nav.set_items(self.items, self.favs())
-        self.win.say(f"В подборке «{name}»: +{n}, всего {len(lst)}")
+        self.win.say(f"В подборке «{name}»: +{n}, всего {len(self.nav.sets().get(name, []))}")
 
     def remove_from_set(self, name, assets):
-        ids = {a.get("id") for a in assets}
-        sets = self.nav.sets()
-        sets[name] = [i for i in sets.get(name, []) if i not in ids]
-        if not sets[name]:
-            del sets[name]
+        from library import unreal_sets
+
+        unreal_sets.remove(name, [a.get("id") for a in assets])
+        if name not in self.nav.sets():
             self.nav.theme = None
         self.nav.set_items(self.items, self.favs())
         self.show_assets()

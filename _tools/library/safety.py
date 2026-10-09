@@ -17,6 +17,7 @@ import os
 import shutil
 import sqlite3
 import time
+from contextlib import closing
 
 import library.common as C
 from library import db
@@ -58,6 +59,9 @@ def backup(reason=""):
         if os.path.exists(C.CFG) and cfg_ok(C.CFG):
             shutil.copy2(C.CFG, os.path.join(tmp, "settings.json"))
             got = True
+        sets = os.path.join(C.HERE, "_unreal_sets.json")  # подборки Unreal - тоже свои данные
+        if os.path.exists(sets) and cfg_ok(sets):
+            shutil.copy2(sets, os.path.join(tmp, "_unreal_sets.json"))
         if not got:
             shutil.rmtree(tmp, ignore_errors=True)
             return None
@@ -103,7 +107,7 @@ def daily_backup():
     return backup()
 
 
-def restore(src, what=("library.db", "settings.json")):
+def restore(src, what=("library.db", "settings.json", "_unreal_sets.json")):
     """Вернуть копию. Текущее состояние сначала само уходит в копию «перед восстановлением».
     Окно после этого надо перезапустить (база и настройки уже прочитаны)."""
     hold = os.path.join(backups_dir(), "_restoring")  # файлы копии - в сторону: новая копия ниже
@@ -125,8 +129,10 @@ def restore(src, what=("library.db", "settings.json")):
                     if os.path.exists(db.DB + side):
                         os.remove(db.DB + side)
                 shutil.copy2(p, db.DB)
-            else:
+            elif f == "settings.json":
                 shutil.copy2(p, C.CFG)
+            else:
+                shutil.copy2(p, os.path.join(C.HERE, f))
         return list(files)
     finally:
         shutil.rmtree(hold, ignore_errors=True)
@@ -214,7 +220,7 @@ def check():
         row("База", ok, f"цела, {C.human(size)}" if ok else "повреждена - взять из копии", "db")
         if ok:
             try:
-                with sqlite3.connect(f"file:{db.DB}?mode=ro", uri=True) as c:
+                with closing(sqlite3.connect(f"file:{db.DB}?mode=ro", uri=True)) as c:  # with без closing не закрывает
                     n = {t: c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in ("tags", "notes", "fav")}
                 row("Метки и заметки", True, f"меток {n['tags']}, заметок {n['notes']}, в избранном {n['fav']}")
             except sqlite3.Error as e:
