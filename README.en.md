@@ -226,6 +226,15 @@ py -3.14 _tools/cli.py api                                  # assistant tools, J
 py -3.14 _tools/cli.py api search '{"query": "cozy night street"}'
 ```
 
+## If something breaks
+
+"Инструменты" -> "Проверка и восстановление" (Tools -> Check and restore, also via Ctrl+P) shows the state of the
+settings, the database, backups, models and disk space, fixes problems in one click and restores backups.
+The database (tags, notes, favorites, smart folders, undo journal) and the settings are backed up daily into
+`_tools/_backups` (last 10). A damaged file is never deleted: it is moved aside as `*.broken-<time>` and the last
+good backup is used. If the window does not start at all, run `_tools/repair.cmd` or
+`py -3.14 _tools/cli.py repair fix`.
+
 ## Project layout
 
 `_tools/imaging/` - Qt-free core (cutting, encoding, editing, similarity, CLIP, doctor, sprites);
