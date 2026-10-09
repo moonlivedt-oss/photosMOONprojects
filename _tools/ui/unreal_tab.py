@@ -291,6 +291,8 @@ class UnrealTab(QWidget):
             self.nav.set_items(res, self.favs())
             self.show_assets()
             self.build_sem()
+            if self.sem is not None and not self.sem_busy:
+                self.ai_sections()  # векторы уже посчитаны - разложить «Мелочи» сразу
             self.draw_previews()
             self.build_colors()
 
@@ -341,8 +343,38 @@ class UnrealTab(QWidget):
             if isinstance(_res, Exception):
                 log_error("unreal_sem build: %r" % _res)
             self.show_assets()
+            self.ai_sections()
 
         bg(lambda: self.sem.build(items, lambda d, t: in_main(prog, (d, t))), done)
+
+    def ai_sections(self):
+        """Модели «Дома», которым по имени и меткам раздел не нашёлся («Мелочи»): раздел по превью и имени
+        (CLIP) - только где ИИ уверен. Помечаются section_ai, в подсказке плитки видно."""
+        if self.sem is None:
+            return
+        other = [
+            a
+            for a in self.items
+            if a.get("kind") == "model"
+            and a.get("theme", "").startswith(HOME_PREFIX)
+            and a.get("section") == U.HOME_OTHER
+        ]
+        if not other:
+            return
+        from library import unreal_sem
+
+        def done(got):
+            if isinstance(got, Exception):
+                log_error("unreal ai sections: %r" % got)
+                return
+            for a in other:
+                if a["dir"] in got:
+                    a["section"], a["section_ai"] = got[a["dir"]], True
+            if got:
+                self.nav.set_items(self.items, self.favs())
+                self.show_assets()
+
+        bg(lambda: unreal_sem.classify(self.sem, other), done)
 
     def chosen(self):
         if self.problems is not None:
@@ -491,7 +523,8 @@ class UnrealTab(QWidget):
             li.setData(
                 CARD, card_of(a.get("kind"), a.get("name", ""), sub, res, human(a.get("size", 0)), a.get("id") in favs)
             )
-            li.setToolTip(f"{a.get('name', '')}\n{a['dir']}")
+            ai = "\nРаздел подобран ИИ по картинке и имени" if a.get("section_ai") else ""
+            li.setToolTip(f"{a.get('name', '')}\n{a['dir']}{ai}")
             self.list.addItem(li)
             if os.path.exists(prev):
                 todo.append((i, prev))

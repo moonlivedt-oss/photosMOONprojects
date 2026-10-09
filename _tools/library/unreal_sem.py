@@ -146,3 +146,51 @@ class AssetSem:
         s = img @ me[0].astype(np.float32) + 0.5 * (txt @ me[1].astype(np.float32))
         order = np.argsort(-s)[:top]
         return [(have[i][0], float(s[i])) for i in order]
+
+
+# разделы «Дома» описаниями для CLIP: когда по имени и меткам раздел не нашёлся, решает картинка
+SECTION_PROMPTS = {
+    "Кровати": "a bed",
+    "Диваны": "a sofa or a couch",
+    "Стулья и кресла": "a chair or an armchair",
+    "Столы": "a table or a desk",
+    "Шкафы и полки": "a cabinet, a wardrobe or a shelf",
+    "Кухня и посуда": "kitchenware, dishes or food",
+    "Ванная": "a bathroom fixture, a toilet, a sink or a bathtub",
+    "Свет": "a lamp or a light",
+    "Техника": "an electronic device or an appliance",
+    "Декор": "a decorative object, a vase, a frame or a statue",
+    "Растения": "a potted plant",
+    "Инструменты": "a hand tool",
+    "Хозяйство и уборка": "a household item, a box, a bin or a container",
+    "Спорт и хобби": "sports equipment, a toy or a musical instrument",
+    "Одежда и аксессуары": "clothing or a personal accessory",
+    "Стены, двери, окна": "a wall, a door or a window",
+}
+MARGIN = 1.0  # отрыв лучшего раздела от второго (в стандартных отклонениях); меньше - не угадывать
+# проверено на 551 модели, где раздел известен по словам: картинка + имя и метки, отрыв 1.0 -
+# верно 84% при решении для ~60% моделей; одна картинка давала 46-65% - этого мало
+
+
+def classify(sem, items, prompts=SECTION_PROMPTS, margin=MARGIN):
+    """Раздел по превью и по имени с метками: {папка ассета: раздел} - только там, где уверенно.
+    Ассеты без посчитанных векторов пропускаются."""
+    names = list(prompts)
+    key = tuple(prompts.values())
+    if getattr(sem, "_sec_key", None) != key:
+        sem._sec = np.stack([clip.embed_text(f"a photo of {t}") for t in prompts.values()]).astype(np.float32)
+        sem._sec_key = key
+    have = [(a, sem.data.get(key_of(a))) for a in items]
+    have = [(a, v) for a, v in have if v is not None]
+    if not have:
+        return {}
+    img = np.stack([v[0] for _a, v in have]).astype(np.float32) @ sem._sec.T
+    txt = np.stack([v[1] for _a, v in have]).astype(np.float32) @ sem._sec.T
+
+    def z(x):  # по строке: какой раздел выделяется у этого ассета
+        return (x - x.mean(1, keepdims=True)) / (x.std(1, keepdims=True) + 1e-6)
+
+    s = z(img) + z(txt)
+    top = np.sort(s, 1)
+    best = s.argmax(1)
+    return {a["dir"]: names[best[i]] for i, (a, _v) in enumerate(have) if top[i, -1] - top[i, -2] >= margin}

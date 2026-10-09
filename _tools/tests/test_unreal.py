@@ -75,6 +75,48 @@ class TestThemes(unittest.TestCase):
             self.assertTrue(any(spec.get(k) for k in ("tex", "hdri", "model", "kenney", "quaternius")), th)
 
 
+class TestHomeSections(unittest.TestCase):
+    def test_new_sections_by_words(self):
+        for name, sec in (
+            ("Rusted Hacksaw", "Инструменты"),
+            ("Wooden Axe 02", "Инструменты"),
+            ("Plastic Broom", "Хозяйство и уборка"),
+            ("Trashcan small 1", "Хозяйство и уборка"),
+            ("Baseball Bat", "Спорт и хобби"),
+            ("Ukulele 01", "Спорт и хобби"),
+            ("Rubber Boots", "Одежда и аксессуары"),
+            ("Coat rack standing", "Одежда и аксессуары"),
+            ("Antique Katana 01", "Декор"),
+            ("Hood modern", "Кухня и посуда"),
+            ("Bed double", "Кровати"),
+            ("Table lamp", "Свет"),
+        ):
+            self.assertEqual(U.home_section({"name": name}), sec, name)
+        self.assertEqual(U.home_section({"name": "Ocean Buoy"}), U.HOME_OTHER)
+        for sec, _keys in U.HOME_SECTIONS:
+            self.assertIn(sec, U.HOME_ORDER)
+
+    def test_classify_only_when_sure(self):
+        import numpy as np
+
+        from library import unreal_sem as S
+
+        prompts = {"Кровати": "a bed", "Свет": "a lamp", "Инструменты": "a hand tool"}
+        basis = {f"a photo of {t}": np.eye(3, dtype=np.float32)[i] for i, t in enumerate(prompts.values())}
+
+        class Sem:
+            data = {}
+
+        sem = Sem()
+        sure = {"name": "x", "dir": "a"}
+        unsure = {"name": "y", "dir": "b"}
+        sem.data[S.key_of(sure)] = (np.float32([0, 1, 0]), np.float32([0, 1, 0]))  # и картинка, и имя - лампа
+        sem.data[S.key_of(unsure)] = (np.float32([1, 0, 0]), np.float32([0, 0, 1]))  # картинка и имя спорят
+        with mock.patch.object(S.clip, "embed_text", side_effect=lambda t: basis[t]):
+            got = S.classify(sem, [sure, unsure, {"name": "z", "dir": "c"}], prompts)
+        self.assertEqual(got, {"a": "Свет"})
+
+
 class TestCatalog(unittest.TestCase):
     def test_guess_theme(self):
         self.assertEqual(
