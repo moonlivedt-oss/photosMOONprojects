@@ -98,6 +98,7 @@ class Window(QMainWindow):
         self.tabs.addTab(self.inbox, lib_icon("Задачи"), "Входящие")
         self.tabs.addTab(self.lib, lib_icon("Книга"), "Библиотека")
         self.unreal = UnrealTab(self)
+        self.unreal.items_loaded.connect(self.lib.update_ue_strip)
         self.tabs.addTab(self.unreal, lib_icon("game-cartridge"), "Unreal")
         self.inbox.reload()
         self.setCentralWidget(self.tabs)

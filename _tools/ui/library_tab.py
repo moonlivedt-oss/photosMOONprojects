@@ -909,11 +909,11 @@ class LibTab(QWidget):
         if not text or ue is None:
             self.ue_box.hide()
             return
-        if not ue.items:  # вкладку Unreal ещё не открывали - список ассетов подгрузится и полоса обновится
-            if not getattr(self, "ue_loading", False):
-                self.ue_loading = True
-                ue.refresh()
-                QTimer.singleShot(1500, lambda: (setattr(self, "ue_loading", False), self.update_ue_strip()))
+        if not ue.loaded:  # вкладку Unreal ещё не открывали - подгрузит список и сама обновит полосу (loaded)
+            ue.refresh()
+            return
+        if not ue.items:
+            self.ue_box.hide()
             return
         if ue.sem is not None:
             found = [a for a, _s in ue.sem.rank(text, ue.items)][:16]

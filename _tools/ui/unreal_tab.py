@@ -49,10 +49,12 @@ def drag_files(a):
 
 
 class UnrealTab(QWidget):
+    items_loaded = pyqtSignal()  # список ассетов прочитан (полоса ассетов в поиске библиотеки ждёт его)
+
     def __init__(self, win):
         super().__init__()
         self.win, self.cfg = win, win.cfg
-        self.items = []
+        self.items, self.loaded, self.loading, self.again = [], False, False, False
         self.side = max(96, min(THUMB, self.cfg.get("ue_thumb", 160)))
 
         # «Новое» - скачанное после прошлого открытия окна (метка времени пишется с настройками)
@@ -271,11 +273,20 @@ class UnrealTab(QWidget):
 
     # ------------------------------------------------------------ данные
     def refresh(self):
+        if self.loading:  # чтение уже идёт - перечитать ещё раз после него (могло скачаться новое)
+            self.again = True
+            return
+        self.loading, self.again = True, False
+
         def done(res):
+            self.loading = False
+            if self.again:
+                QTimer.singleShot(0, self.refresh)
             if isinstance(res, Exception):
                 log_error("unreal: %r" % res)
                 res = []
-            self.items = res
+            self.items, self.loaded = res, True
+            self.items_loaded.emit()
             self.nav.set_items(res, self.favs())
             self.show_assets()
             self.build_sem()
