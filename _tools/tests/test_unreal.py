@@ -97,6 +97,33 @@ class TestCatalog(unittest.TestCase):
             U.refetch({"source": "Kenney", "kind": "model", "id": "x", "name": "x", "dir": "."}, "2k")
 
 
+class TestImport(unittest.TestCase):
+    def test_script_and_same_names(self):
+        import ast
+        import json
+
+        from library import unreal_import
+
+        tmp = tempfile.mkdtemp()
+        try:
+            src = []
+            for pack in ("a", "b"):  # одно имя в двух наборах
+                d = os.path.join(tmp, "src", pack)
+                os.makedirs(d)
+                open(os.path.join(d, "Stool.fbx"), "w").close()
+                src.append({"name": "Stool", "kind": "model", "dir": d, "main": ["Stool.fbx"]})
+            dst = os.path.join(tmp, "out")
+            script = unreal_import.export(src, dst)
+            self.assertEqual(sorted(os.listdir(dst)), ["Stool", "Stool_2", "import_to_unreal.py"])
+            with open(script, encoding="utf-8") as fh:
+                text = fh.read()
+            compile(text, script, "exec")  # скрипт для Unreal - правильный Python
+            jobs = json.loads(ast.literal_eval(text.split("JOBS = json.loads(", 1)[1].split(")\n", 1)[0]))
+            self.assertEqual([j["dest"] for j in jobs], ["/Game/Library/Models/Stool", "/Game/Library/Models/Stool_2"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestFiles(unittest.TestCase):
     def test_inside(self):
         root = os.path.join("C:\\", "lib", "a")

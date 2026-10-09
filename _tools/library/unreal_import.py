@@ -22,28 +22,15 @@ def asset_name(name):
     return s or "Asset"
 
 
-def role_of(fn):
-    """Роль карты текстуры по имени файла: color, normal, arm, rough, metal, ao, height или ''."""
-    low = fn.lower()
-    for keys, role in (
-        (("_diff", "_color", "albedo", "basecolor"), "color"),
-        (("nor_dx", "normaldx", "_normal"), "normal"),
-        (("_arm_",), "arm"),
-        (("rough",), "rough"),
-        (("metal",), "metal"),
-        (("ambientocclusion", "_ao_", "_ao."), "ao"),
-        (("_disp", "displacement", "height"), "height"),
-    ):
-        if any(k in low for k in keys):
-            return role
-    return ""
-
-
 def plan(assets, dst):
     """Скопировать файлы ассетов в dst/<имя>/ и составить список работ для скрипта."""
-    jobs = []
+    jobs, used = [], set()
     for a in assets:
-        name = asset_name(a.get("name", "asset"))
+        name = base = asset_name(a.get("name", "asset"))
+        n = 2
+        while name.lower() in used:  # одинаковые имена (Stool в двух наборах Quaternius) - не в одну папку
+            name, n = f"{base}_{n}", n + 1
+        used.add(name.lower())
         folder = os.path.join(dst, name)
         os.makedirs(folder, exist_ok=True)
         files = []
@@ -60,7 +47,7 @@ def plan(assets, dst):
                 shutil.copytree(tex, os.path.join(folder, "textures"), dirs_exist_ok=True)
         jobs.append(
             {
-                "kind": a.get("kind"),
+                "kind": a.get("kind") or "",
                 "name": name,
                 "files": files,
                 "dest": f"{GAME_ROOT}/{SUB.get(a.get('kind'), 'Misc')}/{name}",
@@ -71,10 +58,12 @@ def plan(assets, dst):
 
 SCRIPT = r'''# Импорт ассетов из библиотеки картинок. Запуск в Unreal: Tools -> Execute Python Script
 # (или в Output Log, режим Cmd: py "{path}"). Нужен плагин Python Editor Script Plugin.
+import json
 import os
+
 import unreal
 
-JOBS = {jobs}
+JOBS = json.loads({jobs})
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 mel = unreal.MaterialEditingLibrary
@@ -166,7 +155,7 @@ unreal.log("Библиотека: готово, ассеты в {root}")
 def write_script(jobs, dst):
     path = os.path.join(dst, "import_to_unreal.py")
     text = SCRIPT.format(
-        jobs=json.dumps(jobs, ensure_ascii=False, indent=1), path=path.replace("\\", "/"), root=GAME_ROOT
+        jobs=repr(json.dumps(jobs, ensure_ascii=False, indent=1)), path=path.replace("\\", "/"), root=GAME_ROOT
     )
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)
