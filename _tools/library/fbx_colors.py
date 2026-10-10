@@ -237,3 +237,89 @@ def add_colors(data: bytes, colors: dict):
     pad = (16 - len(out) % 16) % 16 or 16
     out += b"\x00" * pad + struct.pack("<I", version) + b"\x00" * 120 + magic
     return bytes(out), done
+
+
+# ---------------------------------------------------------------- пути к текстурам
+IMAGE_EXT = (b".png", b".jpg", b".jpeg", b".tga", b".bmp", b".tif", b".tiff")
+
+
+def _rewrite_strings(raw, fix):
+    """Свойства узла с заменой строк: fix(байты) -> новые байты или None (оставить)."""
+    out, p, changed = bytearray(), 0, False
+    sizes = {b"Y": 2, b"C": 1, b"I": 4, b"F": 4, b"D": 8, b"L": 8}
+    while p < len(raw):
+        t = raw[p : p + 1]
+        if t in sizes:
+            out += raw[p : p + 1 + sizes[t]]
+            p += 1 + sizes[t]
+        elif t in (b"S", b"R"):
+            n = struct.unpack_from("<I", raw, p + 1)[0]
+            val = raw[p + 5 : p + 5 + n]
+            new = fix(val) if t == b"S" else None
+            if new is not None and new != val:
+                out += t + struct.pack("<I", len(new)) + new
+                changed = True
+            else:
+                out += raw[p : p + 5 + n]
+            p += 5 + n
+        else:  # массив: длина, кодировка, размер в байтах
+            n = struct.unpack_from("<III", raw, p + 1)[2]
+            out += raw[p : p + 13 + n]
+            p += 13 + n
+    return bytes(out), changed
+
+
+def _parse(data):
+    version = struct.unpack_from("<I", data, 23)[0]
+    wide = version >= 7500
+    pos, top = 27, []
+    while True:
+        node, pos = _read_node(data, pos, wide)
+        if node is None:
+            break
+        top.append(node)
+    return version, wide, top, data[pos:]
+
+
+def _build(data, version, wide, top, footer):
+    out = bytearray(data[:27])
+    for n in top:
+        _write_node(out, n, wide, 0)
+    out += b"\x00" * (25 if wide else 13)
+    fid, magic = footer[:16], footer[-16:]
+    out += fid + b"\x00" * 4
+    pad = (16 - len(out) % 16) % 16 or 16
+    out += b"\x00" * pad + struct.pack("<I", version) + b"\x00" * 120 + magic
+    return bytes(out)
+
+
+def relink_textures(data: bytes, have):
+    """Пути к картинкам внутри FBX (часто абсолютные, с компьютера автора: C:/Dropbox/.../T_Brick.png)
+    -> просто имя файла, если такой файл есть рядом с моделью (have - имена в нижнем регистре).
+    -> (байты, сколько строк заменено). Не FBX или нечего менять - (data, 0)."""
+    if not data.startswith(b"Kaydara FBX Binary"):
+        return data, 0
+    version, wide, top, footer = _parse(data)
+    count = [0]
+
+    def fix(val):
+        low = val.lower()
+        if not low.endswith(IMAGE_EXT) or not (b"\\" in val or b"/" in val):
+            return None
+        base = val.replace(b"\\", b"/").rsplit(b"/", 1)[-1]
+        if base.decode("utf-8", "replace").lower() not in have:
+            return None
+        count[0] += 1
+        return base
+
+    def walk(node):
+        node.props = (node.props[0], _rewrite_strings(node.props[1], fix)[0])
+        for c in node.children:
+            walk(c)
+
+    for n in top:
+        if n.name == b"Objects":
+            walk(n)
+    if not count[0]:
+        return data, 0
+    return _build(data, version, wide, top, footer), count[0]

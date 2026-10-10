@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import zipfile
 
 from library import unreal as U
@@ -15,7 +16,7 @@ from library.common import clean_name, unique
 DROP = os.path.join(U.ROOT, "_Архивы")  # сюда можно просто сложить скачанные zip - «Добавить архивы» их возьмёт
 DONE = os.path.join(DROP, "_разобрано")
 UNPACK = os.path.join(U.PACKS, "local")
-SKIP = ("unity", "__macosx", "/obj", "/gltf", "/glb", "/blend", "godot", "unreal")  # копии в других форматах
+SKIP = ("__macosx", "/obj", "/gltf", "/glb", "/blend", "godot")  # другие форматы - не FBX
 IMAGES = (".png", ".jpg", ".jpeg", ".tga", ".bmp", ".tif", ".tiff")
 
 # (слова в имени архива, источник, страница, тема без источника)
@@ -163,17 +164,25 @@ def texture_refs(fbx):
 
 
 def scan(folder):
-    """FBX внутри папки набора: [путь]. Копии для Unity/Godot, OBJ/glTF/Blend пропускаются; если есть
-    папка с «fbx» в имени - только из неё."""
-    fbx = []
+    """FBX внутри папки набора: [путь]. OBJ/glTF/Blend пропускаются. Наборы часто кладут одну модель
+    несколько раз: «FBX (Unreal Engine)», «FBX (Unity)», просто «FBX» - для каждой модели (по имени файла)
+    берётся одна копия: для Unreal, иначе обычная, и только если больше нет ничего - для Unity."""
+    rank = {"unreal": 0, "plain": 1, "unity": 2}
+    best = {}
     for d, dirs, files in os.walk(folder):
         dirs.sort()
         rel = "/" + os.path.relpath(d, folder).replace("\\", "/").lower()
         if any(s in rel for s in SKIP):
             continue
-        fbx += [os.path.join(d, f) for f in sorted(files) if f.lower().endswith(".fbx")]
-    in_fbx = [f for f in fbx if "fbx" in os.path.relpath(os.path.dirname(f), folder).lower()]
-    return in_fbx or fbx
+        variant = "unreal" if "unreal" in rel or "- ue" in rel else ("unity" if "unity" in rel else "plain")
+        for f in sorted(files):
+            if not f.lower().endswith(".fbx"):
+                continue
+            key = (rank[variant], "fbx" not in rel, len(rel))  # и лучше из папки «FBX», и поближе к корню
+            have = best.get(f.lower())
+            if have is None or key < have[0]:
+                best[f.lower()] = (key, os.path.join(d, f))
+    return sorted(p for _k, p in best.values())
 
 
 def images_by_name(folder):
@@ -220,6 +229,24 @@ def candidates(path, theme=None, source=None, page=""):
     return out, theme
 
 
+def relink(fbx):
+    """Абсолютные пути к текстурам в FBX (с компьютера автора) -> имена файлов рядом. Unreal и Blender
+    находят такие текстуры и сами, а 3D-просмотр окна - нет. -> сколько путей заменено."""
+    from library import fbx_colors
+
+    have = {f.lower() for f in os.listdir(os.path.dirname(fbx))}
+    with open(fbx, "rb") as fh:
+        data = fh.read()
+    try:
+        new, n = fbx_colors.relink_textures(data, have)
+    except (ValueError, IndexError, struct.error):  # необычный FBX - оставить как есть
+        return 0
+    if n:
+        with open(fbx, "wb") as fh:
+            fh.write(new)
+    return n
+
+
 def fetch_local(cand, dst):
     fn = os.path.basename(cand["file"])
     shutil.copy2(cand["file"], os.path.join(dst, fn))
@@ -235,6 +262,7 @@ def fetch_local(cand, dst):
                 os.makedirs(os.path.dirname(out), exist_ok=True)
                 shutil.copy2(path, out)
                 extra.append(p)
+    relink(os.path.join(dst, fn))
     low = cand["source"] in U.LOW_POLY
     meta = {
         "source": cand["source"],

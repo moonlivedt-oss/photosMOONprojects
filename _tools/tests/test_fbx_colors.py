@@ -92,5 +92,41 @@ class TestFbxColors(unittest.TestCase):
         self.assertEqual(bytes(out), data[: len(out)])
 
 
+def fbx_with_texture(path):
+    """FBX 7.4 с узлом Texture, где FileName и RelativeFilename - этот путь."""
+    tex = F.Node(
+        b"Texture",
+        raw(7, b"T_Brick\x00\x01Texture", ""),
+        [F.Node(b"FileName", raw(path)), F.Node(b"RelativeFilename", raw(path))],
+        True,
+    )
+    top = [F.Node(b"Objects", (0, b""), [tex], True)]
+    out = bytearray(b"Kaydara FBX Binary  \x00\x1a\x00" + struct.pack("<I", 7400))
+    for n in top:
+        F._write_node(out, n, False, 0)
+    out += b"\x00" * 13
+    out += b"\xfa\xbc" * 8 + b"\x00" * 4
+    out += b"\x00" * ((16 - len(out) % 16) % 16 or 16) + struct.pack("<I", 7400) + b"\x00" * 120 + b"\xf8\x5a" * 8
+    return bytes(out)
+
+
+class Relink(unittest.TestCase):
+    def test_absolute_path_becomes_name(self):
+        data = fbx_with_texture("C:\\Dropbox\\Work\\Kit\\Blends\\T_Brick.png")
+        new, n = F.relink_textures(data, {"t_brick.png"})
+        self.assertEqual(n, 2)
+        self.assertNotIn(b"Dropbox", new)
+        self.assertIn(b"T_Brick.png", new)
+        v, w, top, footer = F._parse(new)  # собранный файл снова читается
+        self.assertEqual(top[0].children[0].name, b"Texture")
+
+    def test_untouched_when_file_missing_or_plain(self):
+        data = fbx_with_texture("C:\\Dropbox\\T_Brick.png")
+        self.assertEqual(F.relink_textures(data, {"other.png"}), (data, 0))
+        plain = fbx_with_texture("T_Brick.png")
+        self.assertEqual(F.relink_textures(plain, {"t_brick.png"}), (plain, 0))
+        self.assertEqual(F.relink_textures(b"not fbx", {"t_brick.png"}), (b"not fbx", 0))
+
+
 if __name__ == "__main__":
     unittest.main()
