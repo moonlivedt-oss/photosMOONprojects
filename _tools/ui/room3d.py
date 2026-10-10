@@ -129,6 +129,7 @@ class RoomDialog(QDialog):
                     "z": it["z"],
                     "rot": 0,
                     "size": it["size"],
+                    "hang": bool(it.get("hang")),
                     "linear": a.get("source") == "Quaternius",
                 }
             )

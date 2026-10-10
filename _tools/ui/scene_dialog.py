@@ -45,7 +45,7 @@ class Row(QWidget):
         self.on.setToolTip("Брать в подборку")
         self.pic = QLabel()
         self.pic.setFixedSize(56, 56)
-        self.sec = QLabel(label, objectName="faint")
+        self.sec = QLabel(label, objectName="sect")  # раздел - читаемо, с чертой акцента
         self.sec.setFixedWidth(150)
         self.name = QLabel()
         self.other = QPushButton(lib_icon("dice"), "Другой вариант")

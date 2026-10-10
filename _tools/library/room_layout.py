@@ -27,6 +27,15 @@ DEFAULT_CM = {
 }
 
 
+HANG_WORDS = ("chandelier", "pendant", "ceiling", "люстра")
+
+
+def hangs(a):
+    """Люстру, подвесной и потолочный свет - под потолок, а не на пол."""
+    name = a.get("name", "").lower()
+    return any(w in name for w in HANG_WORDS)
+
+
 def size_cm(a):
     dims = a.get("dimensions_mm")
     if dims and max(dims) > 0:
@@ -44,8 +53,10 @@ def footprint(a, s):
 
 
 def layout(models, seed=None):
-    """Расстановка рядами от задней стены. -> (items, ширина, глубина) в см."""
-    order = list(models)
+    """Расстановка рядами от задней стены; люстры - под потолком над серединой комнаты (hang=True).
+    -> (items, ширина, глубина) в см."""
+    hanging = [a for a in models if hangs(a)]
+    order = [a for a in models if not hangs(a)]
     if seed is not None:
         random.Random(seed).shuffle(order)
     if seed is None:  # по умолчанию крупное - к задней стене
@@ -67,4 +78,8 @@ def layout(models, seed=None):
     d = max(380.0, z + row + 120)
     for it in items:  # z считался от задней стены
         it["z"] = -d / 2 + 20 + it["z"]
+    for i, a in enumerate(hanging):  # люстры - в ряд по середине потолка, на равных промежутках
+        items.append(
+            {"a": a, "x": -w / 2 + w * (i + 1) / (len(hanging) + 1), "z": 0.0, "size": size_cm(a), "hang": True}
+        )
     return items, w, d

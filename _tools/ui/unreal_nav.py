@@ -415,6 +415,7 @@ class Nav(QWidget):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
+        self.setMinimumWidth(250)  # уже - подписи карточек, стилей и разделов обрезаются
         self.items, self.favs = [], set()
         self.kind = cfg.get("ue_kind", ALL)
         self.theme = cfg.get("ue_theme")

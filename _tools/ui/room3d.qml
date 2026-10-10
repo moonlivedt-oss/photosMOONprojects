@@ -102,7 +102,8 @@ Item {
 
         Node {
             id: orbit
-            PerspectiveCamera { id: cam; position: Qt.vector3d(0, 0, 900); clipNear: 1; clipFar: 50000; fieldOfView: 45 }
+            objectName: "orbit"
+            PerspectiveCamera { id: cam; objectName: "cam"; position: Qt.vector3d(0, 0, 900); clipNear: 1; clipFar: 50000; fieldOfView: 45 }
         }
         DirectionalLight {
             eulerRotation: Qt.vector3d(-55, -30, 0)
@@ -198,7 +199,9 @@ Item {
                         var s = slot.modelData.size / m
                         scale = Qt.vector3d(s, s, s)
                         var cx = (lo.x + hi.x) / 2 - slot.modelData.x, cz = (lo.z + hi.z) / 2 - slot.modelData.z
-                        position = Qt.vector3d(-cx * s, -lo.y * s, -cz * s)
+                        // люстра - верхом под потолок, остальное - на пол
+                        var y = slot.modelData.hang ? root.wallH - 4 - hi.y * s : -lo.y * s
+                        position = Qt.vector3d(-cx * s, y, -cz * s)
                         root.loaded += 1
                     }
                     onStatusChanged: if (status === RuntimeLoader.Success) Qt.callLater(fitOne)

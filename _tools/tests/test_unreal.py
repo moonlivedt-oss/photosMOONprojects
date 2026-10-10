@@ -422,3 +422,16 @@ class TestFromProject(unittest.TestCase):
         self.assertEqual(order[0], "m_med_nrw_body")
         self.assertFalse(U.is_cc0({"license": P.METAHUMAN_LICENSE}))  # в тексте есть «не CC0»
         self.assertTrue(U.is_cc0({"license": U.LICENSE}))
+
+
+class TestRoomLayout(unittest.TestCase):
+    def test_chandeliers_hang(self):
+        from library import room_layout as R
+
+        models = [{"name": "Sofa 03"}, {"name": "Chandelier 01"}, {"name": "Ceiling Fan"}, {"name": "Chair"}]
+        items, w, _d = R.layout(models)
+        hang = [it for it in items if it.get("hang")]
+        self.assertEqual({it["a"]["name"] for it in hang}, {"Chandelier 01", "Ceiling Fan"})
+        self.assertEqual(len(items), 4)  # люстры не пропадают и не занимают место на полу
+        for it in hang:
+            self.assertLess(abs(it["x"]), w / 2)

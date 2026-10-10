@@ -75,13 +75,7 @@ def on_wall(a):
 
 FLOOR_THEMES = ("Дом - полы", "Дом - плитка и камень")
 WALL_THEMES = ("Дом - стены", "Дом - плитка и камень")
-HANG_WORDS = ("chandelier", "pendant", "ceiling", "люстра")
-
-
-def hangs(a):
-    """Люстру и потолочный свет - под потолок, а не на пол."""
-    name = a.get("name", "").lower()
-    return any(w in name for w in HANG_WORDS)
+hangs = room_layout.hangs  # люстры под потолок - общее правило с 3D-комнатой окна
 
 
 def jobs(assets, room=False, floor=None, wall=None, hdri=None):

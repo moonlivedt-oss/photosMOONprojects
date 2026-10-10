@@ -261,7 +261,7 @@ Item {
             id: orbit
             objectName: "orbit"
             PerspectiveCamera {
-                id: cam; position: Qt.vector3d(0, 0, 420); clipNear: 1; clipFar: 20000
+                id: cam; objectName: "cam"; position: Qt.vector3d(0, 0, 420); clipNear: 1; clipFar: 20000
                 // HDRI: зеркальный и матовый шары перед камерой - видно, как небо освещает сцену
                 Node {
                     visible: root.mode === "hdri" && root.mirrorBall
