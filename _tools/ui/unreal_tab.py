@@ -37,7 +37,7 @@ from ui.thumbnails import lib_icon, swatch, thumb
 from ui.unreal_catalog import CatalogDialog
 from ui.unreal_nav import ALL, FAV, HOME_PREFIX, KIND_LOOK, SET, SETS, THEME_ICON, Nav, kind_color, theme_label
 from ui.unreal_tiles import ASSET, CARD, CardList, card_of
-from ui.viewer3d import CAN_VIEW, MiniView, Viewer3D, studio_probe
+from ui.viewer3d import MiniView, Viewer3D, studio_probe, viewable
 from ui.widgets import PicView, key
 
 SHORT = {"tex": "Текстура", "hdri": "HDRI", "model": "Модель", "ies": "IES"}
@@ -100,7 +100,10 @@ class UnrealTab(QWidget):
             "Скачанные вручную zip (KayKit, Quaternius MegaKit с itch.io...): модели разберутся по темам. "
             "Можно просто сложить архивы в _Unreal/_Архивы"
         )
-        arch.clicked.connect(self.add_archives)
+        add_menu = QMenu(arch)
+        add_menu.addAction(lib_icon("zip-archive"), "Скачанные архивы (zip)...", self.add_archives)
+        add_menu.addAction(lib_icon("export"), "Из проекта Unreal (Fab, Megascans, MetaHuman)...", self.from_project)
+        arch.setMenu(add_menu)
         self.arch_btn = arch
         folder = QPushButton(lib_icon("folder"), "", objectName="tool")
         folder.setToolTip("Открыть папку _Unreal")
@@ -680,7 +683,7 @@ class UnrealTab(QWidget):
 
     def view3d(self, a):
         """Двойной щелчок и «Смотреть в 3D». IES в 3D не показать - тогда файл в проводнике."""
-        if a.get("kind") not in CAN_VIEW:
+        if not viewable(a):
             files = drag_files(a)
             reveal(files[0] if files else a["dir"])
             return
@@ -709,7 +712,7 @@ class UnrealTab(QWidget):
     def hover_mini(self):
         it = self.list.item(self.hover_row) if self.hover_row >= 0 else None
         a = it.data(ASSET) if it is not None else None
-        if not a or self.mini is None or not self.live.isChecked() or a.get("kind") not in CAN_VIEW:
+        if not a or self.mini is None or not self.live.isChecked() or not viewable(a):
             return
         if a in self.current():
             return
@@ -744,7 +747,7 @@ class UnrealTab(QWidget):
             self.mini is not None
             and self.live.isChecked()
             and len(cur) == 1
-            and cur[0].get("kind") in CAN_VIEW
+            and viewable(cur[0])
             and self.isVisible()
         )
         if self.mini is not None:
@@ -755,7 +758,7 @@ class UnrealTab(QWidget):
             self.mini_t.start()
         for b in self.btns:
             b.setEnabled(bool(cur))
-        self.look.setEnabled(len(cur) == 1 and cur[0].get("kind") in CAN_VIEW)
+        self.look.setEnabled(len(cur) == 1 and viewable(cur[0]))
         self.star.setEnabled(bool(cur))
         on = bool(cur) and all(a.get("id") in self.favs() for a in cur)
         self.star.setToolTip("Убрать из избранного (Ctrl+D)" if on else "В избранное (Ctrl+D)")
@@ -803,7 +806,7 @@ class UnrealTab(QWidget):
         authors = [x for x in a.get("authors", []) if x != src]
         if authors:
             src += ", " + ", ".join(authors)
-        lines.append(src + ", CC0" if "CC0" in a.get("license", "") else src)
+        lines.append(src + ", CC0" if U.is_cc0(a) else src + ". " + a.get("license", ""))
         if a.get("tags"):
             lines.append("Метки: " + ", ".join(a["tags"][:8]))
         dims = a.get("dims_cm")
@@ -874,7 +877,7 @@ class UnrealTab(QWidget):
         m = QMenu(self)
         sel = self.current()
         a = self.current()[0]
-        if a.get("kind") in CAN_VIEW:
+        if viewable(a):
             m.addAction(lib_icon("dice_3D"), "Смотреть в 3D", lambda: self.view3d(a))
         on = all(x.get("id") in self.favs() for x in self.current())
         m.addAction(lib_icon("star"), "Убрать из избранного" if on else "В избранное", self.toggle_fav)
@@ -1192,6 +1195,51 @@ class UnrealTab(QWidget):
         d.show()
         d.raise_()
         d.q.setFocus()
+
+    def from_project(self):
+        """Скачанное в самом Unreal (.uasset) - выгрузить в FBX силами Unreal и положить в библиотеку."""
+        from PyQt6.QtWidgets import QInputDialog, QMessageBox
+
+        from library import unreal_engine as E
+        from library import unreal_from_project as P
+
+        projects = E.projects()
+        if not projects:
+            QMessageBox.information(self, "Из проекта Unreal", "Проекты Unreal не найдены (Документы/Unreal Projects).")
+            return
+        names = [os.path.splitext(os.path.basename(p))[0] for p in projects]
+        name, ok = QInputDialog.getItem(self, "Из проекта Unreal", "Проект:", names, 0, False)
+        if not ok:
+            return
+        project = projects[names.index(name)]
+        content = os.path.join(os.path.dirname(project), "Content")
+        folder = QFileDialog.getExistingDirectory(
+            self, "Папка с моделями в Content (например, MetaHumans/Emanuel или Fab/...)", content
+        )
+        if not folder:
+            return
+        try:
+            P.game_path(project, folder)
+        except ValueError:
+            QMessageBox.warning(self, "Из проекта Unreal", "Нужна папка внутри Content этого проекта.")
+            return
+        if E.editor_running(project):
+            QMessageBox.warning(
+                self, "Из проекта Unreal", "Закройте редактор Unreal с этим проектом - выгрузку Unreal делает в фоне."
+            )
+            return
+        self.arch_btn.setEnabled(False)
+        self.win.say("Unreal выгружает модели в FBX - пара минут...")
+
+        def done(res):
+            self.arch_btn.setEnabled(True)
+            if isinstance(res, Exception):
+                QMessageBox.warning(self, "Из проекта Unreal", f"Не получилось: {res}")
+                return
+            self.win.say(f"Из проекта «{name}» добавлено: {len(res)}")
+            self.refresh()
+
+        bg(lambda: P.add_to_library(project, folder, log=lambda t: in_main(self.info.setText, f"выгружено: {t}")), done)
 
     def add_archives(self):
         """Скачанные вручную архивы -> модели по темам; превью дорисуются сами (refresh)."""

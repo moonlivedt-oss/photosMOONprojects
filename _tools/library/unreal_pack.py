@@ -7,6 +7,7 @@ import os
 import shutil
 import time
 
+from library import unreal as U
 from library import unreal_import
 
 KIND_RU = {"tex": "PBR-текстура", "hdri": "HDRI", "model": "3D-модель", "ies": "IES-профиль"}
@@ -29,7 +30,7 @@ def credits_md(assets, title):
         if a.get("url"):
             src = f"[{src}]({a['url']})"
         authors = ", ".join(x for x in a.get("authors", []) if x != a.get("source")) or "-"
-        lic = "CC0" if "CC0" in a.get("license", "") else (a.get("license") or "-")
+        lic = "CC0" if U.is_cc0(a) else (a.get("license") or "-")
         lines.append(f"| {name} | {KIND_RU.get(a.get('kind'), a.get('kind', ''))} | {src} | {authors} | {lic} |")
     return "\n".join(lines) + "\n"
 

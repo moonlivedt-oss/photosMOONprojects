@@ -397,3 +397,25 @@ class TestDuplicates(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFromProject(unittest.TestCase):
+    """Модели из проекта Unreal: путь /Game, отбор частей MetaHuman, лицензия не CC0."""
+
+    def test_paths_parts_license(self):
+        from library import unreal_from_project as P
+
+        proj = os.path.join("C:\\", "P", "Game", "Game.uproject")
+        self.assertEqual(
+            P.game_path(proj, os.path.join("C:\\", "P", "Game", "Content", "MetaHumans", "Emanuel")),
+            "/Game/MetaHumans/Emanuel",
+        )
+        with self.assertRaises(ValueError):
+            P.game_path(proj, os.path.join("C:\\", "Other"))
+        self.assertTrue(P.mh_skip("Hair_S_AfroFade_CardsMesh_Group0_LOD3"))
+        self.assertTrue(P.mh_skip("SKM_Face_Preview"))
+        self.assertFalse(P.mh_skip("Hair_S_AfroFade_CardsMesh_Group0_LOD0"))
+        order = sorted(["Emanuel_FaceMesh", "m_top_hoodie", "m_med_nrw_body"], key=P.mh_order)
+        self.assertEqual(order[0], "m_med_nrw_body")
+        self.assertFalse(U.is_cc0({"license": P.METAHUMAN_LICENSE}))  # в тексте есть «не CC0»
+        self.assertTrue(U.is_cc0({"license": U.LICENSE}))

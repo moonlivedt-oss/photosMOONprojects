@@ -320,6 +320,11 @@ KAYKIT_HOWTO = (
 LOW_POLY = ("Kenney", "Quaternius", "KayKit")  # простые модели - отдельно от реалистичных
 
 
+def is_cc0(a):
+    """Лицензия CC0? Не по подстроке: у MetaHuman и Fab в описании есть «не CC0»."""
+    return a.get("license", "").startswith("CC0")
+
+
 def howto(a):
     """Подсказка «как в Unreal» для ассета (у low-poly наборов своя: без PBR-текстур)."""
     if a.get("source") == "KayKit":

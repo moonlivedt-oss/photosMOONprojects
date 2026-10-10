@@ -443,3 +443,27 @@ def ue_check(limit=100):
         "problems": len(probs),
         "items": [dict(_brief(a), problem=why) for a, why in probs[: max(1, limit)]],
     }
+
+
+@tool(
+    "ue_from_project",
+    "Модели, скачанные в самом Unreal (Fab, Megascans, MetaHuman из Bridge), - в библиотеку: Unreal выгружает "
+    "папку проекта в FBX (редактор с проектом должен быть закрыт; минуты). MetaHuman - одним ассетом. "
+    "folder - папка на диске внутри Content (например, .../Content/MetaHumans/Emanuel).",
+    {"project": {"type": "string"}, "folder": {"type": "string"}, "theme": {"type": "string"}},
+    ["project", "folder"],
+    write=True,
+)
+def ue_from_project(project, folder, theme=None):
+    from library import unreal_from_project as P
+
+    if not os.path.exists(project) or not project.lower().endswith(".uproject"):
+        raise ApiError("Нужен путь к .uproject. Проекты на компьютере - ue_overview (unreal_projects).")
+    if not os.path.isdir(folder):
+        raise ApiError("Нет такой папки.")
+    try:
+        made = P.add_to_library(project, folder, theme, log=lambda t: report(0, None, "выгружено: " + t))
+    except (RuntimeError, ValueError, FileNotFoundError, TimeoutError) as e:
+        raise ApiError(str(e)) from e
+    ui_bridge.ue_changed()
+    return {"added": [_brief(a) for a in _items() if a["dir"] in made]}

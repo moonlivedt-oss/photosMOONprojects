@@ -237,9 +237,13 @@ def apply_meta(items, cache=None):
             continue
         if not a.get("polycount") and m.get("triangles"):
             a["polycount"] = m["triangles"]
-        if m.get("dims_cm") and not a.get("dimensions_mm"):
+        # у моделей со скелетом вершины лежат в исходной позе без костей - габариты врут (MetaHuman в метр ростом),
+        # поэтому размер показывается только у обычных моделей
+        if m.get("dims_cm") and not a.get("dimensions_mm") and not m.get("rigged"):
             a["dims_cm"] = m["dims_cm"]
         a["rigged"] = bool(m.get("rigged"))
+        if m.get("morphs", 0) > 100:  # сотни морфов (лицо MetaHuman) роняют 3D окна (Qt Quick 3D)
+            a["no_qt3d"] = True
         if m.get("animations"):
             a["animations"] = m["animations"]
     return items

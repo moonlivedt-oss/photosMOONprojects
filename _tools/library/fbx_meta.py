@@ -179,10 +179,12 @@ def read(path):
     if objs is None:
         return None
     geoms, models = [], {}
-    rigged, anims = False, []
+    rigged, anims, shapes = False, [], 0
     for c in objs.kids:
         oid = c.vals[0] if c.vals and isinstance(c.vals[0], int) else None
-        if c.name == b"Geometry":
+        if c.name == b"Geometry" and len(c.vals) > 2 and c.vals[2] == b"Shape":
+            shapes += 1  # морф (blend shape): у лица MetaHuman их сотни
+        elif c.name == b"Geometry":
             geoms.append((oid, c))
         elif c.name == b"Model":
             models[oid] = c
@@ -220,7 +222,7 @@ def read(path):
             m = world(parent.get(gid))
             w = pts @ m[:3, :3].T + m[:3, 3]
             lo, hi = np.minimum(lo, w.min(0)), np.maximum(hi, w.max(0))
-    out = {"triangles": tris, "vertices": verts, "rigged": rigged, "animations": anims}
+    out = {"triangles": tris, "vertices": verts, "rigged": rigged, "animations": anims, "morphs": shapes}
     if geoms and np.isfinite(lo).all():
         ext = (hi - lo) * unit
         # Z вверх: ширина X, глубина Y, высота Z; Y вверх (обычно): ширина X, глубина Z, высота Y

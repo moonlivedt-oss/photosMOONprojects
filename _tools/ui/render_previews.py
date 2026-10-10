@@ -17,7 +17,7 @@ SIDE = 512
 
 
 def needs_preview(a):
-    if a.get("kind") != "model" or a.get("_np"):  # _np - уже не вышло (preview.none), не пробовать снова
+    if a.get("kind") != "model" or a.get("_np") or a.get("no_qt3d"):  # _np - уже не вышло (preview.none), не пробовать снова
         return False
     if "_pt" in a:  # из обхода assets()
         return not a["_pt"]

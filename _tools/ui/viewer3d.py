@@ -41,6 +41,12 @@ from ui.widgets import key
 QML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "viewer3d.qml")
 CACHE = os.path.join(HERE, "_thumbs", "ue3d")  # нормали, перевёрнутые для Qt (OpenGL), и каналы ARM
 CAN_VIEW = ("tex", "hdri", "model")
+
+
+def viewable(a):
+    """Можно ли открыть ассет в 3D окна: модели с сотнями морфов (лицо MetaHuman) роняют Qt Quick 3D -
+    у них флаг no_qt3d (в asset.json или из library/fbx_meta), вместо 3D - картинка превью."""
+    return a.get("kind") in CAN_VIEW and not a.get("no_qt3d")
 SHORT = {"tex": "Текстура", "hdri": "HDRI", "model": "Модель"}
 
 
@@ -153,6 +159,9 @@ def load_scene(root, a, probe="", sky=False):
     """Ассет в сцену viewer3d.qml (её делят большое окно и живой просмотр в панели вкладки).
     probe - HDRI для освещения модели и текстуры; у самого HDRI - он сам."""
     kind = a.get("kind")
+    if a.get("no_qt3d"):  # страховка: сюда такие не должны попадать (viewable)
+        root.setProperty("status", "Эту модель 3D окна не откроет - смотрите в Unreal или Blender")
+        return
     root.setProperty("status", "")
     root.setProperty("flat", QUrl())
     root.setProperty("sizeText", "")
@@ -444,7 +453,7 @@ class Viewer3D(QDialog):
     # ------------------------------------------------------------ лента
     def fill_strip(self, current):
         """Те же ассеты, что сейчас во вкладке (раздел, поиск), только те, что можно посмотреть."""
-        lst = [a for a in self.tab.chosen() if a.get("kind") in CAN_VIEW]
+        lst = [a for a in self.tab.chosen() if viewable(a)]
         if not any(a["dir"] == current["dir"] for a in lst):
             lst = [current] + lst
         if [a["dir"] for a in lst] == [a["dir"] for a in self.assets]:
@@ -661,7 +670,7 @@ class Viewer3D(QDialog):
         if a.get("url"):
             src = f'<a href="{esc(a["url"])}" style="color:{C["acc"]}">{src}</a>'
         rows.append(src)
-        rows.append("Лицензия: CC0" if "CC0" in a.get("license", "") else esc(a.get("license", "")))
+        rows.append("Лицензия: CC0" if U.is_cc0(a) else "Лицензия: " + esc(a.get("license", "")))
         if a.get("tags"):
             rows.append("Метки: " + esc(", ".join(a["tags"][:12])))
         # имя файла без пробелов не переносится и раздвигает панель - по одному в строку, длинные с многоточием

@@ -239,10 +239,12 @@ SECTIONS = {
 
 
 def base_of(theme):
-    """«Город - Kenney low-poly» -> «Город»; «Дом - мебель» -> «Дом»."""
+    """«Город - Kenney low-poly» -> «Город»; «Дом - мебель» -> «Дом»; «Персонажи - MetaHuman» -> «Персонажи»."""
     if theme.startswith("Дом - "):
         return "Дом"
-    return re.sub(r" - [^-]+ low-poly$", "", theme)
+    base = re.sub(r" - [^-]+ low-poly$", "", theme)
+    head = base.split(" - ", 1)[0]
+    return head if base not in _BASE_GROUP and head in _BASE_GROUP else base
 
 
 def group_of(a_or_theme):
