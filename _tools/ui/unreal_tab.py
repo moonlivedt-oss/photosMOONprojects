@@ -844,6 +844,10 @@ class UnrealTab(QWidget):
         a = self.current()[0]
         if viewable(a):
             m.addAction(lib_icon("dice_3D"), "Смотреть в 3D", lambda: self.view3d(a))
+        from ui.compare3d import can_compare
+
+        if can_compare(sel):
+            m.addAction(lib_icon("multiplayer"), f"Сравнить в 3D ({len(sel)})", lambda: self.compare3d(sel))
         on = all(x.get("id") in self.favs() for x in self.current())
         m.addAction(lib_icon("star"), "Убрать из избранного" if on else "В избранное", self.toggle_fav)
         if len(sel) == 1 and self.sem is not None:
@@ -1094,6 +1098,12 @@ class UnrealTab(QWidget):
                 d.show()
                 d.raise_()
                 return
+
+    def compare3d(self, assets):
+        from ui.compare3d import CompareDialog
+
+        self.cmp_dlg = CompareDialog(self, assets)
+        self.cmp_dlg.show()
 
     def room(self, assets, title="Комната"):
         from ui.room3d import RoomDialog
