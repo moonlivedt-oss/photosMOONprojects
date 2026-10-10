@@ -17,6 +17,7 @@ Item {
     property real skyRotation: 0
     property string shape: "sphere"        // sphere | cube | plane
     property real tiling: 1.0
+    property real tilingV: -1             // повтор по высоте, если не как по ширине (стена 4 x 2.7 м)
     property bool wire: false
     property bool floor: true              // пол с тенью и сеткой
     property bool spin: false              // модель вращается сама, как на подставке
@@ -263,16 +264,21 @@ Item {
     }
 
     function resetView() {
-        var h = mode === "tex" ? (shape === "plane" ? 0 : 180) : mode === "hdri" ? 0 : height3d
+        var h = mode === "tex" ? (shape === "plane" ? 0 : shape === "floor" ? 70 : shape === "wall" ? 130
+                                : shape === "pillow" ? 20 : 180) : mode === "hdri" ? 0 : height3d
         var human = mode === "model" && showHuman && humanHeight > 0
         if (human) h = Math.max(h, humanHeight)
         var pos = Qt.vector3d(human ? -humanHeight * 0.2 : 0, h / 2, 0)
         var rot = mode === "hdri" ? Qt.vector3d(0, 0, 0)
-                : mode === "tex" && shape === "plane" ? Qt.vector3d(-55, 20, 0) : Qt.vector3d(-16, 32, 0)
+                : mode === "tex" && shape === "plane" ? Qt.vector3d(-55, 20, 0)
+                : mode === "tex" && shape === "floor" ? Qt.vector3d(-30, 18, 0)
+                : mode === "tex" && shape === "wall" ? Qt.vector3d(-6, 16, 0) : Qt.vector3d(-16, 32, 0)
         // узкое высокое окно (панель вкладки) - камера дальше, иначе предмет обрезан по бокам
         var aspect = view.width > 0 ? view.height / view.width : 1
         var far = human ? Math.max(1, h / 200, (width3d / 2 + humanHeight * 0.6) / 140) : 1
-        var camPos = Qt.vector3d(0, 0, mode === "hdri" ? 0.01 : 420 * camScale * far * Math.max(1, aspect * 1.05))
+        var dist = mode === "tex" && shape === "floor" ? 760 : mode === "tex" && shape === "wall" ? 700
+                 : mode === "tex" && shape === "pillow" ? 170 : 420
+        var camPos = Qt.vector3d(0, 0, mode === "hdri" ? 0.01 : dist * camScale * far * Math.max(1, aspect * 1.05))
         cam.fieldOfView = mode === "hdri" ? 75 : 40
         if (mode === "hdri") { cam.clipNear = 0.01; cam.clipFar = 1000 }
         fly.stop()
@@ -452,11 +458,23 @@ Item {
             }
         }
 
+        // линейка 1 м на полу - видно, какого размера рисунок
+        Model {
+            id: meter
+            visible: root.mode === "tex" && (root.shape === "floor" || root.shape === "wall")
+            source: "#Cube"
+            position: Qt.vector3d(40, 2, root.shape === "floor" ? 215 : 60)
+            scale: Qt.vector3d(1, 0.02, 0.05)
+            materials: PrincipledMaterial { baseColor: root.accent; lighting: PrincipledMaterial.NoLighting }
+        }
+
         // человек 180 см для масштаба: простая фигура (единицы - сантиметры, масштаб - humanHeight / 180)
         Node {
-            visible: root.showHuman && root.humanHeight > 0 && root.mode === "model"
-            position: Qt.vector3d(-(root.width3d / 2 + root.humanHeight * 0.3), 0, root.width3d * 0.15)
-            scale: Qt.vector3d(root.humanHeight / 180, root.humanHeight / 180, root.humanHeight / 180)
+            property bool texScene: root.mode === "tex" && (root.shape === "floor" || root.shape === "wall")
+            visible: (root.showHuman && root.humanHeight > 0 && root.mode === "model") || texScene
+            position: texScene ? Qt.vector3d(-150, root.shape === "floor" ? 1 : 0, root.shape === "floor" ? 110 : 45)
+                    : Qt.vector3d(-(root.width3d / 2 + root.humanHeight * 0.3), 0, root.width3d * 0.15)
+            scale: texScene ? Qt.vector3d(1, 1, 1) : Qt.vector3d(root.humanHeight / 180, root.humanHeight / 180, root.humanHeight / 180)
             property var mat: PrincipledMaterial {
                 baseColor: Qt.rgba(root.accent.r * 0.5 + 0.35, root.accent.g * 0.5 + 0.35, root.accent.b * 0.5 + 0.35, 1)
                 roughness: 0.6
@@ -494,11 +512,17 @@ Item {
             Model {
                 id: sample
                 visible: root.mode === "tex"
-                source: root.shape === "cube" ? "#Cube" : root.shape === "plane" ? "#Rectangle" : "#Sphere"
-                position: Qt.vector3d(0, root.shape === "plane" ? 0.5 : 90, 0)
-                scale: root.shape === "plane" ? Qt.vector3d(3, 3, 1) : Qt.vector3d(1.8, 1.8, 1.8)
-                eulerRotation: root.shape === "plane" ? Qt.vector3d(-90, 0, 0) : Qt.vector3d(0, 0, 0)
-                castsShadows: root.shape !== "plane"
+                // пол 4 x 4 м, стена 4 x 2.7 м, подушка 55 x 40 см - в сантиметрах, рядом человек 180 см
+                source: root.shape === "cube" ? "#Cube"
+                      : ["plane", "floor", "wall"].indexOf(root.shape) >= 0 ? "#Rectangle" : "#Sphere"
+                position: root.shape === "floor" ? Qt.vector3d(0, 1, 0) : root.shape === "wall" ? Qt.vector3d(0, 135, 0)
+                        : root.shape === "pillow" ? Qt.vector3d(0, 15, 0)
+                        : Qt.vector3d(0, root.shape === "plane" ? 0.5 : 90, 0)
+                scale: root.shape === "floor" ? Qt.vector3d(4, 4, 1) : root.shape === "wall" ? Qt.vector3d(4, 2.7, 1)
+                     : root.shape === "pillow" ? Qt.vector3d(0.55, 0.3, 0.42)
+                     : root.shape === "plane" ? Qt.vector3d(3, 3, 1) : Qt.vector3d(1.8, 1.8, 1.8)
+                eulerRotation: root.shape === "plane" || root.shape === "floor" ? Qt.vector3d(-90, 0, 0) : Qt.vector3d(0, 0, 0)
+                castsShadows: ["plane", "floor", "wall"].indexOf(root.shape) < 0
                 materials: PrincipledMaterial {
                     id: texMat
                     lighting: PrincipledMaterial.FragmentLighting
@@ -516,7 +540,7 @@ Item {
                     occlusionAmount: 1.0
                     heightMap: root.heightMap != "" && root.heightAmount > 0 ? tHeight : null
                     heightAmount: root.heightAmount
-                    cullMode: root.shape === "plane" ? Material.NoCulling : Material.BackFaceCulling
+                    cullMode: ["plane", "floor", "wall"].indexOf(root.shape) >= 0 ? Material.NoCulling : Material.BackFaceCulling
                 }
                 PrincipledMaterial { id: clayMat; baseColor: "#b9b4c4"; roughness: 0.85; lighting: PrincipledMaterial.FragmentLighting }
                 PrincipledMaterial {
@@ -534,12 +558,12 @@ Item {
                 }
             }
         }
-        Texture { id: tBase; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.baseMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tNorm; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.normalMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tRough; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.roughMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tMetal; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.metalMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tAo; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.aoMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tHeight; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.heightMap; scaleU: root.tiling; scaleV: root.tiling }
+        Texture { id: tBase; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.baseMap; scaleU: root.tiling; scaleV: root.tilingV > 0 ? root.tilingV : root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tNorm; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.normalMap; scaleU: root.tiling; scaleV: root.tilingV > 0 ? root.tilingV : root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tRough; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.roughMap; scaleU: root.tiling; scaleV: root.tilingV > 0 ? root.tilingV : root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tMetal; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.metalMap; scaleU: root.tiling; scaleV: root.tilingV > 0 ? root.tilingV : root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tAo; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.aoMap; scaleU: root.tiling; scaleV: root.tilingV > 0 ? root.tilingV : root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tHeight; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.heightMap; scaleU: root.tiling; scaleV: root.tilingV > 0 ? root.tilingV : root.tiling }
     }
 
     // каркас поверх - средствами отладчика сцены
@@ -620,6 +644,21 @@ Item {
             rulerTag.x = p.x - rulerTag.width / 2
             rulerTag.y = p.y - rulerTag.height - 10
         }
+    }
+    FrameAnimation {
+        running: meter.visible
+        onTriggered: {
+            var p = view.mapFrom3DScene(meter.position)
+            meterTag.x = p.x - meterTag.width / 2
+            meterTag.y = p.y + 8
+        }
+    }
+    Rectangle {
+        id: meterTag
+        visible: meter.visible
+        radius: 8; color: "#d90d0d13"
+        width: meterText.implicitWidth + 16; height: meterText.implicitHeight + 6
+        Text { id: meterText; anchors.centerIn: parent; text: "1 м"; color: "#f4f2fb"; font.pixelSize: 12 }
     }
     Rectangle {
         id: rulerTag

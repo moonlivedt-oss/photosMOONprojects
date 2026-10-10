@@ -540,9 +540,21 @@ class Viewer3D(QDialog):
 
         # --- панель справа
         self.shape = QComboBox()
-        for t, v, ic in (("Шар", "sphere", "dot_large"), ("Куб", "cube", "dice_3D"), ("Плоскость", "plane", "card")):
+        for t, v, ic in (
+            ("Шар", "sphere", "dot_large"),
+            ("Куб", "cube", "dice_3D"),
+            ("Плоскость", "plane", "card"),
+            ("Пол комнаты 4 x 4 м", "floor", "card_place"),
+            ("Стена 4 x 2.7 м", "wall", "structure_wall"),
+            ("Подушка 55 x 40 см", "pillow", "heart"),
+        ):
             self.shape.addItem(lib_icon(ic), t, v)
-        self.shape.currentIndexChanged.connect(lambda _i: self.set("shape", self.shape.currentData()))
+        self.shape.currentIndexChanged.connect(self.pick_shape)
+        self.real_scale = QCheckBox("Настоящий масштаб")
+        self.real_scale.setToolTip("Рисунок - в своём размере: доска паркета как в жизни, рядом человек и линейка 1 м")
+        self.real_scale.setChecked(self.cfg.get("ue_tex_real", True))
+        self.real_scale.toggled.connect(lambda v: (self.cfg.__setitem__("ue_tex_real", v), self.apply_scale()))
+        self.scale_lbl = QLabel(objectName="dim", wordWrap=True)
         self.tiling = QSpinBox(minimum=1, maximum=16, value=1, prefix="Повтор x")
         self.tiling.setToolTip("Сколько раз текстура повторяется на фигуре")
         self.tiling.valueChanged.connect(lambda v: self.set("tiling", float(v)))
@@ -605,6 +617,8 @@ class Viewer3D(QDialog):
             "tex",
             section("ФИГУРА"),
             (self.shape, self.tiling),
+            self.real_scale,
+            self.scale_lbl,
             ("Рельеф", self.height_s),
             section("КАРТЫ - ПОСМОТРЕТЬ ОТДЕЛЬНО"),
             self.maps,
@@ -1164,6 +1178,10 @@ class Viewer3D(QDialog):
         self.set("showHuman", self.human.isChecked() and hh > 0)
         for b in (self.spin, self.wire, self.floor, self.human):
             b.setVisible(kind != "hdri")
+        for b in (self.shade_b, self.ruler_b, self.prev_b):  # режимы, линейка, превью - только у моделей
+            b.setVisible(kind == "model")
+        if kind != "model" and getattr(self, "shade", "normal") != "normal":
+            self.set_shade("normal")
         self.place_hud()
         self.stop_timeline()
         vis = {
@@ -1186,9 +1204,11 @@ class Viewer3D(QDialog):
         if kind == "tex":
             self.fill_maps(a)
             self.set("tryOn", False)
+            self.apply_scale()
             for k, v in (("tint", QColor("#ffffff")), ("uvRotation", 0.0), ("roughAmount", 1.0), ("tryMask", [])):
                 self.set(k, v)  # у текстуры на шаре - без настроек примерки
         if kind == "model":
+            self.set("tilingV", -1.0)  # повтор по высоте - только у стены и подушки
             self.set("tryMask", [])
             self.set("flashPart", -1)
             self.fill_tryon()
@@ -1303,6 +1323,39 @@ class Viewer3D(QDialog):
         if how:
             rows.append(f"<b>Как в Unreal.</b> {esc(how)}")
         self.how.setText("<br><br>".join(rows))
+
+    # ------------------------------------------------------------ текстура в настоящем масштабе
+    SCENE_CM = {"floor": (400, 400), "wall": (400, 270), "pillow": (170, 60)}  # что покрывает рисунок, см
+
+    def pick_shape(self, _i=0):
+        self.set("shape", self.shape.currentData())
+        self.apply_scale()
+
+    def tex_cm(self, a):
+        """Сторона рисунка текстуры в см и известна ли она (Poly Haven пишет размер; иначе - примерно 2 м)."""
+        d = a.get("dimensions_mm") if a else None
+        return (d[0] / 10, True) if d and d[0] else (200.0, False)
+
+    def apply_scale(self):
+        """Пол, стена, подушка с галкой «Настоящий масштаб»: повтор считается из размера рисунка."""
+        a, shape = self.asset or {}, self.shape.currentData()
+        scene = self.SCENE_CM.get(shape)
+        real = a.get("kind") == "tex" and scene is not None and self.real_scale.isChecked()
+        self.real_scale.setVisible(scene is not None)
+        self.tiling.setEnabled(not real)
+        if not real:
+            self.set("tiling", float(self.tiling.value()))
+            self.set("tilingV", -1.0)
+            self.scale_lbl.setVisible(False)
+            return
+        cm, known = self.tex_cm(a)
+        self.set("tiling", scene[0] / cm)
+        self.set("tilingV", scene[1] / cm)
+        self.scale_lbl.setText(
+            f"Один повтор рисунка - {cm / 100:.2f} м".replace(".", ",")
+            + ("" if known else " (примерно: размер у текстуры не указан)")
+        )
+        self.scale_lbl.setVisible(True)
 
     # ------------------------------------------------------------ режим показа, линейка, превью
     def set_shade(self, key_):
