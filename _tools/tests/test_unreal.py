@@ -435,3 +435,76 @@ class TestRoomLayout(unittest.TestCase):
         self.assertEqual(len(items), 4)  # люстры не пропадают и не занимают место на полу
         for it in hang:
             self.assertLess(abs(it["x"]), w / 2)
+
+
+class TestAgentKit(unittest.TestCase):
+    """ue_kit / ue_similar / ue_compare на подставных ассетах и подставном поиске по смыслу."""
+
+    def setUp(self):
+        from PIL import Image
+
+        self.tmp = tempfile.mkdtemp()
+        self.items = []
+        for i, (name, kind) in enumerate(
+            [("Palm A", "model"), ("Palm B", "model"), ("Fern", "model"), ("Moss", "tex"), ("Sky", "hdri")]
+        ):
+            d = os.path.join(self.tmp, name)
+            os.makedirs(d)
+            im = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
+            im.paste((40, 160, 90, 255), (90, 90, 110, 110))  # маленький рисунок посередине пустого поля
+            im.save(os.path.join(d, "preview.webp"))
+            self.items.append(
+                {
+                    "id": name.lower().replace(" ", "_"),
+                    "name": name,
+                    "kind": kind,
+                    "dir": d,
+                    "theme": "Лес и природа",
+                    "source": "Poly Haven",
+                    "polycount": 100 * (i + 1),
+                    "size": 2**20,
+                    "_g": "Природа",
+                    "_s": "Деревья",
+                }
+            )
+
+        class Sem:
+            def rank(self, query, items, gap=None):
+                return [(a, 9.0 - k) for k, a in enumerate(items)]
+
+            def similar(self, a, items, top=60):
+                return [(x, 0.9) for x in items if x["dir"] != a["dir"]][:top]
+
+        self.patches = [
+            mock.patch("library.api_unreal._items", lambda: self.items),
+            mock.patch("library.api_unreal._sem", lambda: Sem()),
+        ]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_kit_parts_without_repeats(self):
+        from library import api_unreal as A
+
+        pic = A.ue_kit("джунгли", per_part=2)
+        self.assertIn("1. Palm A", pic.text)
+        names = [line.split(". ", 1)[1].split(" (")[0] for line in pic.text.splitlines() if line[:1].isdigit()]
+        self.assertEqual(len(names), len(set(names)))  # ассет - только в одной части
+        self.assertIn("Moss", names)
+        self.assertIn("Sky", names)
+        self.assertGreater(pic.im.width, 300)
+
+    def test_similar_compare_and_trim(self):
+        from library import api_unreal as A
+
+        pic = A.ue_similar("palm_a")
+        self.assertIn("образец", pic.text)
+        self.assertNotIn("Moss", pic.text)  # тот же вид, что у образца
+        table = A.ue_compare(["palm_a", "fern"]).text
+        self.assertIn("| 2 | Fern |", table)
+        im = A._preview(self.items[0])
+        self.assertLess(im.width, 60)  # пустые поля превью обрезаны

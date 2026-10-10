@@ -11,6 +11,7 @@ from library import ui_bridge
 from library import unreal as U
 from library import unreal_groups as G
 from library.api import AGENT, ApiError, Picture, report, sheet, tool
+from library.unreal_sem import GAP as U_GAP
 
 ASSET_LIMIT = 40
 
@@ -29,7 +30,7 @@ def _section(a):
     return a.get("_s") or G.section_of(a)
 
 
-def _brief(a):
+def _brief(a, score=None):
     out = {
         "id": _key(a),
         "name": a.get("name", ""),
@@ -48,7 +49,33 @@ def _brief(a):
         out["animations"] = len(a.get("animations", []))
     if _section(a):
         out["section"] = _section(a)
+    if score is not None:
+        out["score"] = round(score, 2)  # похожесть на запрос: от лучшего вниз, разница > 2 - уже далеко
     return out
+
+
+def _preview(a):
+    p = os.path.join(a["dir"], "preview.webp")
+    try:
+        im = Image.open(p).convert("RGBA") if os.path.exists(p) else None
+    except OSError:
+        return None
+    box = im.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox() if im else None
+    if box:  # пустые поля прочь: маленькая пальма Kenney иначе занимает десятую часть клетки
+        x0, y0, x1, y1 = box
+        m = max(x1 - x0, y1 - y0) // 14
+        im = im.crop((max(0, x0 - m), max(0, y0 - m), min(im.width, x1 + m), min(im.height, y1 + m)))
+    return im
+
+
+def _sheet(assets):
+    return sheet([_preview(a) for a in assets], [a.get("name", "") for a in assets])
+
+
+def _as_text(d):
+    import json
+
+    return json.dumps(d, ensure_ascii=False, indent=1)
 
 
 def _by_ids(ids, limit=ASSET_LIMIT):
@@ -77,7 +104,7 @@ def _sem():
     "ue_overview",
     "Ассеты Unreal: сколько каких видов; группы и разделы (как в дереве окна: Природа -> Деревья, "
     "Город и транспорт -> Транспорт...); стили (real - PBR, Kenney / Quaternius / KayKit - low-poly); подборки, "
-    "темы для ue_download, найденные Unreal и Blender. Начинать с него.",
+    "темы для ue_download, найденные Unreal и Blender. Начинать с него; набор под тему целиком - ue_kit.",
 )
 def ue_overview():
     from library import blender_scene, unreal_engine, unreal_sets
@@ -122,6 +149,12 @@ def ue_overview():
         "theme": {"type": "string", "description": "тема скачивания или раздел («Кровати»)"},
         "limit": {"type": "integer", "default": 20},
         "offset": {"type": "integer", "default": 0},
+        "broad": {
+            "type": "boolean",
+            "default": False,
+            "description": "по смыслу - весь список по убыванию, а не только уверенные (листать offset)",
+        },
+        "preview": {"type": "boolean", "default": False, "description": "сразу вернуть и лист превью найденного"},
     },
 )
 def ue_search(
@@ -135,6 +168,8 @@ def ue_search(
     theme=None,
     limit=20,
     offset=0,
+    broad=False,
+    preview=False,
 ):
     items = _items()
     if max_polycount:
@@ -153,10 +188,12 @@ def ue_search(
         items = [a for a in items if G.style_ok(a, style)]
     if theme:
         items = [a for a in items if a.get("theme") == theme or _section(a) == theme]
-    found = items
+    found, score = items, {}
     if query.strip():
         sem = _sem()
-        found = [a for a, _s in sem.rank(query, items)] if sem is not None else []
+        ranked = sem.rank(query, items, gap=None if broad else U_GAP) if sem is not None else []
+        score = {id(a): sc for a, sc in ranked}
+        found = [a for a, _s in ranked]
         if not found:
             words = query.lower().split()
             found = [
@@ -167,11 +204,228 @@ def ue_search(
                 )
             ]
     limit = max(1, min(100, limit))
-    return {
+    page = found[offset : offset + limit]
+    out = {
         "total": len(found),
-        "assets": [_brief(a) for a in found[offset : offset + limit]],
-        "hint": "Показать пользователю в окне - ue_show(ids); посмотреть самому - ue_view(ids).",
+        "assets": [_brief(a, score.get(id(a))) for a in page],
+        "hint": "Показать пользователю в окне - ue_show(ids); посмотреть самому - ue_view(ids) или preview=true; "
+        "ещё похожих на удачный - ue_similar(id); сравнить кандидатов - ue_compare(ids); набор под тему - ue_kit.",
     }
+    if preview and page:
+        lines = [f"{i + 1}. {a.get('name', '')} ({_key(a)})" for i, a in enumerate(page[:36])]
+        return Picture(_sheet(page[:36]), _as_text(out) + "\n\nНа листе:\n" + "\n".join(lines))
+    return out
+
+
+# части набора по умолчанию: (часть, вид, что искать вдобавок к описанию)
+KIT_PARTS = (
+    ("Деревья и крупные растения", "model", "trees and large plants"),
+    ("Кусты, трава, цветы", "model", "bushes, ferns, grass and flowers"),
+    ("Камни и земля", "model", "rocks, stones and ground pieces"),
+    ("Постройки и вещи", "model", "buildings, props and objects"),
+    ("Текстуры поверхности", "tex", "ground surface material"),
+    ("Небо и свет HDRI", "hdri", "sky and lighting"),
+)
+KIND_RU = {"model": "модели", "tex": "текстуры", "hdri": "HDRI", "ies": "IES"}
+
+
+def kit_sheet(rows, cell=150):
+    """Лист набора: строка на часть - подпись слева, превью с общими номерами (1, 2, 3... по всему листу)."""
+    from PIL import ImageDraw
+
+    import imaging as K
+    from library.api import checker
+
+    cols = max([len(r[1]) for r in rows] + [1])
+    head, pad, cap = 190, 8, 20
+    w = head + cols * (cell + pad) + pad
+    h = pad + len(rows) * (cell + cap + pad)
+    out = Image.new("RGB", (w, h), (21, 21, 28))
+    d = ImageDraw.Draw(out)
+    f, fb = K.sprites._font(13), K.sprites._font(15)
+    n = 0
+    for r, (title, assets) in enumerate(rows):
+        y = pad + r * (cell + cap + pad)
+        d.rounded_rectangle((pad, y, head - 8, y + cell), 10, fill=(30, 30, 40))
+        words, line, ty = title.split(), "", y + 12
+        for word in words + [""]:  # подпись части - по словам в несколько строк
+            if word and d.textlength((line + " " + word).strip(), font=fb) < head - 30:
+                line = (line + " " + word).strip()
+                continue
+            d.text((pad + 10, ty), line, fill=(236, 234, 246), font=fb)
+            ty, line = ty + 20, word
+        for c, a in enumerate(assets):
+            n += 1
+            x = head + c * (cell + pad)
+            tile = checker((cell, cell))
+            im = _preview(a)
+            if im is not None:
+                im.thumbnail((cell - 8, cell - 8), Image.LANCZOS)
+                tile.alpha_composite(im, ((cell - im.width) // 2, (cell - im.height) // 2))
+            out.paste(tile.convert("RGB"), (x, y))
+            col = (126, 224, 160) if G.style_of(a) == "real" else (240, 163, 94)  # PBR - зелёная метка, low - рыжая
+            d.rounded_rectangle((x + 4, y + 4, x + 32, y + 22), 6, fill=(20, 20, 28), outline=col)
+            d.text((x + 18, y + 13), str(n), fill=(230, 228, 240), font=f, anchor="mm")
+            label = a.get("name", "")
+            while d.textlength(label, font=f) > cell and len(label) > 4:
+                label = label[:-2]
+            d.text((x + cell / 2, y + cell + 3), label, fill=(220, 218, 232), font=f, anchor="ma")
+    return out
+
+
+@tool(
+    "ue_kit",
+    "Набор под тему за один вызов: «джунгли», «заброшенная фабрика», «уютная таверна». Делит тему на части "
+    "(деревья, кусты, камни, вещи, текстуры, небо - или свои parts), в каждой - лучшие по смыслу, без повторов, "
+    "и возвращает ОДИН лист превью: строка на часть, номера сквозные, рамка номера - стиль (зелёная PBR, рыжая "
+    "low-poly). Дальше: ue_similar(id) - ещё таких, ue_compare(ids) - выбрать из похожих, ue_collection - "
+    "сохранить, ue_show - показать пользователю.",
+    {
+        "description": {"type": "string", "description": "тема по-русски или по-английски"},
+        "parts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "query": {"type": "string", "description": "что искать в этой части"},
+                    "kind": {"type": "string", "enum": ["model", "tex", "hdri", "ies"]},
+                    "section": {"type": "string", "description": "раздел из ue_overview («Деревья»)"},
+                },
+                "required": ["query"],
+            },
+            "description": "свои части вместо стандартных: [{name, query, kind}]",
+        },
+        "style": {"type": "string", "enum": [k for k, _t in G.STYLES], "description": "один стиль на весь набор"},
+        "per_part": {"type": "integer", "default": 6, "description": "сколько в каждой части (до 10)"},
+        "max_polycount": {"type": "integer"},
+    },
+    ["description"],
+)
+def ue_kit(description, parts=None, style=None, per_part=6, max_polycount=None):
+    sem = _sem()
+    if sem is None:
+        raise ApiError("Нужна модель поиска по смыслу: py -3.14 _tools/get_models.py clip")
+    items = _items()
+    if style:
+        items = [a for a in items if G.style_ok(a, style)]
+    if max_polycount:
+        items = [a for a in items if a.get("kind") != "model" or 0 < (a.get("polycount") or 0) <= max_polycount]
+    per_part = max(1, min(10, per_part))
+    plan = (
+        [(p.get("name") or p["query"], p.get("kind") or "model", p["query"], p.get("section")) for p in parts]
+        if parts
+        else [(n, k, f"{description}: {q}", None) for n, k, q in KIT_PARTS]
+    )
+    used, rows, out, n = set(), [], [], 0
+    for name, kind, query, section in plan:
+        pool = [a for a in items if a.get("kind") == kind and a["dir"] not in used]
+        if section:
+            pool = [a for a in pool if a["_s"].lower() == section.lower()]
+        ranked = sem.rank(query, pool, gap=None)[:per_part]
+        if not ranked:
+            continue
+        picks = []
+        for a, sc in ranked:
+            used.add(a["dir"])
+            n += 1
+            picks.append(dict(_brief(a, sc), n=n))
+        rows.append((f"{name} ({KIND_RU.get(kind, kind)})", [a for a, _s in ranked]))
+        out.append({"part": name, "kind": kind, "query": query, "assets": picks})
+    if not rows:
+        raise ApiError("Ничего не нашлось: скачанного по этой теме нет - ue_download или другой style.")
+    lines = []
+    for part in out:
+        lines.append(f"\n{part['part']}:")
+        for a in part["assets"]:
+            extra = ", ".join(
+                x
+                for x in (
+                    a["style"],
+                    f"{a['polycount']} полиг." if a.get("polycount") else "",
+                    a.get("section", ""),
+                    f"оценка {a['score']}",
+                )
+                if x
+            )
+            lines.append(f"{a['n']}. {a['name']} ({a['id']}) - {extra}")
+    styles = {}
+    for part in out:
+        for x in part["assets"]:
+            styles[x["style"]] = styles.get(x["style"], 0) + 1
+    mix = ", ".join(f"{k}: {v}" for k, v in sorted(styles.items(), key=lambda kv: -kv[1]))
+    text = (
+        f"Набор «{description}»: {sum(len(p['assets']) for p in out)} шт. в {len(out)} частях. Стили: {mix}"
+        + ("" if style or len(styles) < 2 else " - для единого вида повторить с style='real' или 'low'.")
+        + "".join("\n" + x for x in lines)
+        + "\n\nДальше: ue_similar(id) - ещё таких; ue_compare(ids) - сравнить; "
+        "ue_collection(name, add=ids) - сохранить; ue_show(ids) - показать пользователю."
+    )
+    return Picture(kit_sheet(rows), text)
+
+
+@tool(
+    "ue_similar",
+    "Ещё ассеты, похожие на этот (по превью и меткам): «нравится эта пальма - покажи ещё такие». Фильтры как у "
+    "ue_search. preview=true - сразу лист превью.",
+    {
+        "id": {"type": "string"},
+        "kind": {"type": "string", "enum": ["tex", "hdri", "model", "ies"]},
+        "style": {"type": "string", "enum": [k for k, _t in G.STYLES]},
+        "limit": {"type": "integer", "default": 12},
+        "preview": {"type": "boolean", "default": True},
+    },
+    ["id"],
+)
+def ue_similar(id, kind=None, style=None, limit=12, preview=True):  # noqa: A002
+    sem = _sem()
+    if sem is None:
+        raise ApiError("Нужна модель поиска по смыслу: py -3.14 _tools/get_models.py clip")
+    me = _by_ids([id])[0]
+    items = _items()
+    items = [a for a in items if a.get("kind") == (kind or me.get("kind"))]
+    if style:
+        items = [a for a in items if G.style_ok(a, style)]
+    found = sem.similar(me, items, top=max(1, min(36, limit)))
+    if not found:
+        raise ApiError("Для этого ассета нет векторов поиска (нет превью) - окно досчитает их само.")
+    out = {"like": _brief(me), "assets": [_brief(a, sc) for a, sc in found]}
+    if not preview:
+        return out
+    assets = [me] + [a for a, _s in found]
+    lines = [
+        f"{i + 1}. {a.get('name', '')} ({_key(a)})" + (" - образец" if i == 0 else "") for i, a in enumerate(assets)
+    ]
+    return Picture(_sheet(assets), _as_text(out) + "\n\nНа листе (1 - образец):\n" + "\n".join(lines))
+
+
+@tool(
+    "ue_compare",
+    "Сравнить кандидатов рядом: лист превью и таблица - стиль, полигоны, вес, разрешение, размер в см, скелет и "
+    "анимации, лицензия, раздел. Для выбора «какой из этих трёх деревьев взять».",
+    {"ids": {"type": "array", "items": {"type": "string"}}},
+    ["ids"],
+)
+def ue_compare(ids):
+    assets = _by_ids(ids, 12)
+    rows = [
+        "| # | имя | стиль | полигоны | вес | разрешение | размер, см | скелет | лицензия | раздел |",
+        "|" + "---|" * 10,
+    ]
+    for i, a in enumerate(assets):
+        dims = (
+            [round(x / 10) for x in a["dimensions_mm"]]
+            if a.get("dimensions_mm")
+            else [round(x) for x in a.get("dims_cm") or []]
+        )
+        rig = f"да, {len(a.get('animations', []))} анимаций" if a.get("rigged") else "-"
+        rows.append(
+            f"| {i + 1} | {a.get('name', '')} | {G.style_of(a)} | {a.get('polycount') or '-'} | "
+            f"{round(a.get('size', 0) / 2**20, 1)} МБ | {a.get('res') or '-'} | {' x '.join(map(str, dims)) or '-'} | "
+            f"{rig} | {'CC0' if U.is_cc0(a) else 'своя'} | {_section(a) or '-'} |"
+        )
+    ids_txt = "\n".join(f"{i + 1}. {_key(a)}" for i, a in enumerate(assets))
+    return Picture(_sheet(assets), "\n".join(rows) + "\n\nid:\n" + ids_txt)
 
 
 @tool(
@@ -182,12 +436,8 @@ def ue_search(
 )
 def ue_view(ids):
     assets = _by_ids(ids, 24)
-    ims = []
-    for a in assets:
-        p = os.path.join(a["dir"], "preview.webp")
-        ims.append(Image.open(p).convert("RGBA") if os.path.exists(p) else None)
     text = "\n".join(f"{i + 1}. {a.get('name', '')} ({_key(a)})" for i, a in enumerate(assets))
-    return Picture(sheet(ims, [a.get("name", "") for a in assets]), text)
+    return Picture(_sheet(assets), text)
 
 
 @tool(

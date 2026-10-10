@@ -111,8 +111,9 @@ class AssetSem:
             self.save()
         return len(todo)
 
-    def rank(self, query, items):
-        """[(ассет, оценка)] по убыванию похожести; непосчитанные пропускаются."""
+    def rank(self, query, items, gap=GAP):
+        """[(ассет, оценка)] по убыванию похожести; непосчитанные пропускаются. gap=None - весь список,
+        без обрезки «дальше лучшего на gap - уже случайные» (помощнику: набор под тему, листать дальше)."""
         if not query.strip():
             return []
         have = [(a, self.data.get(key_of(a))) for a in items]
@@ -136,7 +137,7 @@ class AssetSem:
         s = z(img @ q - bias[0]) + TEXT_WEIGHT * z(txt @ q - bias[1])
         order = np.argsort(-s)
         best = s[order[0]]
-        return [(have[i][0], float(s[i])) for i in order if s[i] >= best - GAP]
+        return [(have[i][0], float(s[i])) for i in order if gap is None or s[i] >= best - gap]
 
     def similar(self, a, items, top=60):
         """Похожие на ассет по превью и меткам: [(ассет, оценка)], сам ассет не входит."""

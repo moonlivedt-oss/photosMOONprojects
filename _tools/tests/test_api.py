@@ -108,6 +108,9 @@ class Api(unittest.TestCase):
             "ue_pack",
             "ue_import",
             "ue_blender",
+            "ue_kit",
+            "ue_similar",
+            "ue_compare",
             "versions",
             "restore_version",
         ):
