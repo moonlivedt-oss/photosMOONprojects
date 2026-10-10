@@ -191,16 +191,49 @@ THEMES = {
     # Quaternius: low-poly с цветными материалами, тоже CC0; папки FBX на Google Drive
     "Дом - Quaternius low-poly": {"quaternius": ["ultimate-home-interior", "furniture", "ultimatefurniture"]},
     # другие наборы Kenney (CC0) - для уровней и прототипов; цвета в общей текстуре colormap.png
-    "Лес и природа - Kenney low-poly": {"kenney": ["nature-kit", "survival-kit"], "categories": ["nature"]},
+    "Лес и природа - Kenney low-poly": {
+        "kenney": ["nature-kit", "survival-kit", "mini-forest"],
+        "categories": ["nature"],
+    },
     "Город - Kenney low-poly": {
-        "kenney": ["city-kit-suburban", "city-kit-commercial", "city-kit-roads", "car-kit"],
+        "kenney": [
+            "city-kit-suburban",
+            "city-kit-commercial",
+            "city-kit-roads",
+            "city-kit-industrial",
+            "car-kit",
+            "factory-kit",
+            "retro-urban-kit",
+            "modular-buildings",
+            "mini-market",
+            "train-kit",
+            "watercraft-kit",
+        ],
         "categories": ["buildings", "street"],
     },
     "Средневековье - Kenney low-poly": {
-        "kenney": ["castle-kit", "fantasy-town-kit", "graveyard-kit", "mini-dungeon"],
+        "kenney": [
+            "castle-kit",
+            "fantasy-town-kit",
+            "graveyard-kit",
+            "mini-dungeon",
+            "modular-dungeon-kit",
+            "modular-cave-kit",
+            "retro-fantasy-kit",
+            "pirate-kit",
+        ],
         "categories": ["medieval", "fantasy"],
     },
-    "Космос - Kenney low-poly": {"kenney": ["space-kit", "space-station-kit"], "categories": ["sci-fi", "space"]},
+    "Космос - Kenney low-poly": {
+        "kenney": ["space-kit", "space-station-kit", "modular-space-kit"],
+        "categories": ["sci-fi", "space"],
+    },
+    # уровни начерно: серые блоки, платформы, гексы, трассы - для первых карт в Unreal
+    "Прототипы и уровни - Kenney low-poly": {
+        "kenney": ["prototype-kit", "platformer-kit", "tower-defense-kit", "hexagon-kit", "mini-arena", "racing-kit"],
+        "categories": ["prototype", "level"],
+    },
+    "Персонажи - Kenney low-poly": {"kenney": ["mini-characters", "blocky-characters"], "categories": ["characters"]},
     "Еда - Kenney low-poly": {"kenney": ["food-kit"], "categories": ["food"]},
     # другие наборы Quaternius (CC0): папки FBX и OBJ находятся сами по странице набора (quaternius_folders)
     "Лес и природа - Quaternius low-poly": {
@@ -220,6 +253,22 @@ THEMES = {
         "categories": ["sci-fi", "space"],
     },
     "Еда - Quaternius low-poly": {"quaternius": ["ultimatefood", "junkfood"], "categories": ["food"]},
+    # KayKit (Kay Lousberg, CC0): официальные репозитории на GitHub, FBX + одна текстура-палитра на набор
+    "Дом - KayKit low-poly": {"kaykit": ["KayKit-Furniture-Bits-1.0", "KayKit-Restaurant-Bits-1.0"]},
+    "Средневековье - KayKit low-poly": {
+        "kaykit": ["KayKit-Dungeon-Remastered-1.0", "KayKit-Medieval-Hexagon-Pack-1.0", "KayKit-Halloween-Bits-1.0"],
+        "categories": ["medieval", "fantasy"],
+    },
+    "Город - KayKit low-poly": {"kaykit": ["KayKit-City-Builder-Bits-1.0"], "categories": ["buildings", "street"]},
+    "Космос - KayKit low-poly": {"kaykit": ["KayKit-Space-Base-Bits-1.0"], "categories": ["sci-fi", "space"]},
+    "Прототипы и уровни - KayKit low-poly": {
+        "kaykit": ["KayKit-Prototype-Bits-1.0"],
+        "categories": ["prototype", "level"],
+    },
+    "Персонажи - KayKit low-poly": {
+        "kaykit": ["KayKit-Character-Pack-Adventures-1.0", "KayKit-Character-Pack-Skeletons-1.0"],
+        "categories": ["characters", "rigged"],
+    },
     "Животные - Quaternius low-poly": {
         "quaternius": ["ultimateanimatedanimals", "farmanimal"],
         "categories": ["animals", "rigged"],
@@ -263,8 +312,18 @@ QUATERNIUS_HOWTO = (
 )
 
 
+KAYKIT_HOWTO = (
+    "Перетащите .fbx в Content Browser, в окне импорта - Import Materials и Import Textures: цвета берутся "
+    "из одной картинки-палитры рядом с моделью (её можно перекрасить - поменяются все модели набора). "
+    "Если модель вышла крошечной - Import Uniform Scale 100."
+)
+LOW_POLY = ("Kenney", "Quaternius", "KayKit")  # простые модели - отдельно от реалистичных
+
+
 def howto(a):
-    """Подсказка «как в Unreal» для ассета (у Kenney и Quaternius своя: без текстур)."""
+    """Подсказка «как в Unreal» для ассета (у low-poly наборов своя: без PBR-текстур)."""
+    if a.get("source") == "KayKit":
+        return KAYKIT_HOWTO
     if a.get("source") == "Kenney":
         return KENNEY_HOWTO
     if a.get("source") == "Quaternius":
@@ -340,6 +399,9 @@ def candidates(kind, theme, have=()):
         return [
             c for pack in THEMES[theme]["quaternius"] for c in quaternius_candidates(pack, cats) if c["id"] not in have
         ]
+    if kind == "model" and THEMES[theme].get("kaykit"):
+        cats = THEMES[theme].get("categories") or ["furniture"]
+        return [c for repo in THEMES[theme]["kaykit"] for c in kaykit_candidates(repo, cats) if c["id"] not in have]
     if kind == "model" and THEMES[theme].get("kenney"):
         cats = THEMES[theme].get("categories") or ["furniture"]
         return [c for pack in THEMES[theme]["kenney"] for c in kenney_candidates(pack, cats) if c["id"] not in have]
@@ -390,6 +452,9 @@ def kenney_zip(pack):
         if not m:
             raise OSError("на странице Kenney нет ссылки на архив: " + pack)
         download(m.group(0), dst)
+    if not zipfile.is_zipfile(dst):  # оборванная загрузка или страница ошибки - не держать в кэше
+        os.remove(dst)
+        raise OSError("архив Kenney скачался не целиком: " + pack + " - попробуйте ещё раз")
     return dst
 
 
@@ -615,6 +680,95 @@ def fetch_quaternius(cand, dst, progress=None, stop=None):
         "main": [fn],
         "description": "Low-poly модель с цветными материалами, без текстур. Превью нарисовано библиотекой.",
     }
+
+
+# ---------------------------------------------------------------- KayKit (репозитории на GitHub)
+KAYKIT_TREES = os.path.join(PACKS, "kaykit-trees.json")  # список файлов репозитория - один запрос к API
+
+
+def kaykit_tree(repo):
+    """Файлы репозитория KayKit: [путь]. API GitHub без входа - 60 запросов в час, поэтому запоминается."""
+    try:
+        with open(KAYKIT_TREES, encoding="utf-8") as fh:
+            known = json.load(fh)
+    except (OSError, ValueError):
+        known = {}
+    if repo not in known:
+        data = get_json(f"https://api.github.com/repos/KayKit-Game-Assets/{repo}/git/trees/main?recursive=1")
+        known[repo] = [t["path"] for t in data.get("tree", []) if t.get("type") == "blob"]
+        os.makedirs(PACKS, exist_ok=True)
+        K.write_atomic(KAYKIT_TREES, json.dumps(known, ensure_ascii=False), "utf-8")
+    return known[repo]
+
+
+def kaykit_raw(repo, path):
+    return f"https://raw.githubusercontent.com/KayKit-Game-Assets/{repo}/main/" + urllib.parse.quote(path)
+
+
+def kaykit_candidates(repo, categories=("furniture",)):
+    files = kaykit_tree(repo)
+    fbx = sorted(f for f in files if f.lower().endswith(".fbx") and "/fbx/" in f.lower() and "(unity)" not in f.lower())
+    pngs = [f for f in files if f.lower().endswith(".png")]
+    # текстура-палитра: из папки самой модели, иначе из Assets/texture(s) - не превью набора и не копии для Unity
+    shared = [f for f in pngs if os.path.basename(os.path.dirname(f)).lower() in ("texture", "textures")]
+    out = []
+    for f in fbx:
+        here = [p for p in pngs if os.path.dirname(p) == os.path.dirname(f)]
+        tex = here or shared
+        base = os.path.splitext(os.path.basename(f))[0]
+        sub = f.lower().split("/fbx/", 1)[1]
+        out.append(
+            {
+                "src": "kaykit",
+                "id": f"kaykit-{repo}-{os.path.splitext(sub)[0].replace('/', '-')}",
+                "name": pretty(base),
+                "info": {},
+                "repo": repo,
+                "path": f,
+                "textures": tex,
+                "base": base,
+                "categories": list(categories),
+                "score": 0,
+            }
+        )
+    return out
+
+
+def kaykit_file(repo, path):
+    """Общий файл набора (текстура) - один раз на набор, дальше из кэша."""
+    dst = os.path.join(PACKS, "kaykit", repo, *path.split("/"))
+    if not os.path.exists(dst):
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        download(kaykit_raw(repo, path), dst)
+    return dst
+
+
+def fetch_kaykit(cand, dst):
+    """FBX + текстура-палитра рядом с ним (FBX ссылается на неё по имени). Превью рисует окно."""
+    fn = cand["base"] + ".fbx"
+    download(kaykit_raw(cand["repo"], cand["path"]), os.path.join(dst, fn))
+    with open(os.path.join(dst, fn), "rb") as fh:
+        if not fh.read(20).startswith(b"Kaydara FBX"):
+            raise OSError("GitHub отдал не FBX - попробуйте позже")
+    extra = []
+    for t in cand.get("textures", []):
+        name = os.path.basename(t)
+        if name not in extra:
+            shutil.copy2(kaykit_file(cand["repo"], t), os.path.join(dst, name))
+            extra.append(name)
+    title = cand["repo"].replace("KayKit-", "").replace("-1.0", "").replace("-", " ")
+    meta = {
+        "source": "KayKit",
+        "url": f"https://github.com/KayKit-Game-Assets/{cand['repo']}",
+        "authors": ["Kay Lousberg"],
+        "tags": ["low-poly", "kaykit", title.lower()],
+        "categories": cand.get("categories") or ["furniture"],
+        "main": [fn],
+        "description": f"Low-poly модель KayKit ({title}): цвета - в общей текстуре-палитре набора.",
+    }
+    if extra:
+        meta["extra"] = extra
+    return meta
 
 
 def acg_candidates(queries, have=(), per=None):
@@ -920,7 +1074,7 @@ def has_kind(theme, kind):
     spec = THEMES.get(theme, {})
     if kind == "ies":
         return True
-    if kind == "model" and (spec.get("kenney") or spec.get("quaternius")):
+    if kind == "model" and (spec.get("kenney") or spec.get("quaternius") or spec.get("kaykit")):
         return True
     return bool(spec.get(kind) or (kind == "tex" and spec.get("acg")))
 
@@ -1003,6 +1157,12 @@ def fetch(cand, kind, theme, res="2k", progress=None, stop=None, dst=None, repla
             meta = fetch_kenney(cand, tmp)
         elif cand["src"] == "quaternius":
             meta = fetch_quaternius(cand, tmp, progress, stop)
+        elif cand["src"] == "kaykit":
+            meta = fetch_kaykit(cand, tmp)
+        elif cand["src"] == "local":  # из скачанного вручную архива (library/unreal_local.py)
+            from library import unreal_local
+
+            meta = unreal_local.fetch_local(cand, tmp)
         else:
             meta = fetch_acg(cand, res, tmp, progress, stop)
         meta.update(
@@ -1017,7 +1177,7 @@ def fetch(cand, kind, theme, res="2k", progress=None, stop=None, dst=None, repla
                 "howto": HOWTO[kind],
             }
         )
-        if cand["src"] in ("kenney", "quaternius"):
+        if cand["src"] in ("kenney", "quaternius", "kaykit", "local"):
             meta["res"] = ""  # у Kenney нет текстур - разрешения тоже
         lost = [m for m in meta.get("main", []) if not os.path.exists(os.path.join(tmp, *m.split("/")))]
         if lost:  # ассет без своих файлов не сохраняем - пусть лучше будет ошибка и повтор

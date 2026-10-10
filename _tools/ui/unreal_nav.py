@@ -82,6 +82,14 @@ THEME_ICON = {
     "Средневековье - Kenney low-poly": "tool_sword_a",
     "Космос - Kenney low-poly": "gear",
     "Еда - Kenney low-poly": "coffee-mug-steam",
+    "Дом - KayKit low-poly": "hand_cube",
+    "Средневековье - KayKit low-poly": "tool_sword_a",
+    "Город - KayKit low-poly": "structure_tower",
+    "Космос - KayKit low-poly": "gear",
+    "Прототипы и уровни - KayKit low-poly": "hand_cube",
+    "Персонажи - KayKit low-poly": "pawn",
+    "Прототипы и уровни - Kenney low-poly": "hand_cube",
+    "Персонажи - Kenney low-poly": "pawn",
     "Лес и природа - Quaternius low-poly": "bonsai-tree",
     "Город - Quaternius low-poly": "structure_tower",
     "Средневековье - Quaternius low-poly": "tool_sword_a",
@@ -103,7 +111,7 @@ def theme_label(th):
     """Имя темы в дереве: внутри группы «Дом» - без приставки."""
     if th.startswith(HOME_PREFIX):
         rest = th[len(HOME_PREFIX) :]
-        for src in ("Kenney", "Quaternius"):
+        for src in U.LOW_POLY:
             if rest.startswith(src):
                 return f"{src} - простые low-poly"
         return rest[:1].upper() + rest[1:]
@@ -323,7 +331,7 @@ class Nav(QWidget):
             if th == self.theme:
                 pick = it
         if home is not None:
-            for src in ("Kenney", "Quaternius"):  # простые модели отдельно - для черновой расстановки
+            for src in U.LOW_POLY:  # простые модели отдельно - для черновой расстановки
                 th = f"Дом - {src} low-poly"
                 mine = [a for a in lst if a.get("theme") == th]
                 if mine:

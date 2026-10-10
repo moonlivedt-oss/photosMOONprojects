@@ -95,6 +95,13 @@ class UnrealTab(QWidget):
         get = QPushButton(lib_icon("download"), "Скачать ещё...", objectName="primary")
         get.setToolTip("Бесплатные ассеты CC0 с Poly Haven и ambientCG: вид, тема, сколько")
         get.clicked.connect(self.download)
+        arch = QPushButton(lib_icon("zip-archive"), "Добавить архивы...", objectName="ghost")
+        arch.setToolTip(
+            "Скачанные вручную zip (KayKit, Quaternius MegaKit с itch.io...): модели разберутся по темам. "
+            "Можно просто сложить архивы в _Unreal/_Архивы"
+        )
+        arch.clicked.connect(self.add_archives)
+        self.arch_btn = arch
         folder = QPushButton(lib_icon("folder"), "", objectName="tool")
         folder.setToolTip("Открыть папку _Unreal")
         folder.clicked.connect(
@@ -169,6 +176,7 @@ class UnrealTab(QWidget):
         bar.addWidget(doc)
         bar.addWidget(scene)
         bar.addWidget(cat)
+        bar.addWidget(arch)
         bar.addWidget(get)
         bar.addWidget(folder)
         mid = QWidget()
@@ -543,7 +551,7 @@ class UnrealTab(QWidget):
             res = (a.get("res") or "").upper()
             sub = theme_label(a.get("theme", ""))
             if a.get("section"):  # дом: раздел и откуда модель
-                low = a.get("source") in ("Kenney", "Quaternius")
+                low = a.get("source") in U.LOW_POLY
                 sub = a["section"] + (f", {a['source']}" if low else "")
             if a.get("polycount"):
                 sub += f", {a['polycount'] // 1000 or 1}k полиг."
@@ -1049,6 +1057,42 @@ class UnrealTab(QWidget):
         d.show()
         d.raise_()
         d.q.setFocus()
+
+    def add_archives(self):
+        """Скачанные вручную архивы -> модели по темам; превью дорисуются сами (refresh)."""
+        from PyQt6.QtWidgets import QMessageBox
+
+        from library import unreal_local as L
+
+        os.makedirs(L.DROP, exist_ok=True)
+        waiting = L.dropped()
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Скачанные архивы с моделями" + (f" (в _Архивы уже лежит {len(waiting)})" if waiting else ""),
+            L.DROP,
+            "Архивы (*.zip)",
+        )
+        paths = list(dict.fromkeys(files + waiting))
+        if not paths:
+            return
+        self.arch_btn.setEnabled(False)
+        self.win.say(f"Разбираю архивы: {len(paths)}...")
+
+        def done(res):
+            self.arch_btn.setEnabled(True)
+            if isinstance(res, Exception):
+                QMessageBox.warning(self, "Архивы", f"Не получилось: {res}")
+                return
+            text = f"Из архивов добавлено моделей: {res['added']}"
+            if res["themes"]:
+                text += " (" + ", ".join(f"{t}: {n}" for t, n in res["themes"].items()) + ")"
+            if res["errors"]:
+                text += f"   не вышло: {len(res['errors'])}"
+                log_error("архивы Unreal:\n" + "\n".join(res["errors"]))
+            self.win.say(text)
+            self.refresh()
+
+        bg(lambda: L.import_archives(paths, log=lambda _s: None), done)
 
     def catalog(self):
         d = getattr(self, "cat_dlg", None)

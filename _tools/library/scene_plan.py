@@ -76,8 +76,19 @@ ROOMS = {
     },
 }
 DEFAULT_ROOM = "гостиная"
-LOW_POLY_WORDS = ("low-poly", "low poly", "лоу-поли", "лоупол", "мультяш", "простые", "cartoon", "kenney", "quaternius")
-LOW_POLY_SOURCES = ("Kenney", "Quaternius")
+LOW_POLY_WORDS = (
+    "low-poly",
+    "low poly",
+    "лоу-поли",
+    "лоупол",
+    "мультяш",
+    "простые",
+    "cartoon",
+    "kenney",
+    "quaternius",
+    "kaykit",
+)
+LOW_POLY_SOURCES = ("Kenney", "Quaternius", "KayKit")
 FLOOR_THEMES = ("Дом - полы", "Дом - плитка и камень")
 WALL_THEMES = ("Дом - стены", "Дом - плитка и камень")
 

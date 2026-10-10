@@ -38,6 +38,17 @@
   в `_unreal_quaternius.json`). Новые темы: природа (Ultimate Nature, Simple Nature, Survival), город (Cars,
   Buildings, Modular Streets, Public Transport), средневековье (Medieval Village, Dungeon, Pirate Kit), космос
   (Ultimate Space Kit, Modular Sci-Fi, Spaceships), еда, животные с анимациями; в «Дом» - Ultimate Furniture.
+- **KayKit** (Kay Lousberg, CC0) - третий источник low-poly: официальные репозитории на GitHub (мебель и
+  ресторан в «Дом», подземелье, гексы, Хэллоуин, город, космобаза, прототипы, персонажи со скелетом);
+  текстура-палитра кладётся рядом с FBX.
+- Ещё наборы Kenney: Modular Dungeon, Cave, Retro Fantasy, Pirate, Mini Forest, City Industrial, Factory,
+  Retro Urban, Modular Buildings, Mini Market, Train, Watercraft, Modular Space и новая тема «Прототипы и
+  уровни» (Prototype, Platformer, Tower Defense, Hexagon, Mini Arena, Racing), «Персонажи».
+- **Добавить архивы...** во вкладке Unreal (и `cli.py unreal archives`): скачанные вручную zip (itch.io:
+  KayKit, Quaternius MegaKit) разбираются по темам сами - тема и автор по имени архива, копии для
+  Unity/OBJ/glTF пропускаются, текстуры, которые называет FBX, кладутся рядом. Архивы можно просто сложить в
+  `_Unreal/_Архивы` - там же `Ссылки.html` со списком наборов и как их скачать.
+- Битый архив Kenney (оборванная загрузка) больше не застревает в кэше.
 - Докачаны оставшиеся модели Poly Haven (природа, город, индустрия, интерьер).
 - `undo` у помощника не отменяет старое действие поверх более новых, тронувших те же картинки (подскажет,
   что отменить сначала; `force=true` - всё равно).

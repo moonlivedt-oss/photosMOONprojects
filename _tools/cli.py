@@ -9,6 +9,7 @@ py -3.14 cli.py gallery
 py -3.14 cli.py unreal                       # ассеты Unreal: что скачано, темы
 py -3.14 cli.py repair [fix|backup|list|restore latest]   # проверка и восстановление базы и настроек
 py -3.14 cli.py unreal get tex "Город" --count 6 --res 2k     # tex | hdri | model | ies
+py -3.14 cli.py unreal archives [--path X.zip]  # скачанные вручную архивы (_Unreal/_Архивы) -> модели
 py -3.14 cli.py api                          # операции для ИИ-помощников и скриптов (JSON)
 py -3.14 cli.py api search '{"query": "ночной город"}'
 py -3.14 cli.py api view '{"paths": ["04 Иконки/x.webp"]}' --out preview.png
@@ -237,6 +238,22 @@ def cmd_unreal(a):
     if a.action == "previews":
         unreal_previews()
         return
+    if a.action == "archives":
+        from library import unreal_local as L
+
+        paths = a.path or L.dropped()
+        if not paths:
+            print(f"Архивов нет. Положите скачанные zip в {L.DROP} или укажите --path")
+            return
+        res = L.import_archives(paths)
+        print(f"Добавлено моделей: {res['added']}")
+        for th, n in res["themes"].items():
+            print(f"  {th}: {n}")
+        for e in res["errors"][:20]:
+            print("  !", e)
+        if res["added"]:
+            unreal_previews()
+        return
     items = U.assets()
     print("Папка:", U.ROOT)
     for kind, (_folder, title, _t) in U.KINDS.items():
@@ -319,11 +336,12 @@ def main():
     ap.add_argument("--who", default="ИИ (командная строка)", help="кто действует - так подписано в журнале")
     ap.add_argument("--help-tool", action="store_true", help="описание и схема параметров операции")
     ue = sub.add_parser("unreal", help="ассеты для Unreal Engine (CC0): текстуры, HDRI, модели, IES")
-    ue.add_argument("action", nargs="?", default="list", choices=["list", "get", "previews"])
+    ue.add_argument("action", nargs="?", default="list", choices=["list", "get", "previews", "archives"])
     ue.add_argument("kind", nargs="?", default="tex", help="tex | hdri | model | ies")
     ue.add_argument("theme", nargs="?", help="тема или «все»")
     ue.add_argument("--count", type=int, default=4)
     ue.add_argument("--res", default="2k", choices=["1k", "2k", "4k"])
+    ue.add_argument("--path", action="append", help="для archives: zip-архив или папка (можно несколько раз)")
     rp = sub.add_parser("repair", help="проверка и восстановление: база, настройки, резервные копии")
     rp.add_argument("action", nargs="?", default="check", choices=["check", "fix", "backup", "list", "restore"])
     rp.add_argument("name", nargs="?", help="для restore: часть имени копии или latest")
