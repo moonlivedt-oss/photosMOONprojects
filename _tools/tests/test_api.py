@@ -413,6 +413,37 @@ class Api(unittest.TestCase):
         self.assertEqual(sent[0]["method"], "notifications/progress")
         self.assertEqual(sent[0]["params"], {"progressToken": "t1", "progress": 1, "total": 2, "message": "половина"})
 
+    def test_selection_and_status_bridge(self):
+        from unittest import mock
+
+        from library import ui_bridge
+
+        d = self.lib
+        with (
+            mock.patch.object(ui_bridge, "STATE", os.path.join(d, "state.json")),
+            mock.patch.object(ui_bridge, "STATUS", os.path.join(d, "status.json")),
+        ):
+            self.assertIn("не открыто", api.call("selection")["window"])
+            ui_bridge.write_state({"tab": "library", "library": {"title": "Космос", "selected": ["a/b.png"]}})
+            got = api.call("selection")
+            self.assertEqual((got["tab"], got["library"]["selected"]), ("library", ["a/b.png"]))
+            self.assertLess(got["seconds_ago"], 5)
+            seen = []
+            api.TOOLS["_work"] = dict(
+                fn=lambda: (api.report(3, 10, "качаю"), seen.append(ui_bridge.read_status(0)), {"ok": 1})[2],
+                desc="",
+                write=True,
+                preview=None,
+                destructive=False,
+                schema={"type": "object", "properties": {}, "required": []},
+            )
+            try:
+                api.call("_work")
+            finally:
+                del api.TOOLS["_work"]
+            self.assertEqual((seen[0]["text"], seen[0]["done"], seen[0]["total"]), ("качаю", 3, 10))
+            self.assertEqual(ui_bridge.read_status(0)["text"], "")  # операция кончилась - строка пустая
+
 
 if __name__ == "__main__":
     unittest.main()

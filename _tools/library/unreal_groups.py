@@ -68,7 +68,7 @@ SECTIONS = {
             "Лагерь и выживание",
             W(
                 "tent campfire fire axe bucket barrel chest fence sign signpost workbench bedroll tool hammer hoe "
-                "pickaxe shovel canoe paddle box bottle pot structure floor panel roof building ladder bed flag "
+                "pickaxe shovel canoe paddle box bottle pot structure floor panel roof building ladder bed flag fish "
                 "statue column resource"
             ),
         ),
@@ -81,20 +81,24 @@ SECTIONS = {
                 "locomotive carriage tractor sedan suv pickup delivery hatchback race kart"
             ),
         ),
+        ("Индустрия", W("pipe pipes tank container crate pallet conveyor machine generator silo")),
+        ("Железная дорога", W("rail rails railroad railroadrail railstraight track tracks")),
         (
-            "Дороги и рельсы",
+            "Дороги",
             W(
-                "road roads street crossing intersection highway rail rails track tracks bridge sidewalk asphalt "
-                "decal arrow lane crosswalk stripe doubleyellow curve turn"
+                "road roads street crossing intersection highway bridge sidewalk asphalt decal arrow lane crosswalk "
+                "stripe doubleyellow curve turn"
             ),
         ),
+        ("Окна и двери", W("window windows door doors balcony entrance awning")),
+        ("Крыши", W("roof roofs roofflat chimney")),
         (
-            "Здания",
-            W(
-                "building buildings house skyscraper shop store garage factory warehouse roof wall walls door "
-                "window windows facade stairs chimney balcony apartment office brick column trim cornice corner "
-                "angle cap inset entrance concrete floor tile"
-            ),
+            "Дома целиком",
+            W("building buildings house skyscraper shop store garage factory warehouse apartment office"),
+        ),
+        (
+            "Стены и фасады",
+            W("wall walls facade stairs brick column trim cornice corner angle cap inset concrete floor tile"),
         ),
         (
             "Улица и детали",
@@ -103,7 +107,6 @@ SECTIONS = {
                 "dumpster bollard billboard"
             ),
         ),
-        ("Индустрия", W("pipe pipes tank container crate pallet conveyor machine generator silo")),
     ),
     "Средневековье и фэнтези": (
         (
@@ -116,21 +119,26 @@ SECTIONS = {
         ),
         ("Кладбище и подземелье", W("grave tomb coffin skull bone bones crypt dungeon trap cage gravestone")),
         ("Корабли", W("ship boat pirate cannon anchor mast")),
-        ("Природа", W("tree trees treesa treesb pine rock grass bush mushroom stone hedge")),
+        ("Природа", W("tree trees treesa treesb pine rock grass bush mushroom stone hedge trunk hill mountain")),
+        ("Башни и ворота", W("tower towers towersquare buildingtower battlement gate castle arch drawbridge")),
+        ("Крыши", W("roof roofs roofhigh overhang overhangside chimney")),
+        ("Двери и окна", W("door doors doorway window windows balcony shutter")),
+        ("Полы и лестницы", W("floor floortile tile tiles stairs stair bridge corridor corridorwide platform")),
+        ("Дома целиком", W("building house home windmill well structure mill hut shack")),
         (
-            "Строения",
+            "Стены",
             W(
-                "wall walls tower towers castle house roof gate door doors bridge stairs floor tile column pillar "
-                "arch window building windmill well corner overhang overhangside brick plaster corridor room "
-                "exterior interior chimney battlement balcony structure unevenbrick hole cover road path"
+                "wall walls wallwood wallcorner corner brick plaster exterior interior unevenbrick column pillar "
+                "room cover hole road path"
             ),
         ),
+        ("Знамёна и флаги", W("banner bannerpattern bannerthin bannertriple flag flags")),
         (
             "Утварь и мебель",
             W(
-                "barrel crate chest table chair bed bookcase shelf candle torch lantern banner bottle mug plate "
-                "bucket cart sack bag book potion coin fence ironfence bench stall fountain flag prop pumpkin vine "
-                "propvine detail"
+                "barrel crate chest table chair bed bookcase shelf candle torch lantern bottle mug plate bucket cart "
+                "sack bag book potion coin fence ironfence bench stall fountain prop pumpkin vine propvine detail "
+                "shovel pickaxe anvil workbench weaponrack vase urn lightpost lamppost post pouch dummy"
             ),
         ),
         ("Карты", W("card cards")),
@@ -150,12 +158,13 @@ SECTIONS = {
             "Инструменты",
             W("wrench screwdriver hammer pliers drill saw vice cutters sledgehammer toolbox tool"),
         ),
+        ("Коридоры и двери", W("corridor door doors window gate hangar tunnel wallwindow")),
+        ("Платформы и лестницы", W("platform stairs floor rail track slope incline")),
         (
-            "Модули и стены",
+            "Стены и углы",
             W(
-                "wall walls floor corridor door doors panel platform column stairs module room window roof corner "
-                "cornerround cornersquare basemodule roofmodule hangar tunnel structure top bottom inner outer "
-                "slope incline gate rail track"
+                "wall walls panel column module room roof corner cornerround cornersquare basemodule roofmodule "
+                "structure top bottom inner outer"
             ),
         ),
         (
@@ -316,3 +325,77 @@ def annotate(items):
             a["_g"] = group_of(a)
             a["_s"] = section_of(a)
     return items
+
+
+# ---------------------------------------------------------------- «Прочее» - по картинке (CLIP)
+# что за вещь в разделе - для поиска по смыслу: раздел ставится, только когда ИИ уверен (unreal_sem.classify)
+PROMPTS = {
+    "Природа": {
+        "Деревья": "a tree",
+        "Камни и скалы": "a rock or boulder",
+        "Кусты, трава, цветы": "a bush, grass or flowers",
+        "Земля и дорожки": "a ground tile or path",
+        "Лагерь и выживание": "camping gear, tools or a wooden structure",
+    },
+    "Город и транспорт": {
+        "Транспорт": "a car or vehicle",
+        "Железная дорога": "railway tracks",
+        "Дороги": "a road piece",
+        "Окна и двери": "a window or door",
+        "Крыши": "a roof",
+        "Дома целиком": "a whole building",
+        "Стены и фасады": "a brick wall segment",
+        "Улица и детали": "a street lamp, bench or sign",
+        "Индустрия": "industrial pipes or containers",
+    },
+    "Средневековье и фэнтези": {
+        "Гексы и карта": "a hexagonal map tile",
+        "Оружие и броня": "a medieval weapon or shield",
+        "Кладбище и подземелье": "a gravestone, skull or dungeon prop",
+        "Корабли": "a wooden ship",
+        "Природа": "a tree or rock",
+        "Башни и ворота": "a castle tower or gate",
+        "Крыши": "a roof",
+        "Двери и окна": "a door or window",
+        "Полы и лестницы": "a floor tile or stairs",
+        "Дома целиком": "a medieval house",
+        "Стены": "a stone wall segment",
+        "Знамёна и флаги": "a banner or flag",
+        "Утварь и мебель": "a barrel, crate, table or chest",
+    },
+    "Космос и sci-fi": {
+        "Персонажи": "an alien or robot",
+        "Корабли и транспорт": "a spaceship or vehicle",
+        "Декали": "a flat decal sign",
+        "Поверхность": "planet terrain rocks",
+        "Инструменты": "a hand tool",
+        "Коридоры и двери": "a sci-fi corridor or door",
+        "Платформы и лестницы": "a metal platform or stairs",
+        "Стены и углы": "a sci-fi wall panel",
+        "Предметы": "a sci-fi crate, computer or container",
+    },
+    "Персонажи и животные": {
+        "Животные": "an animal",
+        "Снаряжение и одежда": "a weapon, hat or clothing item",
+        "Персонажи": "a human character",
+    },
+    "Еда": {
+        "Фрукты и овощи": "a fruit or vegetable",
+        "Выпечка и сладкое": "a cake, bread or sweets",
+        "Блюда": "a cooked dish",
+        "Напитки": "a drink bottle or cup",
+        "Посуда": "kitchen utensils or dishes",
+    },
+}
+
+
+def classify_other(sem, items):
+    """Модели из «Прочего» -> раздел своей группы по превью и имени (только уверенно). -> {папка: раздел}."""
+    from library import unreal_sem
+
+    out = {}
+    for g, prompts in PROMPTS.items():
+        rest = [a for a in items if a.get("kind") == "model" and a.get("_g") == g and a.get("_s") == OTHER]
+        if rest:
+            out.update(unreal_sem.classify(sem, rest, prompts, margin=1.5))  # строже, чем у Дома: разделов больше
+    return out

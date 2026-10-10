@@ -12,6 +12,7 @@ import imaging as K
 from library.unreal import CACHE, KINDS, ROOT, assets
 
 COLORS_STORE = os.path.join(os.path.dirname(CACHE), "_unreal_colors.json")
+SIGS_STORE = os.path.join(os.path.dirname(CACHE), "_unreal_sigs.json")  # отпечатки превью для повторов
 _lock = threading.Lock()
 
 
@@ -69,6 +70,75 @@ def added(a):
         return 0
 
 
+# ---------------------------------------------------------------- повторы
+def _norm(name):
+    """Имя для сравнения: «Birch Tree 1», «birch_tree_1», «BirchTree1» - одно и то же."""
+    return "".join(c for c in name.lower() if c.isalnum())
+
+
+def build_sigs(items, cache=None):
+    """Отпечатки превью (12x12, как у картинок библиотеки) - досчитываются только новые. -> {ключ: [..]}."""
+    if cache is None:
+        try:
+            with open(SIGS_STORE, encoding="utf-8") as fh:
+                cache = json.load(fh)
+        except (OSError, ValueError):
+            cache = {}
+    changed = False
+    for a in items:
+        k = _key(a)
+        if k is None or k in cache:
+            continue
+        try:
+            with Image.open(os.path.join(a["dir"], "preview.webp")) as im:
+                ratio, vec = K.signature(im)
+            cache[k] = [round(ratio, 4)] + [int(v) for v in vec.reshape(-1)]
+        except Exception:
+            cache[k] = []
+        changed = True
+    if changed:
+        with _lock:
+            K.write_atomic(SIGS_STORE, json.dumps(cache), "utf-8")
+    return cache
+
+
+def duplicates(items):
+    """Один и тот же ассет, скачанный дважды (из архива и из сети, из двух наборов): то же имя и то же
+    превью. Только имя - мало (у Kenney и KayKit бывают разные «Wall»), только превью - тоже (простые
+    кубики похожи). -> [[ассеты]], в группе первым - тот, что оставить (из сети, а не из архива; крупнее)."""
+    import numpy as np
+
+    by_name = {}
+    for a in items:
+        if a.get("kind") == "model" and a.get("_pt", 1):
+            by_name.setdefault((_norm(a.get("name", "")), a.get("kind")), []).append(a)
+    cands = [g for g in by_name.values() if len(g) > 1]
+    if not cands:
+        return []
+    sigs = build_sigs([a for g in cands for a in g])
+    out = []
+    for g in cands:
+        vecs = []
+        for a in g:
+            s = sigs.get(_key(a) or "")
+            vecs.append((s[0], np.asarray(s[1:], float).reshape(12, 12, 3)) if s else None)
+        used = set()
+        for i in range(len(g)):
+            if i in used or vecs[i] is None:
+                continue
+            same = [
+                j
+                for j in range(i + 1, len(g))
+                if j not in used and vecs[j] is not None and K.same_sig(vecs[i], vecs[j])
+            ]
+            if same:
+                group = [g[i]] + [g[j] for j in same]
+                used.update(same)
+                group.sort(key=lambda x: (str(x.get("id", "")).startswith("local-"), -x.get("size", 0)))
+                out.append(group)
+    return out
+
+
 # ---------------------------------------------------------------- проверка
 def check(items=None):
     """Проблемные ассеты: [(ассет или None, что не так)]. Недокачанные папки *.part убираются сразу."""
@@ -95,4 +165,8 @@ def check(items=None):
             out.append((a, "нет превью"))
         if a.get("kind") not in KINDS:
             out.append((a, "непонятный вид"))
+    for group in duplicates(assets() if items is None else items):
+        keep = group[0]
+        for a in group[1:]:
+            out.append((a, f"повтор: {keep.get('name', '')} ({keep.get('source', '')}) - можно убрать"))
     return out

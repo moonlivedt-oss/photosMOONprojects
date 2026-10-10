@@ -123,12 +123,15 @@ def theme_of(base, src):
     return f"{base} - {src or 'Свои'} low-poly" if base != "Разное" else "Разное - Свои архивы"
 
 
+def unpacked_name(path):
+    return clean_name(os.path.splitext(os.path.basename(path))[0]) or "archive"
+
+
 def unpack(path):
     """Архив -> папка с содержимым (распаковывается один раз; папка как есть)."""
     if os.path.isdir(path):
         return path
-    stem = clean_name(os.path.splitext(os.path.basename(path))[0]) or "archive"
-    dst = os.path.join(UNPACK, stem)
+    dst = os.path.join(UNPACK, unpacked_name(path))
     if not os.path.isdir(dst):
         tmp = dst + ".part"
         shutil.rmtree(tmp, ignore_errors=True)
@@ -304,6 +307,8 @@ def import_archives(paths, log=print, stop=None):
                 res["themes"][theme] = res["themes"].get(theme, 0) + 1
             except Exception as e:
                 res["errors"].append(f"{c['name']}: {e}")
+        if os.path.isfile(path):  # распакованная копия больше не нужна - модели уже в _Unreal (до 1.5 ГБ)
+            shutil.rmtree(os.path.join(UNPACK, unpacked_name(path)), ignore_errors=True)
         if os.path.dirname(os.path.abspath(path)) == os.path.abspath(DROP) and os.path.isfile(path):
             os.makedirs(DONE, exist_ok=True)  # разобранный архив из папки - в «_разобрано», чтобы не брать снова
             shutil.move(path, unique(os.path.join(DONE, os.path.basename(path))))

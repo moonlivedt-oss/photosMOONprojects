@@ -401,3 +401,21 @@ def ue_add_archives(paths=None):
     if res["added"]:
         ui_bridge.ue_changed()
     return res
+
+
+@tool(
+    "ue_check",
+    "Проверка ассетов Unreal: нет файлов, пустой FBX, нет превью и повторы (одна модель, скачанная дважды: то же "
+    "имя и то же превью). Убрать - пользователь сам в окне («Проверка» -> правый щелчок -> в корзину). Ничего не меняет.",
+    {"limit": {"type": "integer", "default": 100}},
+)
+def ue_check(limit=100):
+    from library import unreal_extra as X
+
+    items = _items()
+    probs = [(a, why) for a, why in X.check(items) if a is not None]
+    return {
+        "checked": len(items),
+        "problems": len(probs),
+        "items": [dict(_brief(a), problem=why) for a, why in probs[: max(1, limit)]],
+    }

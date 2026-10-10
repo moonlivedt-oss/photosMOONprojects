@@ -1,6 +1,7 @@
 """Главное окно: вкладки, строка состояния, отмена (Ctrl+Z), приём файлов, папка генератора."""
 
 import os
+import re
 import shutil
 import sys
 import time
@@ -185,6 +186,11 @@ class Window(QMainWindow):
         self.inbox.changed.connect(self.library_changed)
         self.lib.changed.connect(self.library_changed)
         self.tabs.currentChanged.connect(self.tab_changed)
+        self.state_timer = QTimer(self, singleShot=True, interval=500)  # выбор для помощника - не на каждый щелчок
+        self.state_timer.timeout.connect(self.share_state)
+        self.tabs.currentChanged.connect(lambda _i: self.state_timer.start())
+        self.lib.list.itemSelectionChanged.connect(self.state_timer.start)
+        self.unreal.list.itemSelectionChanged.connect(self.state_timer.start)
 
         # копирование пачки файлов дёргает слежение десятки раз - перечитываем один раз, когда утихнет
         self.inbox_timer = QTimer(self, singleShot=True, interval=400)
@@ -440,6 +446,36 @@ class Window(QMainWindow):
             log_error(f"метки не переехали: {e}")
 
     # --- действия ИИ-помощника: появляются в истории (Ctrl+Z отменяет) и всплывают пузырём
+    def share_state(self, closed=False):
+        """Что открыто и выбрано - для помощника (операция selection)."""
+        from library import ui_bridge
+
+        tab = {0: "inbox", 1: "library", 2: "unreal"}.get(self.tabs.currentIndex(), "other")
+        lib_sel = [os.path.relpath(p, LIB).replace(os.sep, "/") for p in self.lib.paths()][:200]
+        ue_sel = [a.get("id") or a.get("name") for a in self.unreal.current()][:200]
+        state = {
+            "tab": tab,
+            "library": {"title": re.sub(r"<[^>]+>", "", self.lib.title.text()).strip(), "selected": lib_sel},
+            "unreal": {"title": self.unreal.title.text(), "selected": ue_sel},
+        }
+        if closed:
+            state["closed"] = True
+        ui_bridge.write_state(state)
+
+    def show_status(self):
+        """Ход долгой операции помощника - в строке состояния (сам он видит его уведомлениями MCP)."""
+        from library import ui_bridge
+
+        st = ui_bridge.read_status(getattr(self, "status_seen", 0))
+        if not st:
+            return
+        self.status_seen = st["t"]
+        if not st.get("text"):
+            self.statusBar().clearMessage()
+            return
+        part = f" {st['done']}/{st['total']}" if st.get("total") else ""
+        self.statusBar().showMessage(f"{st.get('who') or 'ИИ-помощник'}: {st['text']}{part}", 60000)
+
     def check_bridge(self):
         """ИИ-помощник просит показать найденное (show / ue_show) или поменял ассеты Unreal."""
         from library import ui_bridge
@@ -464,6 +500,7 @@ class Window(QMainWindow):
 
     def check_journal(self):
         self.check_bridge()
+        self.show_status()
         try:
             new = journal.entries(50, since=self.jseen)
             gone = journal.undone_among([j for _t, _s, j in self.history])
@@ -728,6 +765,10 @@ class Window(QMainWindow):
         self.cfg["archive"] = self.inbox.keep.isChecked()
         self.lib.remember_section()
         self.drop_redo()  # после закрытия вернуть отменённое нельзя
+        try:
+            self.share_state(closed=True)
+        except Exception as ex:
+            log_error(f"состояние окна для помощника: {ex!r}")
         try:
             if not getattr(self, "cfg_frozen", False):  # после восстановления из копии - не затирать её
                 save_cfg(self.cfg)

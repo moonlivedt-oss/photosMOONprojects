@@ -27,6 +27,7 @@ _tools/_unreal_quaternius.json
 _tools/_unreal_packs/
 _tools/_unreal_clip.npz
 _tools/_unreal_colors.json
+_tools/_unreal_sigs.json
 _tools/_unreal_sets.json
 
 # стрелки стилей: окно пишет их само цветом текущей темы
@@ -38,3 +39,5 @@ _tools/_running.json
 *.broken-*
 _tools/_ui_request.json
 _tools/_unreal_changed
+_tools/_ui_state.json
+_tools/_ui_status.json

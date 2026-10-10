@@ -76,6 +76,10 @@ def report(done, total=None, message=""):
             cb(done, total, message)
         except Exception:
             pass
+    if _writing.get():  # долгая операция записи - ход виден и пользователю, внизу окна
+        from library import ui_bridge
+
+        ui_bridge.status(message or "работаю", done, total, AGENT["who"])
 
 
 def write_allowed():
@@ -107,6 +111,11 @@ def call(name, args=None, progress=None):
     try:
         return t["fn"](**args)
     finally:
+        if writing:
+            from library import ui_bridge
+
+            if ui_bridge._last[0]:  # ход работы сообщался - строку состояния окна убрать
+                ui_bridge.status("", who=AGENT["who"])
         _writing.reset(token)
         _progress.reset(ptoken)
 
@@ -1248,6 +1257,27 @@ def show(paths, title=""):
     ps = images(paths, 500)
     ui_bridge.request("library", [rel(p) for p in ps], title or "Подборка помощника", AGENT["who"])
     return {"shown": len(ps), "title": title or "Подборка помощника"}
+
+
+@tool(
+    "selection",
+    "Что пользователь сейчас видит и выбрал в окне: вкладка, заголовок списка, выбранные картинки (пути) "
+    "или ассеты Unreal (id). Для просьб «сделай вот с этими», «что это за модель». Ничего не меняет.",
+)
+def selection():
+    from library import ui_bridge
+
+    st = ui_bridge.read_state()
+    if not st:
+        return {"window": "не открыто или ещё ничего не выбирали"}
+    age = round(time.time() - st.get("t", 0))
+    out = {k: v for k, v in st.items() if k != "t"}
+    out["seconds_ago"] = age
+    if st.get("closed"):
+        out["note"] = "окно закрыто - это выбор на момент закрытия"
+    elif age > 3600:
+        out["note"] = "выбор старый (больше часа) - уточните у пользователя"
+    return out
 
 
 # ---------------------------------------------------------------- версии картинки

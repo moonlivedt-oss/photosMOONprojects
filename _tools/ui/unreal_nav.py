@@ -139,6 +139,19 @@ THEME_ICON = {
     "Гексы": "hexagon",
     "Арена": "trophy-cup",
     "Блоки-заготовки": "hand_cube",
+    "Железная дорога": "card_place",
+    "Дороги": "card_place",
+    "Окна и двери": "door",
+    "Двери и окна": "door",
+    "Коридоры и двери": "door",
+    "Крыши": "house",
+    "Дома целиком": "house",
+    "Стены и фасады": "structure_wall",
+    "Стены и углы": "structure_wall",
+    "Башни и ворота": "structure_tower",
+    "Полы и лестницы": "card_place",
+    "Платформы и лестницы": "card_place",
+    "Знамёна и флаги": "bookmark",
 }
 
 

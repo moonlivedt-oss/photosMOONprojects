@@ -360,5 +360,40 @@ class TestGroups(unittest.TestCase):
         self.assertEqual(G.group_of("Что-то новое"), "Разное")
 
 
+class TestDuplicates(unittest.TestCase):
+    """Повтор - то же имя и то же превью; разные модели с одним именем или одно превью у разных - не повтор."""
+
+    def test_same_name_and_preview(self):
+        from PIL import Image, ImageDraw
+
+        from library import unreal_extra as X
+
+        tmp = tempfile.mkdtemp()
+        try:
+
+            def asset(sub, name, color, aid, size=10):
+                d = os.path.join(tmp, sub)
+                os.makedirs(d)
+                im = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+                ImageDraw.Draw(im).rectangle((20, 30, 100, 110), fill=color)
+                im.save(os.path.join(d, "preview.webp"))
+                return {"dir": d, "name": name, "kind": "model", "id": aid, "size": size, "_pt": 1.0}
+
+            a = asset("a", "Grass", (40, 200, 60, 255), "kenney-x-grass", 5)
+            b = asset("b", "grass", (40, 200, 60, 255), "local-pack-grass", 50)
+            c = asset("c", "Grass", (200, 40, 40, 255), "kenney-y-grass")  # то же имя, другой цвет
+            e = asset("e", "Rock", (40, 200, 60, 255), "kenney-rock")  # то же превью, другое имя
+            with (
+                mock.patch.object(X, "SIGS_STORE", os.path.join(tmp, "sigs.json")),
+                mock.patch.object(X, "ROOT", tmp),
+            ):
+                groups = X.duplicates([a, b, c, e])
+                self.assertEqual([[x["id"] for x in g] for g in groups], [["kenney-x-grass", "local-pack-grass"]])
+                why = dict((x["id"], w) for x, w in X.check([a, b, c, e]) if x is not None)
+                self.assertIn("повтор", why["local-pack-grass"])  # скачанное из сети остаётся, из архива - повтор
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

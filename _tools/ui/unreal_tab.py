@@ -386,7 +386,7 @@ class UnrealTab(QWidget):
         bg(lambda: self.sem.build(items, lambda d, t: in_main(prog, (d, t))), done)
 
     def ai_sections(self):
-        """Модели «Дома», которым по имени и меткам раздел не нашёлся («Мелочи»): раздел по превью и имени
+        """Модели, которым по имени и меткам раздел не нашёлся («Мелочи» Дома, «Прочее» групп): раздел по превью и имени
         (CLIP) - только где ИИ уверен. Помечаются section_ai, в подсказке плитки видно."""
         if self.sem is None:
             return
@@ -397,23 +397,36 @@ class UnrealTab(QWidget):
             and a.get("theme", "").startswith(HOME_PREFIX)
             and a.get("section") == U.HOME_OTHER
         ]
-        if not other:
-            return
+        from library import unreal_groups as G
         from library import unreal_sem
 
-        def done(got):
-            if isinstance(got, Exception):
-                log_error("unreal ai sections: %r" % got)
+        G.annotate(self.items)
+        rest = [a for a in self.items if a.get("kind") == "model" and a.get("_s") == G.OTHER]  # «Прочее» групп
+        if not other and not rest:
+            return
+
+        def work():
+            got = unreal_sem.classify(self.sem, other) if other else {}
+            return got, G.classify_other(self.sem, rest) if rest else {}
+
+        def done(res):
+            if isinstance(res, Exception):
+                log_error("unreal ai sections: %r" % res)
                 return
+            home, groups = res
             for a in other:
-                if a["dir"] in got:
-                    a["section"] = a["_s"] = got[a["dir"]]
+                if a["dir"] in home:
+                    a["section"] = a["_s"] = home[a["dir"]]
                     a["section_ai"] = True
-            if got:
+            for a in rest:
+                if a["dir"] in groups:
+                    a["_s"] = groups[a["dir"]]
+                    a["section_ai"] = True
+            if home or groups:
                 self.nav.set_items(self.items, self.favs())
                 self.show_assets()
 
-        bg(lambda: unreal_sem.classify(self.sem, other), done)
+        bg(work, done)
 
     def chosen(self):
         if self.problems is not None:
