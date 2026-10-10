@@ -22,7 +22,6 @@ from PyQt6.QtGui import (
     QBrush,
     QColor,
     QDrag,
-    QFont,
     QKeySequence,
     QPainter,
     QPainterPath,
@@ -37,6 +36,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHeaderView,
     QInputDialog,
+    QLabel,
     QLayout,
     QListWidget,
     QPushButton,
@@ -54,7 +54,7 @@ import imaging as K
 from library import db
 from library.sorting import PLANNED
 from ui.common import CLOSING, FAV, HEAVY, LIB, PIX, RECENT, ROLE, SETS, SMART, TAG, bg, clean_name
-from ui.theme import C, readable
+from ui.theme import C, font, readable
 from ui.thumbnails import TileDelegate, lib_icon, lib_pix, remember, thumb_key, tile_image
 
 
@@ -151,11 +151,8 @@ def header(tree, text):
     """Подпись группы в дереве: мелкие прописные, не выбирается."""
     it = QTreeWidgetItem(tree, [text, ""])
     it.setFlags(Qt.ItemFlag.NoItemFlags)
-    f = QFont("Segoe UI", 7)
-    f.setBold(True)
-    f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.2)
-    it.setFont(0, f)
-    it.setForeground(0, QColor(C["faint"]))
+    it.setFont(0, font("head", 8))
+    it.setForeground(0, QColor(C["head"]))
     it.setSizeHint(0, QSize(10, 30))
     return it
 
@@ -292,15 +289,16 @@ class NameDelegate(QStyledItemDelegate):
         style.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, p, opt.widget)
         r = style.subElementRect(QStyle.SubElement.SE_ItemViewItemText, opt, opt.widget)
         p.save()
-        f = QFont(opt.font)
-        f.setPointSizeF(max(6.5, f.pointSizeF() - 1.5))
-        p.setFont(f)
-        p.setPen(QColor(C["faint"]))
+        sel = opt.state & QStyle.StateFlag.State_Selected
+        p.setFont(font("num", max(7.0, opt.font.pointSizeF() - 1)))
+        dim = QColor(C["selt"] if sel else C["num"])
+        if sel:
+            dim.setAlpha(170)
+        p.setPen(dim)
         num = m.group(1)
         w = p.fontMetrics().horizontalAdvance(num) + 6
         p.drawText(r.adjusted(2, 0, 0, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, num)
         p.setFont(opt.font)
-        sel = opt.state & QStyle.StateFlag.State_Selected
         fg = index.data(Qt.ItemDataRole.ForegroundRole)
         p.setPen(QColor(C["selt"]) if sel else (fg.color() if fg is not None else QColor(C["text"])))
         rest = r.adjusted(2 + w, 0, 0, 0)
@@ -311,6 +309,10 @@ class NameDelegate(QStyledItemDelegate):
 
 class CountDelegate(QStyledItemDelegate):
     """Число справа и под ним тонкая полоска - доля среди соседей: сразу видно, где 1436, а где 160."""
+
+    def initStyleOption(self, opt, index):
+        super().initStyleOption(opt, index)
+        opt.font = font("num", 9.5)
 
     def paint(self, p, opt, index):
         super().paint(p, opt, index)
@@ -367,6 +369,14 @@ def filter_tree(tree, text):
     root = tree.invisibleRootItem()
     for i in range(root.childCount()):
         walk(root.child(i))
+
+
+def panel_head(text):
+    """Заголовок панели («ЧТО ПОКАЗАТЬ», «РАЗДЕЛЫ»): узкий шрифт на своей подложке - читается на живом фоне."""
+    w = QLabel(text, objectName="panelhead")
+    w.setFont(font("head", 8.5))
+    w.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+    return w
 
 
 def make_tree():

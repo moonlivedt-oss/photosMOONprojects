@@ -85,9 +85,42 @@ def apply(theme="dark", accent="lavender"):
     r2, g2, b2 = _rgb(acc2)
     k = (0.30, 0.10) if theme == "dark" else (0.22, 0.08)
     SOFT = f"qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba({r},{g},{b},{k[0]}),stop:1 rgba({r2},{g2},{b2},{k[1]}))"
+    # подписи поверх живого фона: своя полупрозрачная подложка, иначе бледный текст тонет в пятнах цвета
+    b0 = _rgb(base["bg0"])
+    C["glass"] = "rgba(%d,%d,%d,%d)" % (*b0, 185 if theme == "dark" else 210)
+    C["head"] = _mix(base["dim"], base["text"], 0.45)  # заголовки панелей: ярче dim, тише текста
+    C["num"] = _mix(base["faint"], base["text"], 0.35)  # номер раздела «06» в дереве
 
 
 apply()
+
+# ---------------------------------------------------------------- шрифты по ролям
+# Только шрифты, что есть в любой Windows 10/11: Bahnschrift (узкий, ровные цифры) - заголовки панелей и числа,
+# Segoe UI Variable Display - названия карточек. Нет шрифта - остаётся Segoe UI.
+FONTS = {
+    "head": ("Bahnschrift", 600, 87),  # (семейство, насыщенность, ширина в %: 87 - SemiCondensed)
+    "num": ("Bahnschrift", 500, 100),
+    "title": ("Segoe UI Variable Display", 600, 100),
+}
+_have = {}
+
+
+def font(role, pt):
+    """QFont роли: head - заголовки панелей, num - числа и счётчики, title - названия карточек."""
+    from PyQt6.QtGui import QFont, QFontDatabase
+
+    family, weight, stretch = FONTS[role]
+    if family not in _have:
+        _have[family] = family in QFontDatabase.families()
+    f = QFont(family if _have[family] else "Segoe UI")
+    f.setPointSizeF(pt)
+    f.setWeight(QFont.Weight(weight))
+    if _have[family] and stretch != 100:
+        f.setStretch(stretch)
+    if role == "head":
+        f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.4)
+    return f
+
 
 SVG = {
     "down": '<path d="M2.5 4l3.5 3.5 3.5-3.5" fill="none" stroke="$arrow" stroke-width="1.6" '
@@ -206,6 +239,7 @@ QStatusBar::item{border:0}
 QStatusBar QLabel{color:$dim;padding:0 6px}
 QLabel#dim{color:$dim}
 QLabel#faint{color:$faint;font-size:8pt;font-weight:700;letter-spacing:1px}
+QLabel#panelhead{color:$head;background:$glass;border-radius:8px;padding:3px 10px 3px 8px}
 QLabel#title{font-size:16pt;font-weight:700}
 QLabel#big{font-size:12pt;font-weight:600}
 QLabel#head{font-size:13pt;font-weight:700}

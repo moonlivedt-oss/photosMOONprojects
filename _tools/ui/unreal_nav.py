@@ -1,14 +1,13 @@
 """Левая панель вкладки «Unreal»: сверху карточки видов (у каждого свой цвет), ниже - темы только
 выбранного вида; темы «Дом - ...» собраны в одну раскрывающуюся группу «Дом»."""
 
-from PyQt6.QtCore import QRectF, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen
+from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QAbstractButton,
     QBoxLayout,
     QButtonGroup,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QPushButton,
     QSizePolicy,
@@ -19,9 +18,9 @@ from PyQt6.QtWidgets import (
 from library import unreal as U
 from library import unreal_groups as G
 from ui.common import ROLE, human
-from ui.theme import C, readable
+from ui.theme import C, font, readable
 from ui.thumbnails import lib_icon, lib_pix
-from ui.widgets import Flow, filter_tree, make_tree, set_shares, tree_item
+from ui.widgets import filter_tree, make_tree, panel_head, set_shares, tree_item
 
 ALL, FAV = "::all", "::fav"
 NEW, SETS = "::new", "::sets"  # скачанное за последние дни; свои подборки
@@ -194,9 +193,8 @@ class KindCard(QAbstractButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(hint if hint is not None else KIND_HINT[kind])
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.f1 = QFont("Segoe UI", 10)
-        self.f1.setWeight(QFont.Weight.DemiBold)
-        self.f2 = QFont("Segoe UI", 8)
+        self.f1 = font("title", 10.5)  # название - Segoe UI Variable Display
+        self.f2 = font("num", 8.5)  # «5890 шт., 18.7 ГБ» - ровные цифры Bahnschrift
         self.hint = hint if hint is not None else KIND_HINT[kind]
         self.compact = False
 
@@ -236,10 +234,15 @@ class KindCard(QAbstractButton):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = QRectF(self.rect()).adjusted(1, 2, -1, -2)
         col = QColor(readable(self.color))  # в светлой теме пастель темнее
-        if self.isChecked():
-            fill = QColor(col)
-            fill.setAlpha(46)
-            p.setPen(QPen(col, 1.2))
+        if self.isChecked():  # заливка непрозрачная: живой фон окна не просвечивает и не глушит текст
+            base = QColor(C["bg2"])
+            t = 0.22
+            fill = QColor(
+                round(base.red() + (col.red() - base.red()) * t),
+                round(base.green() + (col.green() - base.green()) * t),
+                round(base.blue() + (col.blue() - base.blue()) * t),
+            )
+            p.setPen(QPen(col, 1.4))
             p.setBrush(fill)
         else:
             p.setPen(QPen(QColor(C["line"]), 1))
@@ -288,34 +291,119 @@ class KindCard(QAbstractButton):
 DIM = Qt.ItemDataRole.UserRole + 42  # строка «Прочее» - бледно
 
 
-class StyleChips(QWidget):
-    """Стиль ассетов чипами с переносом строк; currentData / currentText - как у прежнего списка."""
+# стиль -> (подпись, цвет точки)
+STYLE_LOOK = {
+    "all": ("Любой", "#b9b6c8"),
+    "real": ("PBR", "#6cb8ff"),
+    "low": ("Low-poly", "#a897ff"),
+    "Kenney": ("Kenney", "#f0a35e"),
+    "Quaternius": ("Quaternius", "#7ee0a0"),
+    "KayKit": ("KayKit", "#ff8ac9"),
+}
+
+
+class StyleSegments(QWidget):
+    """Стиль ассетов - сегментами 3x2 в общей рамке: у каждого стиля цветная точка, выбранный подсвечен его
+    цветом, стили без ассетов у выбранного вида - бледные. currentData / currentText - как у прежнего списка."""
 
     changed = pyqtSignal()
-    SHORT = {"all": "Любой", "real": "PBR", "low": "Low-poly"}
+    COLS, ROW, PAD, GAP = 3, 28, 4, 3
 
     def __init__(self, current):
         super().__init__()
-        self.group = QButtonGroup(self)
-        self.group.setExclusive(True)
-        flow = Flow(self, 4)
+        self.keys = [k for k, _t in G.STYLES]
         self.texts = dict(G.STYLES)
-        for key, text in G.STYLES:
-            b = QPushButton(self.SHORT.get(key, key), objectName="chip", checkable=True)
-            b.setToolTip(text)
-            b.setProperty("key", key)
-            b.setChecked(key == current)
-            self.group.addButton(b)
-            flow.addWidget(b)
-        if not self.group.checkedButton():
-            self.group.buttons()[0].setChecked(True)
-        self.group.buttonClicked.connect(lambda _b: self.changed.emit())
+        self.cur = current if current in self.keys else "all"
+        self.counts = {}
+        self.hover = None
+        self.setMouseTracking(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        rows = -(-len(self.keys) // self.COLS)
+        self.setFixedHeight(2 * self.PAD + rows * self.ROW + (rows - 1) * self.GAP)
+        self.f = font("title", 9)
+        self.fn = font("num", 7.5)
 
     def currentData(self):
-        return self.group.checkedButton().property("key")
+        return self.cur
 
     def currentText(self):
-        return self.texts.get(self.currentData(), "")
+        return self.texts.get(self.cur, "")
+
+    def set_counts(self, counts):
+        """{стиль: сколько у выбранного вида} - для подсказки и бледных пустых сегментов."""
+        self.counts = counts
+        self.update()
+
+    def cell(self, i):
+        w = (self.width() - 2 * self.PAD - (self.COLS - 1) * self.GAP) / self.COLS
+        r, c = divmod(i, self.COLS)
+        return QRectF(self.PAD + c * (w + self.GAP), self.PAD + r * (self.ROW + self.GAP), w, self.ROW)
+
+    def at(self, pos):
+        for i in range(len(self.keys)):
+            if self.cell(i).contains(QPointF(pos)):
+                return i
+        return None
+
+    def mouseMoveEvent(self, e):
+        i = self.at(e.position().toPoint())
+        if i != self.hover:
+            self.hover = i
+            k = self.keys[i] if i is not None else None
+            n = self.counts.get(k)
+            self.setToolTip(f"{self.texts[k]}: {n} шт." if k and n is not None else (self.texts[k] if k else ""))
+            self.update()
+
+    def leaveEvent(self, _e):
+        self.hover = None
+        self.update()
+
+    def mousePressEvent(self, e):
+        i = self.at(e.position().toPoint())
+        if i is not None and self.keys[i] != self.cur:
+            self.cur = self.keys[i]
+            self.update()
+            self.changed.emit()
+
+    def paintEvent(self, _e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(QPen(QColor(C["line"]), 1))
+        p.setBrush(QColor(C["bg1"]))
+        p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12)
+        for i, k in enumerate(self.keys):
+            r = self.cell(i)
+            text, color = STYLE_LOOK.get(k, (k, C["dim"]))
+            if k == "all":  # «Любой» - цветом акцента темы, а не серым
+                color = C["acc"]
+            col = QColor(readable(color))
+            empty = self.counts.get(k, 1) == 0 and k != self.cur
+            if k == self.cur:
+                fill = QColor(col)
+                fill.setAlpha(60)
+                p.setPen(QPen(col, 1.2))
+                p.setBrush(fill)
+                p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 9, 9)
+            elif i == self.hover:
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(QColor(C["bg3"]))
+                p.drawRoundedRect(r, 9, 9)
+            p.setFont(self.f)
+            fm = p.fontMetrics()
+            label = fm.elidedText(text, Qt.TextElideMode.ElideRight, int(r.width()) - 20)
+            tw = fm.horizontalAdvance(label)
+            x = r.center().x() - (tw + 11) / 2  # точка и подпись - вместе по центру сегмента
+            dot = QColor(col)
+            if empty:
+                dot.setAlpha(70)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(dot)
+            p.drawEllipse(QPointF(x + 3, r.center().y()), 3, 3)
+            tc = QColor(C["selt"] if k == self.cur else (C["faint"] if empty else C["text"]))
+            p.setPen(tc)
+            p.drawText(QRectF(x + 11, r.y(), tw + 2, r.height()), Qt.AlignmentFlag.AlignVCenter, label)
+        p.end()
 
 
 class Nav(QWidget):
@@ -339,7 +427,8 @@ class Nav(QWidget):
         v.setSpacing(4)
         head = QHBoxLayout()
         head.setContentsMargins(0, 0, 0, 0)
-        head.addWidget(QLabel("ЧТО ПОКАЗАТЬ", objectName="faint"), 1)
+        head.addWidget(panel_head("ЧТО ПОКАЗАТЬ"))
+        head.addStretch(1)
         self.compact_btn = QPushButton(lib_icon("menuGrid"), "", objectName="tool", checkable=True)
         self.compact_btn.setToolTip("Карточки видов - значками в одну строку (больше места дереву)")
         self.compact_btn.setFixedSize(26, 22)
@@ -357,12 +446,14 @@ class Nav(QWidget):
             self.cards_box.addWidget(c)
         v.addLayout(self.cards_box)
         v.addSpacing(8)
-        self.theme_lbl = QLabel("ТЕМЫ", objectName="faint")
-        v.addWidget(self.theme_lbl)
-        # стиль - чипами в один щелчок: реалистичные / low-poly / один источник; числа в дереве - с ним
-        self.style = StyleChips(cfg.get("ue_style", "all"))
+        v.addWidget(panel_head("СТИЛЬ"))
+        # стиль - переключателем в один щелчок: реалистичные / low-poly / один источник; числа в дереве - с ним
+        self.style = StyleSegments(cfg.get("ue_style", "all"))
         self.style.changed.connect(self.pick_style)
         v.addWidget(self.style)
+        v.addSpacing(4)
+        self.theme_lbl = panel_head("ГРУППЫ")
+        v.addWidget(self.theme_lbl)
         self.find = QLineEdit(placeholderText="Найти раздел: кровати, деревья...")
         self.find.setClearButtonEnabled(True)
         self.find.textChanged.connect(lambda t: filter_tree(self.tree, t))
@@ -423,6 +514,7 @@ class Nav(QWidget):
         for k, c in self.cards.items():
             lst = self.of_kind(k)
             c.set_stats(len(lst), sum(a.get("size", 0) for a in lst))
+        self.style_counts()
         for k in (FAV, NEW, SETS):  # пустые особые карточки не показываются
             self.cards[k].setVisible(bool(self.of_kind(k)) or (k == SETS and bool(self.sets())))
         if self.kind not in self.cards or self.cards[self.kind].isHidden():  # isVisible ложно, пока вкладка скрыта
@@ -430,10 +522,15 @@ class Nav(QWidget):
         self.cards[self.kind].setChecked(True)
         self.fill_themes()
 
+    def style_counts(self):
+        lst = self._of_kind(self.kind, self.items)
+        self.style.set_counts({k: sum(1 for a in lst if G.style_ok(a, k)) for k in self.style.keys})
+
     def pick_kind(self, k):
         if k == self.kind:
             return
         self.kind = self.cfg["ue_kind"] = k
+        self.style_counts()
         self.fill_themes()
         self.changed.emit()
 

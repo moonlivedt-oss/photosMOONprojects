@@ -86,6 +86,7 @@ from ui.widgets import (
     forget_counts,
     key,
     make_tree,
+    panel_head,
     section_color,
     select_path,
 )
@@ -808,7 +809,7 @@ class LibTab(QWidget):
         lv = QVBoxLayout(left)
         lv.setContentsMargins(0, 0, 0, 0)
         lv.setSpacing(4)
-        lv.addWidget(QLabel("БЫСТРЫЙ ДОСТУП", objectName="faint"))
+        lv.addWidget(panel_head("БЫСТРЫЙ ДОСТУП"))
         self.quick_box = QWidget()  # карточки: столбиком, на широкой панели - сеткой 2x2 (place_quick)
         grid = self.quick_grid = QGridLayout(self.quick_box)
         grid.setContentsMargins(0, 0, 0, 0)
