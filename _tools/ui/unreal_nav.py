@@ -3,14 +3,25 @@
 
 from PyQt6.QtCore import QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
-from PyQt6.QtWidgets import QAbstractButton, QButtonGroup, QComboBox, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QAbstractButton,
+    QBoxLayout,
+    QButtonGroup,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from library import unreal as U
 from library import unreal_groups as G
 from ui.common import ROLE, human
 from ui.theme import C, readable
 from ui.thumbnails import lib_icon, lib_pix
-from ui.widgets import make_tree, tree_item
+from ui.widgets import Flow, filter_tree, make_tree, set_shares, tree_item
 
 ALL, FAV = "::all", "::fav"
 NEW, SETS = "::new", "::sets"  # скачанное за последние дни; свои подборки
@@ -186,17 +197,31 @@ class KindCard(QAbstractButton):
         self.f1 = QFont("Segoe UI", 10)
         self.f1.setWeight(QFont.Weight.DemiBold)
         self.f2 = QFont("Segoe UI", 8)
+        self.hint = hint if hint is not None else KIND_HINT[kind]
+        self.compact = False
 
     def sizeHint(self):
-        return QSize(200, 50)
+        return QSize(34, 38) if self.compact else QSize(200, 50)
+
+    def set_compact(self, on):
+        """Компактно - один значок с цветной чертой снизу; название и число - во всплывающей подсказке."""
+        self.compact = on
+        pol = QSizePolicy.Policy
+        self.setSizePolicy(pol.Fixed if on else pol.Expanding, pol.Fixed)
+        self._tip()
+        self.updateGeometry()
+        self.update()
+
+    def _tip(self):
+        self.setToolTip(f"{self.title}: {self.sub}\n{self.hint}" if self.compact and self.sub else self.hint)
 
     def set_sub(self, text):
         self.sub = text
+        self._tip()
         self.update()
 
     def set_stats(self, n, size):
-        self.sub = f"{n} шт., {human(size)}" if n else "пусто"
-        self.update()
+        self.set_sub(f"{n} шт., {human(size)}" if n else "пусто")
 
     def enterEvent(self, e):
         self.update()
@@ -220,6 +245,15 @@ class KindCard(QAbstractButton):
             p.setPen(QPen(QColor(C["line"]), 1))
             p.setBrush(QColor(C["bg3"] if self.underMouse() else C["bg2"]))
         p.drawRoundedRect(r, 10, 10)
+        if self.compact:
+            p.setPen(Qt.PenStyle.NoPen)  # черта цвета вида снизу, значок по центру
+            p.setBrush(col)
+            p.drawRoundedRect(QRectF(r.center().x() - 7, r.bottom() - 6, 14, 3), 1.5, 1.5)
+            pm = lib_pix(self.icon_name, 44)
+            if not pm.isNull():
+                p.drawPixmap(QRectF(r.center().x() - 10, r.center().y() - 13, 20, 20), pm, QRectF(pm.rect()))
+            p.end()
+            return
         p.setPen(Qt.PenStyle.NoPen)  # полоска цвета вида слева
         p.setBrush(col)
         p.drawRoundedRect(QRectF(r.x() + 5, r.y() + 9, 4, r.height() - 18), 2, 2)
@@ -251,6 +285,39 @@ class KindCard(QAbstractButton):
         p.end()
 
 
+DIM = Qt.ItemDataRole.UserRole + 42  # строка «Прочее» - бледно
+
+
+class StyleChips(QWidget):
+    """Стиль ассетов чипами с переносом строк; currentData / currentText - как у прежнего списка."""
+
+    changed = pyqtSignal()
+    SHORT = {"all": "Любой", "real": "PBR", "low": "Low-poly"}
+
+    def __init__(self, current):
+        super().__init__()
+        self.group = QButtonGroup(self)
+        self.group.setExclusive(True)
+        flow = Flow(self, 4)
+        self.texts = dict(G.STYLES)
+        for key, text in G.STYLES:
+            b = QPushButton(self.SHORT.get(key, key), objectName="chip", checkable=True)
+            b.setToolTip(text)
+            b.setProperty("key", key)
+            b.setChecked(key == current)
+            self.group.addButton(b)
+            flow.addWidget(b)
+        if not self.group.checkedButton():
+            self.group.buttons()[0].setChecked(True)
+        self.group.buttonClicked.connect(lambda _b: self.changed.emit())
+
+    def currentData(self):
+        return self.group.checkedButton().property("key")
+
+    def currentText(self):
+        return self.texts.get(self.currentData(), "")
+
+
 class Nav(QWidget):
     """kind - ALL / FAV / вид; theme - None (все темы) / HOME / имя темы."""
 
@@ -270,28 +337,54 @@ class Nav(QWidget):
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(4)
-        v.addWidget(QLabel("ЧТО ПОКАЗАТЬ", objectName="faint"))
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.addWidget(QLabel("ЧТО ПОКАЗАТЬ", objectName="faint"), 1)
+        self.compact_btn = QPushButton(lib_icon("menuGrid"), "", objectName="tool", checkable=True)
+        self.compact_btn.setToolTip("Карточки видов - значками в одну строку (больше места дереву)")
+        self.compact_btn.setFixedSize(26, 22)
+        self.compact_btn.setChecked(bool(cfg.get("ue_compact")))
+        self.compact_btn.toggled.connect(self.set_compact)
+        head.addWidget(self.compact_btn)
+        v.addLayout(head)
+        self.cards_box = QBoxLayout(QBoxLayout.Direction.TopToBottom)
+        self.cards_box.setSpacing(4)
         for k in (ALL, "tex", "hdri", "model", "ies", FAV, NEW, SETS):
             c = KindCard(k)
             c.clicked.connect(lambda _c=False, k=k: self.pick_kind(k))
             self.group.addButton(c)
             self.cards[k] = c
-            v.addWidget(c)
+            self.cards_box.addWidget(c)
+        v.addLayout(self.cards_box)
         v.addSpacing(8)
         self.theme_lbl = QLabel("ТЕМЫ", objectName="faint")
         v.addWidget(self.theme_lbl)
-        self.style = QComboBox()  # реалистичные / low-poly / один источник - до дерева, числа в дереве с ним
-        for key, text in G.STYLES:
-            self.style.addItem(text, key)
-        self.style.setCurrentIndex(max(0, self.style.findData(cfg.get("ue_style", "all"))))
-        self.style.setToolTip("Реалистичные PBR-модели (Poly Haven) или простые low-poly наборы")
-        self.style.currentIndexChanged.connect(self.pick_style)
+        # стиль - чипами в один щелчок: реалистичные / low-poly / один источник; числа в дереве - с ним
+        self.style = StyleChips(cfg.get("ue_style", "all"))
+        self.style.changed.connect(self.pick_style)
         v.addWidget(self.style)
+        self.find = QLineEdit(placeholderText="Найти раздел: кровати, деревья...")
+        self.find.setClearButtonEnabled(True)
+        self.find.textChanged.connect(lambda t: filter_tree(self.tree, t))
+        v.addWidget(self.find)
         self.tree = make_tree()
         self.tree.currentItemChanged.connect(self.pick_theme)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._node_menu)
         v.addWidget(self.tree, 1)
+        self.set_compact(self.compact_btn.isChecked())
+
+    def set_compact(self, on):
+        self.cfg["ue_compact"] = on
+        box = self.cards_box
+        box.setDirection(QBoxLayout.Direction.LeftToRight if on else QBoxLayout.Direction.TopToBottom)
+        for c in self.cards.values():
+            c.set_compact(on)
+        for i in reversed(range(box.count())):  # растяжка нужна только строке
+            if box.itemAt(i).spacerItem():
+                box.takeAt(i)
+        if on:
+            box.addStretch(1)
 
     # ------------------------------------------------------------
     def pick_style(self, _i=None):
@@ -363,9 +456,7 @@ class Nav(QWidget):
                 pick = it
         for i in range(self.tree.topLevelItemCount()):
             self._tint(self.tree.topLevelItem(i), col)
-        self.tree.setCurrentItem(pick)
-        self.theme = pick.data(0, ROLE)
-        self.tree.blockSignals(False)
+        self._finish(pick)
         self.theme_lbl.setText("ПОДБОРКИ")
 
     def fill_themes(self):
@@ -396,14 +487,15 @@ class Nav(QWidget):
                 for sec in names:
                     key = SECTION + g + "|" + sec
                     ch = tree_item(it, sec, key, lib_icon(THEME_ICON.get(sec, "folder")), secs[(g, sec)])
+                    if sec == G.OTHER:  # неразобранное - бледно: тут ещё есть что разложить
+                        ch.setData(0, DIM, True)
+                        ch.setToolTip(0, "Не узнано по имени - можно разобрать (правый щелчок по группе)")
                     if self.theme == key:
                         pick = ch
                         it.setExpanded(True)
         for i in range(self.tree.topLevelItemCount()):  # число справа - цветом вида
             self._tint(self.tree.topLevelItem(i), col)
-        self.tree.setCurrentItem(pick)
-        self.theme = pick.data(0, ROLE)
-        self.tree.blockSignals(False)
+        self._finish(pick)
         title = KIND_LOOK[self.kind][0].upper()
         self.theme_lbl.setText(f"ГРУППЫ: {title}" if self.kind != ALL else "ГРУППЫ")
 
@@ -419,8 +511,21 @@ class Nav(QWidget):
         else:
             self.theme = GROUP + G.group_of(th)
 
+    def _finish(self, pick):
+        set_shares(self.tree)
+        self.tree.setCurrentItem(pick)
+        self.theme = pick.data(0, ROLE)
+        if self.find.text():
+            filter_tree(self.tree, self.find.text())
+        self.tree.blockSignals(False)
+
     def _tint(self, it, col):
-        it.setForeground(1, col)
+        if it.data(0, DIM):
+            faint = QColor(C["faint"])
+            it.setForeground(0, faint)
+            it.setForeground(1, faint)
+        else:
+            it.setForeground(1, col)
         for i in range(it.childCount()):
             self._tint(it.child(i), col)
 

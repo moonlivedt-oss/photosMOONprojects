@@ -212,6 +212,7 @@ QLabel#head{font-size:13pt;font-weight:700}
 QLabel#chip{background:$bg3;border-radius:8px;padding:3px 9px;color:$text;font-size:9pt}
 QPushButton#chip{background:$bg3;border:1px solid $line;border-radius:8px;padding:2px 9px;color:$text;font-size:9pt}
 QPushButton#chip:hover{border-color:$acc;color:$selt}
+QPushButton#chip:checked{background:$accd;border-color:$acc;color:$selt}
 QPushButton#chip:disabled{color:$dim;background:transparent}
 QLabel#body{color:$text}
 QFrame#spec{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 $bg2,stop:1 $bg1);border:1px solid $line;border-radius:14px}
