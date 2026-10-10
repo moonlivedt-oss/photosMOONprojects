@@ -5,6 +5,7 @@ HDRI - панорама изнутри. Мышь: тянуть - вращать,
 
 import hashlib
 import os
+import shutil
 from html import escape as esc  # сведения - rich text: имена и метки с сайта не должны стать разметкой
 
 from PIL import Image
@@ -26,6 +27,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QPushButton,
     QScrollArea,
     QSlider,
@@ -55,6 +57,15 @@ def viewable(a):
 
 
 SHORT = {"tex": "Текстура", "hdri": "HDRI", "model": "Модель"}
+
+
+SHADES = (
+    ("normal", "Обычно"),
+    ("clay", "Глина - только форма"),
+    ("albedo", "Только цвет"),
+    ("normals", "Нормали"),
+    ("uv", "Развёртка UV - шахматка"),
+)
 
 
 def url(path):
@@ -401,6 +412,12 @@ class Viewer3D(QDialog):
             self.root.setProperty("smooth", MOTION["on"])
             self.size_prop = QQmlProperty(self.root, "sizeText")
             self.size_prop.connectNotifySignal(self.update_info)
+            self.click_prop = QQmlProperty(self.root, "clickSeq")  # щёлкнули по детали модели
+            self.click_prop.connectNotifySignal(self.part_clicked)
+            self.hover_prop = QQmlProperty(self.root, "hoverPart")
+            self.hover_prop.connectNotifySignal(self.part_hovered)
+            self.root.setProperty("uvMap", url(checker()))
+            self.quick.setAcceptDrops(True)  # текстуру из сетки примерки можно бросить на деталь
 
         # --- лента слева
         self.strip = QListWidget()
@@ -465,11 +482,24 @@ class Viewer3D(QDialog):
         self.human = hud_btn("user-silhouette", "Человек 180 см рядом - сравнить размер (H)", True)
         self.human.setChecked(self.cfg.get("ue_human", False))
         self.human.toggled.connect(self.toggle_human)
+        self.shade_b = hud_btn("contrast", "Как показать: обычно, глина, только цвет, нормали, развёртка UV (M)")
+        self.shade_menu = QMenu(self)
+        self.shade_acts = {}
+        for key_, text in SHADES:
+            act = self.shade_menu.addAction(text, lambda k=key_: self.set_shade(k))
+            act.setCheckable(True)
+            self.shade_acts[key_] = act
+        self.shade_acts["normal"].setChecked(True)
+        self.shade_b.setMenu(self.shade_menu)
+        self.ruler_b = hud_btn("target", "Линейка: щёлкните две точки на модели - расстояние в см (R)", True)
+        self.ruler_b.toggled.connect(self.toggle_ruler)
         sep = QFrame(objectName="vline")
         sep.setFixedWidth(1)
         hl.addWidget(sep)
         self.shot_b = hud_btn("camera", "Снимок того, что видно сейчас")
         self.shot_b.clicked.connect(self.screenshot)
+        self.prev_b = hud_btn("save", "Превью плитки - с этого ракурса (P)")
+        self.prev_b.clicked.connect(self.make_preview)
         self.quick.installEventFilter(self)
 
         # --- шкала анимации под сценой
@@ -602,7 +632,13 @@ class Viewer3D(QDialog):
         block("anim", section("АНИМАЦИЯ"), self.anim)
         block("light", section("СВЕТ"), self.env, self.sky)
         block("expo", ("Яркость", self.expo), ("Поворот неба", self.rot))
-        block("info", section("СВЕДЕНИЯ"), self.info, self.how)
+        self.warn = QLabel(objectName="warnbox", wordWrap=True)
+        self.warn.setStyleSheet(
+            "QLabel#warnbox{background:rgba(240,180,94,28);border:1px solid rgba(240,180,94,110);"
+            "border-radius:10px;padding:8px 10px;color:#f0c890}"
+        )
+        self.warn.hide()
+        block("info", section("СВЕДЕНИЯ"), self.warn, self.info, self.how)
         pv.addStretch(1)
         btns = QHBoxLayout()
         for b in (files, proj):
@@ -637,6 +673,9 @@ class Viewer3D(QDialog):
             ("W", self.wire.toggle),
             ("G", self.floor.toggle),
             ("H", self.human.toggle),
+            ("R", self.ruler_b.toggle),
+            ("M", self.next_shade),
+            ("P", self.make_preview),
             ("Escape", self.close),
         ):
             key(seq, self, fn)
@@ -675,6 +714,8 @@ class Viewer3D(QDialog):
     def eventFilter(self, obj, e):
         if obj is self.quick and e.type() == e.Type.Resize:
             self.place_hud()
+        if obj is self.quick and e.type() in (e.Type.DragEnter, e.Type.DragMove, e.Type.Drop, e.Type.DragLeave):
+            return self.drop_on_model(e)
         parts = getattr(self, "parts", None)  # фильтр ставится раньше, чем создан список деталей
         if parts is not None and obj is parts.viewport() and e.type() == e.Type.Leave:  # мышь ушла со списка
             self.set("flashPart", -1)
@@ -787,6 +828,8 @@ class Viewer3D(QDialog):
         self.tryon.setFixedHeight(214)
         self.tryon.setToolTip("Щелчок - надеть на модель; сначала - подходящие ей по смыслу")
         self.tryon.currentItemChanged.connect(lambda *_: self.apply_tryon())
+        self.tryon.setDragEnabled(True)  # бросить на деталь модели - надеть только на неё
+        self.tryon.setDragDropMode(QListWidget.DragDropMode.DragOnly)
         self.parts_lbl = QLabel("Детали: на что надеть", objectName="dim")
         self.parts = QListWidget()
         self.parts.setMaximumHeight(124)
@@ -924,6 +967,8 @@ class Viewer3D(QDialog):
         many = len(parts) > 1
         self.parts.setVisible(many)
         self.parts_lbl.setVisible(many)
+        self.parts_lbl.setText("Детали: щёлкайте по модели или ставьте галочки" if many else "")
+        self.set("partPick", many)
         saved = self.cfg.get("ue_tryon", {}).get((self.asset or {}).get("dir", ""), {})
         if many and saved.get("off"):
             self.parts.blockSignals(True)
@@ -932,6 +977,50 @@ class Viewer3D(QDialog):
                     self.parts.item(i).setCheckState(Qt.CheckState.Unchecked)
             self.parts.blockSignals(False)
         self.apply_mask()
+
+    def part_clicked(self):
+        """Щелчок по детали в сцене - как галочка в списке: надеть или снять примерку с неё."""
+        k = self.root.property("clickedPart")
+        if not (0 <= k < self.parts.count()):
+            return
+        if self.tryon_data() is None:
+            self.tab.win.say("Сначала выберите текстуру в сетке - потом щёлкайте детали, на которые её надеть")
+            return
+        it = self.parts.item(k)
+        on = it.checkState() != Qt.CheckState.Checked
+        it.setCheckState(Qt.CheckState.Checked if on else Qt.CheckState.Unchecked)
+        self.tab.win.say(f"{it.data(Qt.ItemDataRole.UserRole)}: " + ("надета примерка" if on else "родной материал"))
+
+    def part_hovered(self):
+        k = self.root.property("hoverPart")
+        if 0 <= k < self.parts.count():
+            self.parts.setCurrentRow(k)
+            self.parts.scrollToItem(self.parts.item(k))
+
+    def drop_on_model(self, e):
+        """Текстуру из сетки примерки бросили на модель: она надевается только на деталь под мышью."""
+        if e.type() == e.Type.DragLeave:
+            self.set("hoverPart", -1)
+            return True
+        if e.source() is not self.tryon or not self.asset or self.asset.get("kind") != "model":
+            return False
+        pos = e.position()
+        k = self.root.partAt(pos.x(), pos.y()) if self.root is not None else -1
+        if e.type() in (e.Type.DragEnter, e.Type.DragMove):
+            self.set("hoverPart", k if self.parts.count() > 1 else -1)
+            e.acceptProposedAction()
+            return True
+        self.set("hoverPart", -1)
+        e.acceptProposedAction()
+        self.apply_tryon()  # текстура уже выбрана в сетке, когда её потянули
+        if self.parts.count() > 1 and k >= 0:
+            self.parts.blockSignals(True)
+            for i in range(self.parts.count()):
+                self.parts.item(i).setCheckState(Qt.CheckState.Checked if i == k else Qt.CheckState.Unchecked)
+            self.parts.blockSignals(False)
+            self.apply_mask()
+            self.tab.win.say(f"Надето на «{self.parts.item(k).data(Qt.ItemDataRole.UserRole)}»")
+        return True
 
     def apply_mask(self):
         on = [i for i in range(self.parts.count()) if self.parts.item(i).checkState() == Qt.CheckState.Checked]
@@ -1063,6 +1152,9 @@ class Viewer3D(QDialog):
         self.set("subtitle", "  /  ".join(b for b in (U.KINDS.get(kind, ("", ""))[1], a.get("theme", "")) if b))
         row = next((i for i, x in enumerate(self.assets) if x["dir"] == a["dir"]), -1)
         self.counter.setText(f"{row + 1} из {len(self.assets)}" if row >= 0 else "")
+        dims = [x / 10 for x in a["dimensions_mm"]] if a.get("dimensions_mm") else a.get("dims_cm") or []
+        self.set("realMax", float(max(dims)) if dims else 0.0)
+        self.ruler_b.setChecked(False)
         hh = self.human_height(a)
         self.set("humanHeight", hh)
         self.human.setEnabled(hh > 0)
@@ -1198,6 +1290,12 @@ class Viewer3D(QDialog):
             return
         size = self.root.property("sizeText") if self.root is not None else ""
         self.info.show_asset(a, size_text=size or "")
+        warns = self.root.property("warnings") if self.root is not None and a.get("kind") == "model" else []
+        if hasattr(warns, "toVariant"):
+            warns = warns.toVariant()
+        warns = [str(w) for w in (warns or [])]
+        self.warn.setText("<b>Проверка для Unreal</b><br>" + "<br>".join(esc(w) for w in warns))
+        self.warn.setVisible(bool(warns))
         # имя файла без пробелов не переносится и раздвигает панель - по одному в строку, длинные с многоточием
         names = [os.path.basename(m) for m in a.get("main", [])]
         rows = ["<b>Файлы</b><br>" + "<br>".join(esc(n if len(n) <= 34 else n[:16] + "..." + n[-15:]) for n in names)]
@@ -1205,6 +1303,61 @@ class Viewer3D(QDialog):
         if how:
             rows.append(f"<b>Как в Unreal.</b> {esc(how)}")
         self.how.setText("<br><br>".join(rows))
+
+    # ------------------------------------------------------------ режим показа, линейка, превью
+    def set_shade(self, key_):
+        self.shade = key_
+        for k, act in self.shade_acts.items():
+            act.setChecked(k == key_)
+        self.set("shade", key_)
+        self.shade_b.setChecked(key_ != "normal")
+        if key_ != "normal":
+            self.tab.win.say("Показ: " + dict(SHADES)[key_].lower() + "  (M - дальше)")
+
+    def next_shade(self):
+        keys = [k for k, _t in SHADES]
+        self.set_shade(keys[(keys.index(getattr(self, "shade", "normal")) + 1) % len(keys)])
+
+    def toggle_ruler(self, on):
+        self.set("ruler", on)
+        if on:
+            self.spin.setChecked(False)  # метки линейки стоят в сцене - модель не должна уезжать из-под них
+            self.tab.win.say("Линейка: щёлкните две точки на модели. Третий щелчок - заново, R - выключить")
+
+    def make_preview(self):
+        """Превью плитки - как сейчас в окне (ракурс, свет, яркость), тем же рендером без фона, что и обычные превью.
+        Прежнее превью остаётся рядом (preview.old.webp)."""
+        a = self.asset
+        if not a or a.get("kind") != "model" or self.root is None:
+            return
+        from ui.render_previews import PreviewRenderer
+
+        orbit = self.root.findChild(QObject, "orbit")
+        cam = self.root.findChild(QObject, "cam")
+        pose = (orbit.property("eulerRotation"), cam.property("position").z() / max(1.0, self.default_cam_z()))
+        r = getattr(self, "prev_render", None)
+        if r is None:
+            r = self.prev_render = PreviewRenderer(self)
+            r.one.connect(self.preview_made)
+        old = os.path.join(a["dir"], "preview.webp")
+        if os.path.exists(old):
+            shutil.copy2(old, os.path.join(a["dir"], "preview.old.webp"))
+        self.tab.win.say("Рисую превью с этого ракурса...")
+        r.root.setProperty("exposure", self.expo.value() / 100)  # яркость - как сейчас в окне
+        r.run([a], self.env.currentData() or studio_probe(self.tab.items, self.cfg), pose=pose)  # свет - как в окне
+
+    def default_cam_z(self):
+        """Где стоит камера после «Вид заново» - от этого считается, ближе или дальше её отвели."""
+        aspect = self.quick.height() / max(1, self.quick.width())
+        return 420 * max(1.0, aspect * 1.05)
+
+    def preview_made(self, a, ok):
+        if ok:
+            self.tab.win.say(f"Превью обновлено: {a.get('name', '')} (прежнее - preview.old.webp)")
+            self.tab.show_assets()
+            self.fill_strip(a)
+        else:
+            self.tab.win.say("Превью не вышло - подробности в _tools/_errors.log")
 
     # ------------------------------------------------------------ кнопки
     def screenshot(self):

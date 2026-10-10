@@ -89,7 +89,9 @@ class PreviewRenderer(QObject):
         self.timer = QTimer(self, interval=100)
         self.timer.timeout.connect(self.poll)
 
-    def run(self, assets, probe=""):
+    def run(self, assets, probe="", pose=None):
+        """pose = (поворот камеры QVector3D, во сколько раз дальше обычного) - ракурс из окна 3D («Превью отсюда»)."""
+        self.pose = pose
         if self.root is None:
             log_error("render_previews: сцена не открылась")
             self.done.emit(0)
@@ -111,6 +113,10 @@ class PreviewRenderer(QObject):
         # взгляд чуть сверху и сбоку - как на карточках Kenney
         self.timer.start()
 
+    def apply_pose(self, k):
+        rot, far = self.pose
+        _pose_cam(self.root, rot, max(1.0, far) * 1.15 * k)
+
     def poll(self):
         self.wait += 1
         status = self.root.property("status") or ""
@@ -128,14 +134,19 @@ class PreviewRenderer(QObject):
 
             set_animation(self.root)
             self.frozen, self.wait = True, 0
+            if getattr(self, "pose", None):
+                self.apply_pose(1.0)
             return
-        if self.wait < 4:  # пара кадров после подгонки
+        if self.wait < (25 if getattr(self, "pose", None) else 4):  # пара кадров; с ракурсом - и текстуры догрузить
             return
         img = self.view.grabFramebuffer()
         if touches_edge(img) and self.tries < 4:  # модель вылезла за кадр - отъехать и снять заново
             self.tries += 1
-            self.root.setProperty("camScale", 1.35 * 1.5**self.tries)
-            self.root.resetView()
+            if getattr(self, "pose", None):
+                self.apply_pose(1.5**self.tries)
+            else:
+                self.root.setProperty("camScale", 1.35 * 1.5**self.tries)
+                self.root.resetView()
             self.wait = 0
             return
         self.timer.stop()
@@ -148,6 +159,13 @@ class PreviewRenderer(QObject):
             give_up(self.cur)
             self.one.emit(self.cur, False)
         QTimer.singleShot(0, self.next)
+
+
+def _pose_cam(root, rot, far):
+    from PyQt6.QtGui import QVector3D
+
+    root.findChild(QObject, "orbit").setProperty("eulerRotation", rot)
+    root.findChild(QObject, "cam").setProperty("position", QVector3D(0, 0, 420 * far))
 
 
 def render_all(assets, probe=""):

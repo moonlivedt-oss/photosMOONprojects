@@ -51,6 +51,18 @@ Item {
     property color tint: "white"          // оттенок примеряемой текстуры
     property real uvRotation: 0           // поворот рисунка, градусы
     property real roughAmount: 1.0        // шероховатость: 1 - как в карте, меньше - глянцевее
+    property bool partPick: false         // наведение и щелчок по детали модели (примерка)
+    property int hoverPart: -1            // деталь под мышью - подсвечена
+    property int clickedPart: -1          // последняя щёлкнутая деталь; clickSeq растёт на каждый щелчок
+    property int clickSeq: 0
+    property string shade: "normal"       // normal | clay | albedo | normals | uv - режим показа
+    property url uvMap: ""                // шахматка для режима «развёртка UV»
+    property bool ruler: false            // линейка: два щелчка по модели - расстояние в см
+    property var rulerA: null
+    property var rulerB: null
+    property real realMax: 0              // см: самая большая сторона модели (с сайта или из FBX), 0 - неизвестно
+    property real fileMax: 0              // та же сторона в единицах файла
+    property var warnings: []             // что не так для Unreal: точка опоры, единицы
     property bool smooth: true            // камера перелетает к новому кадру, модель проявляется (настройки: анимации)
     property var origMats: []             // [{model, mats}] - вернуть родные материалы
     property real humanHeight: 0          // силуэт человека 180 см в масштабе модели (единицы сцены), 0 - нет
@@ -155,7 +167,7 @@ Item {
 
     function applyTryOn() {
         restoreMats()
-        var on = tryOn || flashPart >= 0
+        var on = tryOn || flashPart >= 0 || hoverPart >= 0 || shade === "clay" || shade === "uv"
         if (!on || mode !== "model" || loader.status !== RuntimeLoader.Success) return
         var saved = []
         var ms = models(loader, [])
@@ -165,7 +177,8 @@ Item {
                 var orig = ms[i].materials[j], k = partMats.indexOf(orig)
                 keep.push(orig)
                 var wear = tryOn && (tryMask.length === 0 || tryMask.indexOf(k) >= 0)
-                now.push(k >= 0 && k === flashPart ? flashMat : (wear ? texMat : orig))
+                var base = shade === "clay" ? clayMat : shade === "uv" ? uvMat : (wear ? texMat : orig)
+                now.push(k >= 0 && (k === flashPart || k === hoverPart) ? flashMat : base)
             }
             saved.push({model: ms[i], mats: keep})
             ms[i].materials = now
@@ -181,6 +194,9 @@ Item {
     onTryOnChanged: applyTryOn()
     onTryMaskChanged: applyTryOn()
     onFlashPartChanged: applyTryOn()
+    onHoverPartChanged: applyTryOn()
+    onShadeChanged: applyTryOn()
+    onRulerChanged: { rulerA = null; rulerB = null }
 
     function fit() {
         if (fitted || mode !== "model" || loader.status !== RuntimeLoader.Success) return
@@ -200,6 +216,10 @@ Item {
         var m = Math.max(dx, dy, dz)
         if (!(m > 0)) return
         var s = 200 / m
+        fileMax = m
+        var ms = models(loader, [])
+        for (var q = 0; q < ms.length; q++) ms[q].pickable = true  // наведение и щелчок по детали, линейка
+        warnings = checks(lo, hi, m)
         loader.scale = Qt.vector3d(s, s, s)
         // по центру по x и z, низом на пол
         loader.position = Qt.vector3d(-(lo.x + dx / 2) * s, -lo.y * s, -(lo.z + dz / 2) * s)
@@ -208,6 +228,38 @@ Item {
         sizeText = [dx, dy, dz].map(function (v) { return v < 10 ? v.toFixed(2) : Math.round(v) }).join(" x ")
         resetView()
         if (smooth) appear.restart()  // загруженная модель проявляется и чуть «встаёт» на подиум
+    }
+
+    // проверка перед Unreal: где точка опоры относительно модели и в чём единицы файла
+    function checks(lo, hi, m) {
+        var out = [], dx = hi.x - lo.x, dy = hi.y - lo.y, dz = hi.z - lo.z
+        var cm = realMax > 0 ? realMax / m : 1                       // FBX по умолчанию - сантиметры
+        if (lo.y < -0.03 * dy)
+            out.push("Точка опоры не внизу: в Unreal модель уйдёт под пол на " + Math.round(-lo.y * cm) + " см")
+        else if (lo.y > 0.03 * dy)
+            out.push("Точка опоры ниже модели: в Unreal она повиснет над полом на " + Math.round(lo.y * cm) + " см")
+        var off = Math.sqrt(Math.pow(lo.x + dx / 2, 2) + Math.pow(lo.z + dz / 2, 2))
+        if (off > 0.25 * Math.max(dx, dz, 1e-6))
+            out.push("Точка опоры сбоку от модели: вращать и ставить её в Unreal неудобно")
+        if (realMax > 0 && realMax / m > 50)
+            out.push("Файл в метрах: при импорте в Unreal поставьте Import Uniform Scale 100")
+        else if (realMax <= 0 && m < 3)
+            out.push("Модель меньше 3 единиц - похоже, файл в метрах: Import Uniform Scale 100")
+        return out
+    }
+
+    // деталь под точкой экрана: номер в partMats (материал - родной, даже когда надета примерка)
+    function partOf(r) {
+        if (!r || !r.objectHit) return -1
+        var m = r.objectHit, i = r.subsetIndex !== undefined && r.subsetIndex >= 0 ? r.subsetIndex : 0
+        for (var k = 0; k < origMats.length; k++)
+            if (origMats[k].model === m) return partMats.indexOf(origMats[k].mats[Math.min(i, origMats[k].mats.length - 1)])
+        return m.materials && m.materials.length ? partMats.indexOf(m.materials[Math.min(i, m.materials.length - 1)]) : -1
+    }
+    function partAt(x, y) { return partOf(view.pick(x, y)) }
+
+    function cmPerScene() {  // сантиметров в единице сцены: модель вписана в 200 по большей стороне
+        return (realMax > 0 ? realMax : fileMax) / 200
     }
 
     function resetView() {
@@ -301,6 +353,7 @@ Item {
     View3D {
         id: view
         anchors.fill: parent
+        camera: cam
         environment: SceneEnvironment {
             backgroundMode: (root.mode === "hdri" || root.showSky) && root.probe != "" ? SceneEnvironment.SkyBox : SceneEnvironment.Transparent
             lightProbe: root.probe != "" ? probeTex : null
@@ -465,6 +518,13 @@ Item {
                     heightAmount: root.heightAmount
                     cullMode: root.shape === "plane" ? Material.NoCulling : Material.BackFaceCulling
                 }
+                PrincipledMaterial { id: clayMat; baseColor: "#b9b4c4"; roughness: 0.85; lighting: PrincipledMaterial.FragmentLighting }
+                PrincipledMaterial {
+                    id: uvMat
+                    lighting: PrincipledMaterial.FragmentLighting
+                    baseColorMap: Texture { source: root.uvMap; generateMipmaps: true; mipFilter: Texture.Linear }
+                    roughness: 0.8
+                }
                 PrincipledMaterial {  // подсветка детали при наведении на её строку в окне
                     id: flashMat
                     lighting: PrincipledMaterial.FragmentLighting
@@ -483,8 +543,91 @@ Item {
     }
 
     // каркас поверх - средствами отладчика сцены
-    Binding { target: view.environment; property: "debugSettings"; value: dbg; when: root.wire }
-    DebugSettings { id: dbg; wireframeEnabled: true }
+    Binding {
+        target: view.environment; property: "debugSettings"; value: dbg
+        when: root.wire || root.shade === "albedo" || root.shade === "normals"
+    }
+    DebugSettings {
+        id: dbg
+        wireframeEnabled: root.wire
+        materialOverride: root.shade === "albedo" ? DebugSettings.BaseColor
+                        : root.shade === "normals" ? DebugSettings.Normals : DebugSettings.None
+    }
+
+    // деталь под мышью и щелчок по ней; линейка - два щелчка по модели. Обработчики не мешают вращению камеры.
+    HoverHandler {
+        enabled: root.partPick && root.mode === "model"
+        onPointChanged: root.hoverPart = enabled ? root.partAt(point.position.x, point.position.y) : -1
+        onHoveredChanged: if (!hovered) root.hoverPart = -1
+    }
+    TapHandler {
+        enabled: (root.partPick || root.ruler) && root.mode === "model"
+        onTapped: (ep) => {
+            var r = view.pick(ep.position.x, ep.position.y)
+            if (root.ruler) {
+                if (!r.objectHit) return
+                if (root.rulerA === null || root.rulerB !== null) { root.rulerA = r.scenePosition; root.rulerB = null }
+                else root.rulerB = r.scenePosition
+                return
+            }
+            var k = root.partOf(r)
+            if (k >= 0) { root.clickedPart = k; root.clickSeq += 1 }
+        }
+    }
+
+    // линейка: метки на точках, линия между ними и расстояние в сантиметрах подписью
+    Node {
+        parent: view.scene
+        visible: root.ruler && root.rulerA !== null
+        Model {
+            source: "#Sphere"; position: root.rulerA || Qt.vector3d(0, 0, 0); scale: Qt.vector3d(0.035, 0.035, 0.035)
+            materials: PrincipledMaterial { baseColor: root.accent; lighting: PrincipledMaterial.NoLighting }
+        }
+        Model {
+            visible: root.rulerB !== null
+            source: "#Sphere"; position: root.rulerB || Qt.vector3d(0, 0, 0); scale: Qt.vector3d(0.035, 0.035, 0.035)
+            materials: PrincipledMaterial { baseColor: root.accent; lighting: PrincipledMaterial.NoLighting }
+        }
+        Node {
+            id: rulerLine
+            visible: root.rulerB !== null
+            Model {
+                id: rulerCyl
+                source: "#Cylinder"
+                materials: PrincipledMaterial { baseColor: root.accent; lighting: PrincipledMaterial.NoLighting }
+            }
+        }
+    }
+    onRulerBChanged: {
+        if (rulerA === null || rulerB === null) return
+        var len = rulerB.minus(rulerA).length()
+        rulerLine.position = rulerA.plus(rulerB).times(0.5)
+        // ось цилиндра (Y) - вдоль отрезка: поворот кватернионом от (0, 1, 0) к направлению A -> B
+        var d = rulerB.minus(rulerA).normalized(), up = Qt.vector3d(0, 1, 0)
+        var ax = up.crossProduct(d), c = up.dotProduct(d)
+        if (ax.length() < 1e-6) rulerLine.rotation = c > 0 ? Qt.quaternion(1, 0, 0, 0) : Qt.quaternion(0, 1, 0, 0)
+        else {
+            var a = Math.acos(Math.max(-1, Math.min(1, c))) / 2, n = ax.normalized()
+            rulerLine.rotation = Qt.quaternion(Math.cos(a), n.x * Math.sin(a), n.y * Math.sin(a), n.z * Math.sin(a))
+        }
+        rulerCyl.scale = Qt.vector3d(0.008, len / 100, 0.008)
+        rulerText.text = Math.round(len * cmPerScene()) + " см"
+    }
+    FrameAnimation {
+        running: root.ruler && root.rulerB !== null
+        onTriggered: {
+            var p = view.mapFrom3DScene(root.rulerA.plus(root.rulerB).times(0.5))
+            rulerTag.x = p.x - rulerTag.width / 2
+            rulerTag.y = p.y - rulerTag.height - 10
+        }
+    }
+    Rectangle {
+        id: rulerTag
+        visible: root.ruler && root.rulerB !== null
+        radius: 9; color: "#e60d0d13"; border.color: root.accent
+        width: rulerText.implicitWidth + 20; height: rulerText.implicitHeight + 10
+        Text { id: rulerText; anchors.centerIn: parent; color: "#f4f2fb"; font.pixelSize: 15; font.weight: Font.DemiBold }
+    }
 
     OrbitCameraController {
         anchors.fill: parent
