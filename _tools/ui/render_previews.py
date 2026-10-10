@@ -17,7 +17,22 @@ SIDE = 512
 
 
 def needs_preview(a):
-    return a.get("kind") == "model" and not os.path.exists(os.path.join(a["dir"], "preview.webp"))
+    if a.get("kind") != "model" or a.get("_np"):  # _np - уже не вышло (preview.none), не пробовать снова
+        return False
+    if "_pt" in a:  # из обхода assets()
+        return not a["_pt"]
+    d = a["dir"]
+    return not os.path.exists(os.path.join(d, "preview.webp")) and not os.path.exists(os.path.join(d, NONE))
+
+
+NONE = "preview.none"  # метка «превью не рисуется» (плоская стена в профиль, пустой FBX)
+
+
+def give_up(a):
+    try:
+        open(os.path.join(a["dir"], NONE), "w").close()
+    except OSError:
+        pass
 
 
 def touches_edge(img: QImage, pad=3):
@@ -99,6 +114,7 @@ class PreviewRenderer(QObject):
         status = self.root.property("status") or ""
         if status or self.wait > 120:  # не открылась или 12 с без ответа
             log_error(f"render_previews: {self.cur.get('name')}: {status or 'нет ответа'}")
+            give_up(self.cur)
             self.one.emit(self.cur, False)
             self.timer.stop()
             QTimer.singleShot(0, self.next)
@@ -119,6 +135,7 @@ class PreviewRenderer(QObject):
             self.one.emit(self.cur, True)
         except Exception as e:
             log_error(f"render_previews: {self.cur.get('name')}: {e!r}")
+            give_up(self.cur)
             self.one.emit(self.cur, False)
         QTimer.singleShot(0, self.next)
 

@@ -109,7 +109,7 @@ class UnrealTab(QWidget):
         )
         self.sort = QComboBox()
         for t, v in (
-            ("По видам и темам", "kind"),
+            ("По видам и разделам", "kind"),
             ("По имени", "name"),
             ("Сначала новые", "new"),
             ("Сначала лёгкие", "light"),
@@ -147,6 +147,7 @@ class UnrealTab(QWidget):
         doc.setToolTip("Проверить ассеты: битые FBX, пропавшие файлы, недокачанные папки")
         doc.clicked.connect(self.check_assets)
         self.like, self.problems = None, None  # особые списки: «похожие на», «проблемные»
+        self.ai_title = None  # список показал ИИ-помощник (ue_show): заголовок над плитками
         self.title = QLabel(objectName="big")
         self.info = QLabel(objectName="dim")
         self.room_btn = QPushButton(lib_icon("house"), "Комната", objectName="flat")
@@ -406,7 +407,8 @@ class UnrealTab(QWidget):
                 return
             for a in other:
                 if a["dir"] in got:
-                    a["section"], a["section_ai"] = got[a["dir"]], True
+                    a["section"] = a["_s"] = got[a["dir"]]
+                    a["section_ai"] = True
             if got:
                 self.nav.set_items(self.items, self.favs())
                 self.show_assets()
@@ -455,7 +457,8 @@ class UnrealTab(QWidget):
             out,
             key=lambda a: (
                 order.index(a["kind"]) if a.get("kind") in order else 9,
-                a.get("theme", ""),
+                a.get("_g", ""),
+                a.get("_s", ""),  # раздел: деревья к деревьям, из какого набора бы ни были
                 a.get("name", "").lower(),
             ),
         )
@@ -489,10 +492,25 @@ class UnrealTab(QWidget):
     def leave_special(self, quiet=False):
         if self.like is None and self.problems is None:
             return
-        self.like = self.problems = None
+        self.like = self.problems = self.ai_title = None
         self.back_btn.hide()
         if not quiet:
             self.show_assets()
+
+    def show_ai(self, ids, title, who):
+        """Список от ИИ-помощника (ue_show) - отдельным экраном; подпись плитки - раздел."""
+        if not self.loaded:
+            QTimer.singleShot(500, lambda: self.show_ai(ids, title, who))
+            return
+        idx = {a.get("id"): a for a in self.items}
+        idx.update({os.path.relpath(a["dir"], U.ROOT).replace(os.sep, "/"): a for a in self.items})
+        found = [idx[i] for i in ids if i in idx]
+        if not found:
+            return
+        self.problems = [(a, a.get("_s") or a.get("section") or "") for a in found]
+        self.like, self.ai_title = None, f"{title}  ({who})"
+        self.back_btn.show()
+        self.show_assets()
 
     def show_similar(self, a):
         if self.sem is None:
@@ -533,6 +551,8 @@ class UnrealTab(QWidget):
             if self.like is None and self.problems is None
             else f"Похожие на «{self.like.get('name', '')}»"
             if self.like is not None
+            else self.ai_title
+            if self.ai_title
             else f"Проблемные ассеты: {len(lst)}"
         )
         self.title.setStyleSheet(f"color: {kind_color(self.nav.kind)}")
@@ -543,16 +563,16 @@ class UnrealTab(QWidget):
         self.list.one_kind = len({a.get("kind") for a in lst}) == 1
         favs = self.favs()
         todo = []
+        self.list.setUpdatesEnabled(False)  # тысячи плиток: без перерисовки после каждой
         for i, a in enumerate(lst):
             prev = os.path.join(a["dir"], "preview.webp")
             li = QListWidgetItem(a.get("name", ""))
             li.setData(ROLE, prev)
             li.setData(ASSET, a)
             res = (a.get("res") or "").upper()
-            sub = theme_label(a.get("theme", ""))
-            if a.get("section"):  # дом: раздел и откуда модель
-                low = a.get("source") in U.LOW_POLY
-                sub = a["section"] + (f", {a['source']}" if low else "")
+            # подпись: раздел (Деревья, Здания, Кровати) и откуда - группа уже видна в дереве
+            sec = a.get("_s") or a.get("section") or theme_label(a.get("theme", ""))
+            sub = sec + (f", {a['source']}" if a.get("source") in U.LOW_POLY else "")
             if a.get("polycount"):
                 sub += f", {a['polycount'] // 1000 or 1}k полиг."
             if self.problems is not None:
@@ -563,8 +583,9 @@ class UnrealTab(QWidget):
             ai = "\nРаздел подобран ИИ по картинке и имени" if a.get("section_ai") else ""
             li.setToolTip(f"{a.get('name', '')}\n{a['dir']}{ai}")
             self.list.addItem(li)
-            if os.path.exists(prev):
+            if a.get("_pt") or ("_pt" not in a and os.path.exists(prev)):  # _pt - из обхода assets()
                 todo.append((i, prev))
+        self.list.setUpdatesEnabled(True)
         self.list.load_tiles(todo, THUMB, None)
         self.describe()
 

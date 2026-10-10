@@ -756,6 +756,9 @@ def fetch_kaykit(cand, dst):
         if name not in extra:
             shutil.copy2(kaykit_file(cand["repo"], t), os.path.join(dst, name))
             extra.append(name)
+    from library import unreal_local
+
+    unreal_local.relink(os.path.join(dst, fn))  # путь к текстуре в FBX - с компьютера автора: на файл рядом
     title = cand["repo"].replace("KayKit-", "").replace("-1.0", "").replace("-", " ")
     meta = {
         "source": "KayKit",
@@ -1108,22 +1111,51 @@ def browse(kind):
 
 
 # ---------------------------------------------------------------- что уже есть
+_parsed = {}  # папка -> (время и размер asset.json, разобранный dict): повторное чтение не разбирает JSON
+
+
 def assets(root=ROOT):
-    """Все скачанные ассеты: [dict из asset.json + dir]."""
+    """Все скачанные ассеты: [dict из asset.json + dir]. Служебные поля без записи в файл:
+    _t - время asset.json (когда добавлен), _pt - время preview.webp (0 - превью нет).
+    Обход через os.scandir: время файлов приходит вместе со списком папки, без отдельного запроса на файл."""
     out = []
     if not os.path.isdir(root):
         return out
-    for d, dirs, files in os.walk(root):
-        dirs[:] = sorted(x for x in dirs if not x.endswith((".part", ".old")))  # недокачанное и заменённое
-        if "asset.json" in files:
+
+    def walk(d):
+        try:
+            with os.scandir(d) as it:
+                entries = list(it)
+        except OSError:
+            return
+        files = {e.name: e for e in entries if not e.is_dir()}
+        meta = files.get("asset.json")
+        if meta is not None:
             try:
-                with open(os.path.join(d, "asset.json"), encoding="utf-8") as fh:
-                    a = json.load(fh)
+                st = meta.stat()
+                stamp = (st.st_mtime_ns, st.st_size)
+                hit = _parsed.get(d)
+                if hit is None or hit[0] != stamp:
+                    with open(meta.path, encoding="utf-8") as fh:
+                        hit = _parsed[d] = (stamp, json.load(fh))
             except (OSError, ValueError):
-                continue
-            a["dir"] = d
+                return
+            a = dict(hit[1])
+            a["dir"], a["_t"] = d, st.st_mtime
+            prev = files.get("preview.webp")
+            try:
+                a["_pt"] = prev.stat().st_mtime if prev is not None else 0
+            except OSError:
+                a["_pt"] = 0
+            if "preview.none" in files:  # превью не рисуется - окно не пробует снова (ui/render_previews.py)
+                a["_np"] = True
             out.append(a)
-            dirs[:] = []
+            return
+        for e in sorted((e for e in entries if e.is_dir()), key=lambda e: e.name):
+            if not e.name.endswith((".part", ".old")):  # недокачанное и заменённое
+                walk(e.path)
+
+    walk(root)
     return out
 
 

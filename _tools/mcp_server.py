@@ -22,7 +22,9 @@ INSTRUCTIONS = """Библиотека картинок пользователя
 там разделы, метки и правила раскладки. Искать: search (слова или описание по смыслу), similar.
 Смотреть: view (вернёт изображение с номерами). Менять: tag, note, favorite, rename, move, trash, edit,
 remove_background, upscale, convert, cut_sheet. Перед правкой - edit(mode="preview"). Всё отменяется
-undo, а пользователь видит ваши действия в окне и может отменить их сам."""
+undo, а пользователь видит ваши действия в окне и может отменить их сам. Показать найденное пользователю
+прямо в окне - show(paths) и ue_show(ids). Ассеты для Unreal Engine (модели, текстуры, HDRI) - ue_overview,
+ue_search (группы и разделы, стиль real/low-poly), ue_plan_room, ue_collection, ue_download, ue_import."""
 
 
 _out = None  # настоящий stdout - только для ответов протокола (см. guard_stdout)
@@ -89,8 +91,20 @@ def handle(api, msg):
         return dict(tools=tool_list(api))
     if method == "tools/call":
         name, args = params.get("name"), params.get("arguments") or {}
+        token = (params.get("_meta") or {}).get("progressToken")
+        progress = None
+        if token is not None:  # помощник просил ход работы - шлём notifications/progress
+
+            def progress(done, total=None, message=""):
+                note = {"progressToken": token, "progress": done}
+                if total:
+                    note["total"] = total
+                if message:
+                    note["message"] = message
+                send(dict(jsonrpc="2.0", method="notifications/progress", params=note))
+
         try:
-            return dict(content=content(api, api.call(name, args)))
+            return dict(content=content(api, api.call(name, args, progress)))
         except api.ApiError as e:
             return dict(content=[dict(type="text", text=str(e))], isError=True)
         except Exception as e:

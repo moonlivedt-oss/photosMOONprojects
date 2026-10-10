@@ -31,11 +31,19 @@ def available():
     return clip.available()
 
 
+def has_preview(a):
+    if "_pt" in a:
+        return bool(a["_pt"])
+    return os.path.exists(os.path.join(a["dir"], "preview.webp"))
+
+
 def key_of(a):
-    try:
-        t = os.path.getmtime(os.path.join(a["dir"], "asset.json"))
-    except OSError:
-        t = 0
+    t = a.get("_t")
+    if t is None:
+        try:
+            t = os.path.getmtime(os.path.join(a["dir"], "asset.json"))
+        except OSError:
+            t = 0
     return f"{os.path.relpath(a['dir'], ROOT)}|{t:.0f}"
 
 
@@ -77,9 +85,7 @@ class AssetSem:
         os.replace(tmp, STORE)
 
     def missing(self, items):
-        return [
-            a for a in items if key_of(a) not in self.data and os.path.exists(os.path.join(a["dir"], "preview.webp"))
-        ]
+        return [a for a in items if key_of(a) not in self.data and has_preview(a)]
 
     def build(self, items, progress=None, stop=None, batch=16):
         """Досчитать векторы новых ассетов (из фонового потока). progress(готово, всего)."""

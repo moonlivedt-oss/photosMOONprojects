@@ -64,14 +64,27 @@ def tool(name, desc, props=None, required=(), write=False, preview=None, destruc
 
 
 _writing = contextvars.ContextVar("writing", default=False)  # идёт операция записи (см. images)
+_progress = contextvars.ContextVar("progress", default=None)  # куда сообщать ход долгой операции
+
+
+def report(done, total=None, message=""):
+    """Ход долгой операции (скачивание, импорт, проверка): сервер MCP шлёт его помощнику
+    уведомлением notifications/progress, если тот попросил (progressToken)."""
+    cb = _progress.get()
+    if cb is not None:
+        try:
+            cb(done, total, message)
+        except Exception:
+            pass
 
 
 def write_allowed():
     return C.load_cfg().get("ai_write", True)
 
 
-def call(name, args=None):
-    """Выполнить операцию по имени. -> результат (dict/list/Picture) или ApiError."""
+def call(name, args=None, progress=None):
+    """Выполнить операцию по имени. -> результат (dict/list/Picture) или ApiError.
+    progress(готово, всего, текст) - ход долгой операции (см. report)."""
     t = TOOLS.get(name)
     if not t:
         raise ApiError(f"Нет операции «{name}». Список - tools.")
@@ -90,10 +103,12 @@ def call(name, args=None):
             "Искать и смотреть можно."
         )
     token = _writing.set(writing)
+    ptoken = _progress.set(progress)
     try:
         return t["fn"](**args)
     finally:
         _writing.reset(token)
+        _progress.reset(ptoken)
 
 
 # ---------------------------------------------------------------- пути
@@ -1101,7 +1116,9 @@ def duplicates(folder=None, imported=False):
 def check(folder=None, limit=200):
     files = [p for p in in_folder(K.images_in(C.LIB), folder) if not p.lower().endswith(".svg")]
     names, bad = dict(K.PROBLEMS), []
-    for p, res in batch.run(K.job_doctor, [(p, None) for p in files]):
+    for i, (p, res) in enumerate(batch.run(K.job_doctor, [(p, None) for p in files])):
+        if i % 50 == 0:
+            report(i, len(files), "проверяю картинки")
         if isinstance(res, Exception) or not res:
             continue
         bad.append(dict(path=rel(p), problems=[names[c] for c in res]))
@@ -1211,6 +1228,26 @@ def index():
     if sem.ok:
         sem.refresh()
     return dict(signatures=len(sigs.data), semantic=len(sem.data), new_semantic=len(sem.data) - before)
+
+
+# ---------------------------------------------------------------- показать пользователю
+@tool(
+    "show",
+    "Показать картинки пользователю в открытом окне библиотеки (вкладка «Библиотека», отдельным списком с "
+    "заголовком). Удобно после search: «вот что нашлось» - пользователь видит, выбирает, правит сам. "
+    "Окно не открыто - покажет при запуске (если не прошло 10 минут). Ничего не меняет.",
+    {
+        "paths": {"type": "array", "items": {"type": "string"}},
+        "title": {"type": "string", "description": "что это: «Иконки для сайта», «Похожие на логотип»"},
+    },
+    ["paths"],
+)
+def show(paths, title=""):
+    from library import ui_bridge
+
+    ps = images(paths, 500)
+    ui_bridge.request("library", [rel(p) for p in ps], title or "Подборка помощника", AGENT["who"])
+    return {"shown": len(ps), "title": title or "Подборка помощника"}
 
 
 # ---------------------------------------------------------------- версии картинки

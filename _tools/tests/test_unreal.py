@@ -330,5 +330,35 @@ class TestQuaterniusFolders(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestGroups(unittest.TestCase):
+    """Раскладка для дерева окна и ue_search: группа, раздел, стиль."""
+
+    def test_group_section_style(self):
+        from library import unreal_groups as G
+
+        car = {"kind": "model", "name": "Police car", "theme": "Город - Kenney low-poly", "source": "Kenney"}
+        tree = {"kind": "model", "name": "Pine tree 2", "theme": "Лес и природа", "source": "Poly Haven"}
+        bed = {"kind": "model", "name": "bedDouble", "theme": "Дом - Kenney low-poly", "source": "Kenney"}
+        plat = {
+            "kind": "model",
+            "name": "Block grass",
+            "theme": "Прототипы и уровни - Kenney low-poly",
+            "source": "Kenney",
+            "tags": ["low-poly", "kenney", "platformer"],
+        }
+        floor = {"kind": "tex", "name": "Oak", "theme": "Дом - полы", "source": "Poly Haven"}
+        G.annotate([car, tree, bed, plat, floor])
+        self.assertEqual((car["_g"], car["_s"]), ("Город и транспорт", "Транспорт"))
+        self.assertEqual((tree["_g"], tree["_s"]), ("Природа", "Деревья"))
+        self.assertEqual((bed["_g"], bed["_s"]), ("Дом", "Кровати"))
+        self.assertEqual(plat["_s"], "Платформер")
+        self.assertEqual((floor["_g"], floor["_s"]), ("Дом", "Полы"))
+        self.assertEqual(G.style_of(car), "Kenney")
+        self.assertTrue(G.style_ok(car, "low") and not G.style_ok(car, "real"))
+        self.assertTrue(G.style_ok(tree, "real") and not G.style_ok(tree, "KayKit"))
+        self.assertEqual(G.group_of("Средневековье - KayKit low-poly"), "Средневековье и фэнтези")
+        self.assertEqual(G.group_of("Что-то новое"), "Разное")
+
+
 if __name__ == "__main__":
     unittest.main()

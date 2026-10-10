@@ -21,6 +21,20 @@ from library import api, db, journal
 SEC = "02 Наклейки/Тест"
 
 
+class mock_send:
+    """Подменить mcp_server.send: что сервер отправил бы клиенту - в список."""
+
+    def __init__(self, module, sink):
+        self.module, self.sink = module, sink
+
+    def __enter__(self):
+        self.old = self.module.send
+        self.module.send = self.sink.append
+
+    def __exit__(self, *_a):
+        self.module.send = self.old
+
+
 def dot(color, size=96):
     im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     ImageDraw.Draw(im).ellipse((8, 8, size - 8, size - 8), fill=color)
@@ -357,6 +371,47 @@ class Api(unittest.TestCase):
             dot((10, 10, 200, 255)).save(p)
         got = [os.path.basename(v["path"]) for v in versions.versions(self.path(f"{SEC}/red-planet.png"))]
         self.assertEqual(got, ["red-planet.png"])
+
+    def test_show_reaches_window(self):
+        from unittest import mock
+
+        from library import ui_bridge
+
+        req = os.path.join(self.lib, "req.json")
+        with mock.patch.object(ui_bridge, "REQUEST", req):
+            res = api.call("show", {"paths": [f"{SEC}/red-planet.png"], "title": "Планеты"})
+            self.assertEqual(res["shown"], 1)
+            got = ui_bridge.pending(0)
+            self.assertEqual(
+                (got["where"], got["items"], got["title"]), ("library", [f"{SEC}/red-planet.png"], "Планеты")
+            )
+            self.assertIsNone(ui_bridge.pending(got["id"]))  # окно уже видело - второй раз не показывает
+            C.save_cfg({"ai_write": False})  # показать можно и в режиме «Только чтение»
+            self.assertEqual(api.call("show", {"paths": [f"{SEC}/red-planet.png"]})["shown"], 1)
+
+    def test_progress_reaches_mcp_client(self):
+        import mcp_server
+
+        sent = []
+        with mock_send(mcp_server, sent):
+            api.TOOLS["_probe"] = dict(
+                fn=lambda: (api.report(1, 2, "половина"), {"ok": True})[1],
+                desc="",
+                write=False,
+                preview=None,
+                destructive=False,
+                schema={"type": "object", "properties": {}, "required": []},
+            )
+            try:
+                res = mcp_server.handle(
+                    api,
+                    {"id": 7, "method": "tools/call", "params": {"name": "_probe", "_meta": {"progressToken": "t1"}}},
+                )
+            finally:
+                del api.TOOLS["_probe"]
+        self.assertFalse(res.get("isError"))
+        self.assertEqual(sent[0]["method"], "notifications/progress")
+        self.assertEqual(sent[0]["params"], {"progressToken": "t1", "progress": 1, "total": 2, "message": "половина"})
 
 
 if __name__ == "__main__":

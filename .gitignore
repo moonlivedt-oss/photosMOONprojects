@@ -36,3 +36,5 @@ _tools/_ui/
 _tools/_backups/
 _tools/_running.json
 *.broken-*
+_tools/_ui_request.json
+_tools/_unreal_changed

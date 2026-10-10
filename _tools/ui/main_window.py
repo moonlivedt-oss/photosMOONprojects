@@ -440,7 +440,30 @@ class Window(QMainWindow):
             log_error(f"метки не переехали: {e}")
 
     # --- действия ИИ-помощника: появляются в истории (Ctrl+Z отменяет) и всплывают пузырём
+    def check_bridge(self):
+        """ИИ-помощник просит показать найденное (show / ue_show) или поменял ассеты Unreal."""
+        from library import ui_bridge
+
+        stamp = ui_bridge.ue_stamp()
+        if stamp > getattr(self, "ue_seen", stamp):
+            self.unreal.refresh()  # помощник скачал или поменял подборки - перечитать
+        self.ue_seen = stamp
+        req = ui_bridge.pending(getattr(self, "ui_seen", 0))
+        if not req:
+            return
+        self.ui_seen = req["id"]
+        title, who, items = req.get("title") or "Подборка", req.get("who") or "ИИ-помощник", req.get("items") or []
+        if req.get("where") == "unreal":
+            self.tabs.setCurrentIndex(2)
+            self.unreal.show_ai(items, title, who)
+        else:
+            self.tabs.setCurrentIndex(1)
+            self.lib.show_ai(items, title, who)
+        self.toast.say(f"{who} показывает: {title} ({len(items)} шт.)", 5000)
+        QApplication.alert(self)  # мигнуть на панели задач, если окно в фоне
+
     def check_journal(self):
+        self.check_bridge()
         try:
             new = journal.entries(50, since=self.jseen)
             gone = journal.undone_among([j for _t, _s, j in self.history])

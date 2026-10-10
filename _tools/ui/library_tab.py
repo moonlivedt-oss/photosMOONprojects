@@ -688,6 +688,7 @@ class LibTab(QWidget):
         self.win, self.cfg = win, win.cfg
         self.side = max(64, min(THUMB, self.cfg.get("thumb", 128)))
         self.like = None  # "Похожие на ...": путь картинки-образца
+        self.ai_show = None  # (пути, заголовок, кто) - список, который показал ИИ-помощник (show)
         self.like_sem = False  # похожие по смыслу (CLIP), а не по рисунку; like - может быть и не из библиотеки
         self.tree = make_tree()
         self.tree.currentItemChanged.connect(lambda *_: self.leave_similar())
@@ -960,7 +961,7 @@ class LibTab(QWidget):
             self.here = role
 
     def go_back(self):
-        if self.like:  # из «Похожих» - туда, откуда пришли
+        if self.like or self.ai_show:  # из «Похожих» и списка помощника - туда, откуда пришли
             self.leave_similar()
             return
         while self.past:
@@ -975,7 +976,7 @@ class LibTab(QWidget):
     def escape(self):
         if self.q.text():
             self.q.clear()
-        elif self.like:
+        elif self.like or self.ai_show:
             self.leave_similar()
         elif self.color.currentIndex():
             self.color.setCurrentIndex(0)
@@ -1281,11 +1282,14 @@ class LibTab(QWidget):
         self.list.clear()
         self.list.reset_anim()
         fav = db.favs()
-        self.sets_view = root == SETS and not tokens and not self.like
+        self.sets_view = root == SETS and not tokens and not self.like and not self.ai_show
         if self.sets_view:
             self.show_sets()
             return
-        if self.like:
+        if self.ai_show:  # список от ИИ-помощника - в его порядке
+            root = RECENT
+            files = [p for p in self.ai_show[0] if os.path.exists(p)]
+        elif self.like:
             root = RECENT  # порядок задаёт похожесть, сортировку не применяем
             files = self.win.sem.similar(self.like) if self.like_sem else self.win.sigs.similar(self.like)
         elif sem:
@@ -1377,7 +1381,9 @@ class LibTab(QWidget):
         names = {RECENT: "Недавние", FAV: "Избранное", HEAVY: "Тяжёлые (больше %d КБ)" % HEAVY_KB, SETS: "Наборы"}
         if isinstance(root, str) and root.startswith(TAG):
             names[root] = "Метка: " + root[len(TAG) :]
-        if self.like:
+        if self.ai_show:
+            head = f"{self.ai_show[1]}  ({self.ai_show[2]})"
+        elif self.like:
             head = ("Похожие по смыслу на «%s»" if self.like_sem else "Похожие на «%s»") % os.path.basename(self.like)
         elif smart:
             head = f"Умная папка: {smart}"
@@ -1488,7 +1494,9 @@ class LibTab(QWidget):
             return
         sel = self.paths()
         self.preview.show_paths(sel, self.cfg.get("bg", "chk"))
-        if self.like and not sel:
+        if self.ai_show and not sel:
+            self.info.setText("Показал ИИ-помощник - Esc или раздел слева, чтобы вернуться")
+        elif self.like and not sel:
             self.info.setText(f"Похожие на «{os.path.basename(self.like)}» - щёлкните раздел слева, чтобы вернуться")
         elif sel:
             self.info.setText("Выбрано: %d из %d" % (len(sel), self.list.count()))
@@ -1582,8 +1590,18 @@ class LibTab(QWidget):
         bg(lambda: sem.embed_file(path), done)
 
     def leave_similar(self):
-        self.like, self.like_sem = None, False
+        self.like, self.like_sem, self.ai_show = None, False, None
         self.show_files()
+
+    def show_ai(self, rels, title, who):
+        """Список от ИИ-помощника (операция show): отдельным экраном, как «Похожие»."""
+        self.like, self.like_sem = None, False
+        self.ai_show = ([os.path.join(LIB, *r.split("/")) for r in rels], title, who)
+        self.q.blockSignals(True)
+        self.q.clear()
+        self.q.blockSignals(False)
+        self.show_files()
+        self.list.scrollToTop()
 
     def find_similar(self, sem=False):
         sel = self.paths()

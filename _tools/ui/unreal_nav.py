@@ -3,9 +3,10 @@
 
 from PyQt6.QtCore import QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
-from PyQt6.QtWidgets import QAbstractButton, QButtonGroup, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QAbstractButton, QButtonGroup, QComboBox, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from library import unreal as U
+from library import unreal_groups as G
 from ui.common import ROLE, human
 from ui.theme import C, readable
 from ui.thumbnails import lib_icon, lib_pix
@@ -15,7 +16,8 @@ ALL, FAV = "::all", "::fav"
 NEW, SETS = "::new", "::sets"  # скачанное за последние дни; свои подборки
 SET = "::set:"  # + имя подборки
 HOME = "::home"  # все темы «Дом - ...» разом
-SECTION = "::sec:"  # + раздел «Дома» (Кровати, Столы...) - по назначению, из любого источника
+SECTION = "::sec:"  # + «группа|раздел» (Дом|Кровати, Природа|Деревья) - по назначению, из любого источника
+GROUP = "::grp:"  # + группа (Дом, Природа, Город и транспорт...) - library/unreal_groups.py
 HOME_PREFIX = "Дом - "
 
 # вид -> (подпись на карточке, значок, цвет)
@@ -100,6 +102,43 @@ THEME_ICON = {
     "Стены": "structure_wall",
     "Плитка и камень": "hexagon",
     "Ткани и кожа": "leather-boots",
+    # разделы групп (library/unreal_groups.py)
+    "Деревья": "bonsai-tree",
+    "Камни и скалы": "round-cactus",
+    "Кусты, трава, цветы": "snake-plant",
+    "Земля и дорожки": "card_place",
+    "Лагерь и выживание": "toolbox",
+    "Транспорт": "gear",
+    "Дороги и рельсы": "card_place",
+    "Здания": "structure_tower",
+    "Улица и детали": "sun",
+    "Индустрия": "gear",
+    "Гексы и карта": "hexagon",
+    "Оружие и броня": "tool_sword_a",
+    "Кладбище и подземелье": "moon-stars",
+    "Корабли": "anchor",
+    "Строения": "structure_wall",
+    "Утварь и мебель": "cards_stack",
+    "Карты": "cards_stack",
+    "Персонажи": "pawn",
+    "Корабли и транспорт": "gear",
+    "Декали": "card_place",
+    "Поверхность": "round-cactus",
+    "Модули и стены": "structure_wall",
+    "Предметы": "toolbox",
+    "Животные": "heart",
+    "Снаряжение и одежда": "leather-boots",
+    "Фрукты и овощи": "snake-plant",
+    "Выпечка и сладкое": "coffee-mug-steam",
+    "Блюда": "coffee-mug-steam",
+    "Напитки": "coffee-mug-steam",
+    "Посуда": "coffee-mug-steam",
+    "Платформер": "hand_cube",
+    "Гонки": "trophy-cup",
+    "Tower defense": "structure_tower",
+    "Гексы": "hexagon",
+    "Арена": "trophy-cup",
+    "Блоки-заготовки": "hand_cube",
 }
 
 
@@ -227,24 +266,43 @@ class Nav(QWidget):
         v.addSpacing(8)
         self.theme_lbl = QLabel("ТЕМЫ", objectName="faint")
         v.addWidget(self.theme_lbl)
+        self.style = QComboBox()  # реалистичные / low-poly / один источник - до дерева, числа в дереве с ним
+        for key, text in G.STYLES:
+            self.style.addItem(text, key)
+        self.style.setCurrentIndex(max(0, self.style.findData(cfg.get("ue_style", "all"))))
+        self.style.setToolTip("Реалистичные PBR-модели (Poly Haven) или простые low-poly наборы")
+        self.style.currentIndexChanged.connect(self.pick_style)
+        v.addWidget(self.style)
         self.tree = make_tree()
         self.tree.currentItemChanged.connect(self.pick_theme)
         v.addWidget(self.tree, 1)
 
     # ------------------------------------------------------------
-    def of_kind(self, kind):
+    def pick_style(self, _i=None):
+        self.cfg["ue_style"] = self.style.currentData()
+        self.set_items(self.items, self.favs)
+        self.changed.emit()
+
+    def of_kind(self, kind, styled=True):
+        items = self.items
+        st = self.style.currentData() if styled else "all"
+        if st != "all":
+            items = [a for a in items if G.style_ok(a, st)]
+        return self._of_kind(kind, items)
+
+    def _of_kind(self, kind, items):
         if kind == ALL:
-            return self.items
+            return items
         if kind == FAV:
-            return [a for a in self.items if a.get("id") in self.favs]
+            return [a for a in items if a.get("id") in self.favs]
         if kind == NEW:
             from library.unreal_extra import added
 
-            return [a for a in self.items if added(a) > self.since]
+            return [a for a in items if added(a) > self.since]
         if kind == SETS:
             ids = {i for lst in self.sets().values() for i in lst}
-            return [a for a in self.items if a.get("id") in ids]
-        return [a for a in self.items if a.get("kind") == kind]
+            return [a for a in items if a.get("id") in ids]
+        return [a for a in items if a.get("kind") == kind]
 
     def set_items(self, items, favs):
         self.items, self.favs = items, favs
@@ -252,6 +310,7 @@ class Nav(QWidget):
             if a.get("theme", "").startswith(HOME_PREFIX) and "section" not in a:
                 # модели - по назначению; у текстур дома тема и есть раздел (полы, стены, плитка, ткани)
                 a["section"] = U.home_section(a) if a.get("kind") == "model" else theme_label(a["theme"])
+        G.annotate(items)  # группа и раздел для дерева (_g, _s)
         for k, c in self.cards.items():
             lst = self.of_kind(k)
             c.set_stats(len(lst), sum(a.get("size", 0) for a in lst))
@@ -294,59 +353,55 @@ class Nav(QWidget):
         self.theme_lbl.setText("ПОДБОРКИ")
 
     def fill_themes(self):
-        """Темы только выбранного вида, в порядке библиотеки; «Дом - ...» - одной группой."""
+        """Группы и их разделы (library/unreal_groups.py) для выбранного вида и стиля."""
         if self.kind == SETS:
             self.fill_sets()
             return
         lst = self.of_kind(self.kind)
-        counts = {}
+        self._legacy_theme()
+        groups, secs = {}, {}
         for a in lst:
-            counts[a.get("theme", "")] = counts.get(a.get("theme", ""), 0) + 1
-        order = [t for t in U.THEMES if t in counts] + sorted(t for t in counts if t not in U.THEMES)
+            groups[a["_g"]] = groups.get(a["_g"], 0) + 1
+            secs[(a["_g"], a["_s"])] = secs.get((a["_g"], a["_s"]), 0) + 1
         col = QColor(kind_color(self.kind))
         self.tree.blockSignals(True)
         self.tree.clear()
-        top = tree_item(self.tree, "Все темы", None, lib_icon("menuGrid"), len(lst))
+        top = tree_item(self.tree, "Все группы", None, lib_icon("menuGrid"), len(lst))
         pick = top
-        home = None
-        for th in order:
-            if th.startswith(HOME_PREFIX):
-                if home is None:  # «Дом» - по разделам назначения, а не по источникам
-                    home_items = [a for a in lst if a.get("theme", "").startswith(HOME_PREFIX)]
-                    home = tree_item(self.tree, "Дом", HOME, lib_icon(THEME_ICON[HOME]), len(home_items))
-                    home.setToolTip(0, "Всё для дома по назначению: кровати, столы, шкафы, кухня, ванная...")
-                    if self.theme == HOME:
-                        pick = home
-                    secs = {}
-                    for a in home_items:
-                        secs[a.get("section", U.HOME_OTHER)] = secs.get(a.get("section", U.HOME_OTHER), 0) + 1
-                    for sec in list(U.HOME_ORDER) + sorted(x for x in secs if x not in U.HOME_ORDER):
-                        if sec in secs:
-                            it = tree_item(home, sec, SECTION + sec, lib_icon(THEME_ICON.get(sec, "folder")), secs[sec])
-                            if self.theme == SECTION + sec:
-                                pick = it
+        for g in G.group_order():
+            if g not in groups:
                 continue
-            it = tree_item(self.tree, theme_label(th), th, lib_icon(THEME_ICON.get(th, "folder")), counts[th])
-            it.setToolTip(0, th)
-            if th == self.theme:
+            it = tree_item(self.tree, g, GROUP + g, lib_icon(G.GROUP_ICON.get(g, "folder")), groups[g])
+            if self.theme == GROUP + g:
                 pick = it
-        if home is not None:
-            for src in U.LOW_POLY:  # простые модели отдельно - для черновой расстановки
-                th = f"Дом - {src} low-poly"
-                mine = [a for a in lst if a.get("theme") == th]
-                if mine:
-                    it = tree_item(home, f"Только {src}", th, lib_icon(THEME_ICON[th]), len(mine))
-                    it.setToolTip(0, f"Low-poly модели {src}: без текстур, лёгкие - расставить комнату начерно")
-                    if self.theme == th:
-                        pick = it
-            home.setExpanded(True)
+            order = G.section_order(g)
+            names = [x for x in order if (g, x) in secs] + sorted(x for (gg, x) in secs if gg == g and x not in order)
+            if len(names) > 1:  # один раздел - в дереве не нужен
+                for sec in names:
+                    key = SECTION + g + "|" + sec
+                    ch = tree_item(it, sec, key, lib_icon(THEME_ICON.get(sec, "folder")), secs[(g, sec)])
+                    if self.theme == key:
+                        pick = ch
+                        it.setExpanded(True)
         for i in range(self.tree.topLevelItemCount()):  # число справа - цветом вида
             self._tint(self.tree.topLevelItem(i), col)
         self.tree.setCurrentItem(pick)
         self.theme = pick.data(0, ROLE)
         self.tree.blockSignals(False)
         title = KIND_LOOK[self.kind][0].upper()
-        self.theme_lbl.setText(f"ТЕМЫ: {title}" if self.kind != ALL else "ТЕМЫ")
+        self.theme_lbl.setText(f"ГРУППЫ: {title}" if self.kind != ALL else "ГРУППЫ")
+
+    def _legacy_theme(self):
+        """Сохранённый выбор из прежнего дерева (тема, «Дом», раздел Дома) -> группа или раздел."""
+        th = self.theme
+        if not th or th.startswith((GROUP, SET)) or (th.startswith(SECTION) and "|" in th):
+            return
+        if th == HOME:
+            self.theme = GROUP + "Дом"
+        elif th.startswith(SECTION):
+            self.theme = SECTION + "Дом|" + th[len(SECTION) :]
+        else:
+            self.theme = GROUP + G.group_of(th)
 
     def _tint(self, it, col):
         it.setForeground(1, col)
@@ -361,30 +416,28 @@ class Nav(QWidget):
     # ------------------------------------------------------------
     def chosen(self):
         lst = self.of_kind(self.kind)
-        if self.theme == HOME:
-            return [a for a in lst if a.get("theme", "").startswith(HOME_PREFIX)]
-        if self.theme and self.theme.startswith(SET):
-            ids = set(self.sets().get(self.theme[len(SET) :], []))
+        th = self.theme
+        if th and th.startswith(SET):
+            ids = set(self.sets().get(th[len(SET) :], []))
             return [a for a in lst if a.get("id") in ids]
-        if self.theme and self.theme.startswith(SECTION):
-            sec = self.theme[len(SECTION) :]
-            return [a for a in lst if a.get("theme", "").startswith(HOME_PREFIX) and a.get("section") == sec]
-        if self.theme:
-            return [a for a in lst if a.get("theme") == self.theme]
+        if th and th.startswith(GROUP):
+            g = th[len(GROUP) :]
+            return [a for a in lst if a.get("_g") == g]
+        if th and th.startswith(SECTION) and "|" in th:
+            g, sec = th[len(SECTION) :].split("|", 1)
+            return [a for a in lst if a.get("_g") == g and a.get("_s") == sec]
         return lst
 
     def title(self):
         name = KIND_LOOK[self.kind][0]
-        if self.theme == HOME:
-            return f"{name} / Дом"
-        if self.theme and self.theme.startswith(SET):
-            return f"Подборка / {self.theme[len(SET) :]}"
-        if self.theme and self.theme.startswith(SECTION):
-            return f"{name} / Дом / {self.theme[len(SECTION) :]}"
-        if self.theme:
-            return (
-                f"{name} / {theme_label(self.theme)}"
-                if not self.theme.startswith(HOME_PREFIX)
-                else f"{name} / Дом / {theme_label(self.theme)}"
-            )
-        return name
+        th = self.theme
+        style = self.style.currentText() if self.style.currentData() != "all" else ""
+        tail = f"  ({style})" if style else ""
+        if th and th.startswith(SET):
+            return f"Подборка / {th[len(SET) :]}"
+        if th and th.startswith(GROUP):
+            return f"{name} / {th[len(GROUP) :]}{tail}"
+        if th and th.startswith(SECTION) and "|" in th:
+            g, sec = th[len(SECTION) :].split("|", 1)
+            return f"{name} / {g} / {sec}{tail}"
+        return name + tail

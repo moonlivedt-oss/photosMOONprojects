@@ -17,10 +17,13 @@ _lock = threading.Lock()
 
 # ---------------------------------------------------------------- цвета
 def _key(a):
-    try:
-        return f"{os.path.relpath(a['dir'], ROOT)}|{os.path.getmtime(os.path.join(a['dir'], 'preview.webp')):.0f}"
-    except OSError:
-        return None
+    t = a.get("_pt")  # из обхода assets() - без запроса к диску
+    if t is None:
+        try:
+            t = os.path.getmtime(os.path.join(a["dir"], "preview.webp"))
+        except OSError:
+            return None
+    return f"{os.path.relpath(a['dir'], ROOT)}|{t:.0f}" if t else None
 
 
 def load_colors():
@@ -58,6 +61,8 @@ def color_of(a, cache):
 
 # ---------------------------------------------------------------- новое
 def added(a):
+    if "_t" in a:
+        return a["_t"]
     try:
         return os.path.getmtime(os.path.join(a["dir"], "asset.json"))
     except OSError:
