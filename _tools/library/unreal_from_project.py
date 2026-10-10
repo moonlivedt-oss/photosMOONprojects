@@ -206,11 +206,21 @@ def put_metahuman(name, meshes, info, aid, origin, theme=None, preview_png=None)
             prev = next((p["file"] for p in info["previews"] if p["ok"] and os.path.exists(p["file"])), None)
             if prev:
                 _preview(prev, dst)
+    from library import blender_preview
+
+    view = None  # для 3D окна - все части одним GLB без морфов, подкрашенные по портрету
+    if blender_preview.make_view_model(
+        [os.path.join(dst, m) for m in main],
+        os.path.join(dst, "_view.glb"),
+        colors=blender_preview.portrait_colors(os.path.join(dst, "preview.webp")),
+    ):
+        view = "_view.glb"
     _write(
         dst,
         {
             "id": aid,
             "name": f"{name} (MetaHuman)",
+            "view": view,
             "kind": "model",
             "theme": theme or "Персонажи - MetaHuman",
             "source": "MetaHuman",

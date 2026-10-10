@@ -45,8 +45,9 @@ CAN_VIEW = ("tex", "hdri", "model")
 
 def viewable(a):
     """Можно ли открыть ассет в 3D окна: модели с сотнями морфов (лицо MetaHuman) роняют Qt Quick 3D -
-    у них флаг no_qt3d (в asset.json или из library/fbx_meta), вместо 3D - картинка превью."""
-    return a.get("kind") in CAN_VIEW and not a.get("no_qt3d")
+    у них флаг no_qt3d (в asset.json или из library/fbx_meta), вместо 3D - картинка превью. Если есть
+    просмотровая копия без морфов (view в asset.json, library/blender_preview.make_view_model) - открывается она."""
+    return a.get("kind") in CAN_VIEW and (not a.get("no_qt3d") or bool(a.get("view")))
 
 
 SHORT = {"tex": "Текстура", "hdri": "HDRI", "model": "Модель"}
@@ -243,7 +244,7 @@ def load_scene(root, a, probe="", sky=False):
     """Ассет в сцену viewer3d.qml (её делят большое окно и живой просмотр в панели вкладки).
     probe - HDRI для освещения модели и текстуры; у самого HDRI - он сам."""
     kind = a.get("kind")
-    if a.get("no_qt3d"):  # страховка: сюда такие не должны попадать (viewable)
+    if a.get("no_qt3d") and not a.get("view"):  # страховка: сюда такие не должны попадать (viewable)
         root.setProperty("status", "Эту модель 3D окна не откроет - смотрите в Unreal или Blender")
         return
     root.setProperty("status", "")
@@ -263,6 +264,8 @@ def load_scene(root, a, probe="", sky=False):
     root.setProperty("linearColors", a.get("source") == "Quaternius")
     if kind == "model":
         fbx = next((p for p in main if p.lower().endswith((".fbx", ".gltf", ".glb", ".obj"))), "")
+        if a.get("view"):  # просмотровая копия (MetaHuman: все части одним GLB без морфов) - только для 3D окна
+            fbx = os.path.join(a["dir"], a["view"])
         root.setProperty("modelSource", QUrl())  # тот же файл заново - иначе загрузчик не перечитает
         root.setProperty("modelSource", url(fbx))
     if kind == "tex":
