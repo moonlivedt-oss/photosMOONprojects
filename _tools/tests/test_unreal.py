@@ -184,6 +184,37 @@ class TestImport(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_tryon_goes_with_model(self):
+        import ast
+        import json
+
+        from library import unreal_import
+
+        tmp = tempfile.mkdtemp()
+        try:
+            d, tex = os.path.join(tmp, "sofa"), os.path.join(tmp, "rough_linen")
+            os.makedirs(d)
+            os.makedirs(tex)
+            open(os.path.join(d, "Sofa.fbx"), "w").close()
+            for f in ("rough_linen_diff_1k.jpg", "rough_linen_nor_gl_1k.png", "rough_linen_arm_1k.jpg", "preview.webp"):
+                open(os.path.join(tex, f), "w").close()
+            sofa = {"name": "Sofa 03", "kind": "model", "dir": d, "main": ["Sofa.fbx"]}
+            tryons = {d: {"tex": tex, "tiling": 3, "rot": 90, "tint": "#ffd0a0", "gloss": 40, "off": ["legs"]}}
+            script = unreal_import.export([sofa], os.path.join(tmp, "out"), tryons)
+            with open(script, encoding="utf-8") as fh:
+                text = fh.read()
+            compile(text, script, "exec")
+            job = json.loads(ast.literal_eval(text.split("JOBS = json.loads(", 1)[1].split(")\n", 1)[0]))[0]
+            t = job["tryon"]
+            self.assertEqual((t["tiling"], t["rot"], t["tint"], t["off"]), (3.0, 90.0, "#ffd0a0", ["legs"]))
+            self.assertAlmostEqual(t["rough"], 0.6)
+            names = sorted(os.path.basename(f) for f in t["files"])
+            self.assertEqual(names, ["rough_linen_arm_1k.jpg", "rough_linen_diff_1k.jpg"])  # без превью и GL-нормали
+            self.assertTrue(all(os.path.exists(f) for f in t["files"]))  # скопированы рядом с моделью
+            self.assertIsNone(unreal_import.tryon_of(sofa, {d: {"tex": "checker"}}))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 class TestPack(unittest.TestCase):
     def test_pack_folder_and_zip(self):
