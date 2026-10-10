@@ -62,8 +62,19 @@ def pill_width(p, text, font, icon=False, h=20):
     return p.fontMetrics().horizontalAdvance(text) + 14 + (h - 2 if icon else 0)
 
 
+VARIANTS = Qt.ItemDataRole.UserRole + 30  # [(цвет, ассет)] - цветовые варианты этой плитки
+
+
 class AssetDelegate(QStyledItemDelegate):
     PAD, CAP = 8, 46
+
+    @classmethod
+    def variant_rects(cls, rect, n):
+        """Цветные точки вариантов - в левом нижнем углу картинки: и для рисования, и для щелчка."""
+        r = QRectF(rect).adjusted(5, 5, -5, -5)
+        side = r.width() - 2 * cls.PAD
+        y = r.y() + cls.PAD + side - 22
+        return [QRectF(r.x() + cls.PAD + 8 + i * 19, y, 15, 15) for i in range(min(n, 8))]
 
     def __init__(self, view):
         super().__init__(view)
@@ -275,6 +286,19 @@ class AssetDelegate(QStyledItemDelegate):
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
             p.fontMetrics().elidedText(d.get("sub", ""), Qt.TextElideMode.ElideRight, int(tr.width())),
         )
+        # цветовые варианты: точки в углу картинки, показанный - в кольце
+        vs = index.data(VARIANTS) or []
+        if vs:
+            cur = index.data(ASSET)
+            for (hexc, va), rr in zip(vs, self.variant_rects(option.rect, len(vs))):
+                rr = rr.translated(0, -3 * h)
+                p.setPen(QPen(QColor(13, 13, 19, 200), 2))
+                p.setBrush(QColor(hexc))
+                p.drawEllipse(rr.adjusted(1.5, 1.5, -1.5, -1.5))
+                if va is cur:
+                    p.setPen(QPen(QColor(C["selt"]), 1.6))
+                    p.setBrush(Qt.BrushStyle.NoBrush)
+                    p.drawEllipse(rr.adjusted(-1.5, -1.5, 1.5, 1.5))
         p.restore()
 
 
@@ -298,6 +322,20 @@ class CardList(LibList):
         it = self.item(self.hover_row) if self.hover_row >= 0 else None
         if it is not None and (it.data(CARD) or {}).get("kind") == "hdri" and not self.anim.isActive():
             self.anim.start()
+
+    def mousePressEvent(self, e):
+        """Щелчок по цветной точке варианта - плитка показывает этот вариант (а не выделение)."""
+        if e.button() == Qt.MouseButton.LeftButton and getattr(self, "variant_pick", None):
+            pos = e.position()
+            idx = self.indexAt(pos.toPoint())
+            if idx.isValid():
+                vs = idx.data(VARIANTS) or []
+                for i, rr in enumerate(AssetDelegate.variant_rects(self.visualRect(idx), len(vs))):
+                    if rr.adjusted(-3, -3, 3, 3).contains(pos):
+                        self.variant_pick(idx.row(), i)
+                        e.accept()
+                        return
+        super().mousePressEvent(e)
 
     def mimeData(self, items):
         md = QMimeData()

@@ -539,3 +539,26 @@ class TestAgentKit(unittest.TestCase):
         self.assertIn("| 2 | Fern |", table)
         im = A._preview(self.items[0])
         self.assertLess(im.width, 60)  # пустые поля превью обрезаны
+
+
+class TestVariants(unittest.TestCase):
+    def test_colors_one_tile(self):
+        from library import unreal_groups as G
+
+        def m(name, theme="Средневековье - KayKit low-poly"):
+            return {"name": name, "kind": "model", "source": "KayKit", "theme": theme}
+
+        items = [
+            m("Banner red"),
+            m("Banner blue"),
+            m("Barrel"),
+            m("Banner pattern a red"),
+            m("Banner green"),
+            m("Banner red", theme="Другая тема"),
+        ]
+        out = G.group_variants(items)
+        self.assertEqual([a["name"] for a, _v in out], ["Banner red", "Barrel", "Banner pattern a red", "Banner red"])
+        self.assertEqual([x[1]["name"] for x in out[0][1]], ["Banner red", "Banner blue", "Banner green"])
+        self.assertEqual(out[1][1], [])  # без цвета - одиночка
+        self.assertEqual(out[0][1][1][0], G.VARIANT_COLORS["blue"])
+        self.assertIsNone(G.variant_of(m("Red")))  # только цвет в имени - не вариант

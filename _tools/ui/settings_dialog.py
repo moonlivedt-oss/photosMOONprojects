@@ -409,6 +409,14 @@ class SettingsDialog(QDialog):
             ue.nav.compact_btn.setChecked,
             "menuGrid",
         )
+        self.switch(
+            k,
+            "Цвета одной плиткой",
+            "«Banner red», «Banner blue»... - одна плитка с цветными точками: щелчок по точке меняет вариант.",
+            self.cfg.get("ue_variants", True),
+            self.set_variants,
+            "color-palette",
+        )
         self.head(k, "ОКНО 3D")
         self.switch(
             k, "Подиум, тень и сетка", "Клавиша G в окне 3D.", self.cfg.get("ue_floor", True), self.set_floor, "card"
@@ -552,6 +560,11 @@ class SettingsDialog(QDialog):
 
     def viewer(self):
         return getattr(self.win.unreal, "viewer", None)
+
+    def set_variants(self, on):
+        self.cfg["ue_variants"] = on
+        if self.win.unreal.loaded:
+            self.win.unreal.show_assets()
 
     def set_floor(self, on):
         self.cfg["ue_floor"] = on

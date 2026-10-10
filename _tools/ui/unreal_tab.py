@@ -32,13 +32,14 @@ from PyQt6.QtWidgets import (
 
 import imaging as K
 from library import unreal as U
+from library import unreal_groups as G
 from library.unreal_extra import added
-from ui.common import ROLE, THUMB, bg, human, in_main, log_error, reveal
+from ui.common import PIX, ROLE, THUMB, bg, human, in_main, log_error, reveal
 from ui.thumbnails import lib_icon, swatch, thumb
 from ui.unreal_catalog import CatalogDialog
 from ui.unreal_nav import ALL, FAV, HOME_PREFIX, KIND_LOOK, SET, SETS, THEME_ICON, Nav, kind_color, theme_label
 from ui.unreal_panel import AssetCard, HeroView, count_text, mosaic
-from ui.unreal_tiles import ASSET, CARD, CardList, card_of
+from ui.unreal_tiles import ASSET, CARD, VARIANTS, CardList, card_of
 from ui.viewer3d import MiniView, Viewer3D, studio_probe, viewable
 from ui.widgets import key
 
@@ -628,8 +629,14 @@ class UnrealTab(QWidget):
         self.list.one_kind = len({a.get("kind") for a in lst}) == 1
         favs = self.favs()
         todo = []
+        # цветовые варианты (Banner red / blue / green) - одной плиткой с точками
+        if self.cfg.get("ue_variants", True) and self.problems is None:
+            groups = G.group_variants(lst)
+        else:
+            groups = [(a, []) for a in lst]
+        self.list.variant_pick = self.pick_variant
         self.list.setUpdatesEnabled(False)  # тысячи плиток: без перерисовки после каждой
-        for i, a in enumerate(lst):
+        for i, (a, vs) in enumerate(groups):
             prev = os.path.join(a["dir"], "preview.webp")
             li = QListWidgetItem(a.get("name", ""))
             li.setData(ROLE, prev)
@@ -646,12 +653,35 @@ class UnrealTab(QWidget):
                 CARD, card_of(a.get("kind"), a.get("name", ""), sub, res, human(a.get("size", 0)), a.get("id") in favs)
             )
             ai = "\nРаздел подобран ИИ по картинке и имени" if a.get("section_ai") else ""
-            li.setToolTip(f"{a.get('name', '')}\n{a['dir']}{ai}")
+            more = f"\nЦвета: {len(vs)} - щёлкните точку на плитке" if vs else ""
+            li.setToolTip(f"{a.get('name', '')}\n{a['dir']}{ai}{more}")
+            li.setData(VARIANTS, vs)
             self.list.addItem(li)
             if a.get("_pt") or ("_pt" not in a and os.path.exists(prev)):  # _pt - из обхода assets()
                 todo.append((i, prev))
         self.list.setUpdatesEnabled(True)
         self.list.load_tiles(todo, THUMB, None)
+        self.describe()
+
+    def pick_variant(self, row, i):
+        """Точка цвета на плитке: плитка показывает этот вариант, выбор и действия - уже с ним."""
+        it = self.list.item(row)
+        vs = it.data(VARIANTS) or [] if it else []
+        if not (0 <= i < len(vs)):
+            return
+        a = vs[i][1]
+        prev = os.path.join(a["dir"], "preview.webp")
+        it.setData(ASSET, a)
+        it.setData(ROLE, prev)
+        it.setText(a.get("name", ""))
+        card = dict(it.data(CARD) or {})
+        card.update(name=a.get("name", ""), size=human(a.get("size", 0)), fav=a.get("id") in self.favs())
+        it.setData(CARD, card)
+        if os.path.exists(prev):
+            it.setData(PIX, thumb(prev, THUMB))
+        self.list.clearSelection()
+        self.list.setCurrentRow(row)
+        self.list.viewport().update()
         self.describe()
 
         # ------------------------------------------------------------ избранное

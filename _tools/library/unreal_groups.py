@@ -427,3 +427,57 @@ def classify_other(sem, items):
         if rest:
             out.update(unreal_sem.classify(sem, rest, prompts, margin=1.5))  # строже, чем у Дома: разделов больше
     return out
+
+
+# ---------------------------------------------------------------- цветовые варианты одной плиткой
+# Kenney и KayKit кладут одну вещь в нескольких цветах: «Banner red», «Banner blue»... - в сетке это одна
+# плитка с цветными точками. Слово цвета -> цвет точки.
+VARIANT_COLORS = {
+    "red": "#e0524e",
+    "blue": "#4f86e0",
+    "green": "#58b46a",
+    "yellow": "#e8c547",
+    "white": "#eeeef2",
+    "black": "#2b2b33",
+    "brown": "#8a5a3a",
+    "gray": "#8d8d96",
+    "grey": "#8d8d96",
+    "purple": "#9c6ad6",
+    "orange": "#ec8a3c",
+    "pink": "#ec7fb4",
+    "gold": "#d8b04a",
+    "silver": "#c3c6cf",
+    "teal": "#3fb8ad",
+    "cyan": "#53c9e6",
+    "beige": "#d9c6a0",
+}
+
+
+def variant_of(a):
+    """(ключ вещи без цвета, слово цвета) или None, если в имени нет цвета."""
+    words = re.split(r"[^a-z0-9]+", a.get("name", "").lower())
+    col = [w for w in words if w in VARIANT_COLORS]
+    if not col:
+        return None
+    rest = tuple(w for w in words if w and w not in VARIANT_COLORS)
+    if not rest:
+        return None
+    return (a.get("kind"), a.get("source", ""), a.get("theme", ""), rest), col[-1]
+
+
+def group_variants(items):
+    """[(показанный, [(цвет, ассет), ...])] в прежнем порядке: вещи одного вида, набора и имени без цвета -
+    одной записью (первый встреченный - на плитке). Одиночки - с пустым списком вариантов."""
+    groups, order = {}, []
+    for a in items:
+        v = variant_of(a)
+        key = v[0] if v else ("one", id(a))
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append((VARIANT_COLORS[v[1]] if v else "", a))
+    out = []
+    for key in order:
+        g = groups[key]
+        out.append((g[0][1], g if len(g) > 1 else []))
+    return out
