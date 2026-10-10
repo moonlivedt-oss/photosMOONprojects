@@ -23,7 +23,7 @@ an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D 
 ![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
 ![license](https://img.shields.io/badge/code-MIT-green)
 
-<img src="_docs/screenshots/hero.webp" alt="Library window: quick access cards and a section tree with colored counts on the left, fairy-tale sticker tiles with a pink section stripe in the middle, a large baby dragon with its colors and a tag suggestion on the right" width="880">
+<img src="_docs/screenshots/hero.webp" alt="Library window: quick access cards with live counts and a section tree with numbers and share bars on the left, fairy-tale sticker tiles in the middle, a large baby dragon with its colors and a tag suggestion on the right" width="880">
 
 <sub>One folder, PyQt6 window, Pillow and numpy core, semantic search on onnxruntime</sub>
 
@@ -116,7 +116,7 @@ suggested, and everything is filed into the right section and palette.
 ## Unreal Engine assets
 
 <div align="center">
-<img src="_docs/screenshots/unreal.webp" alt="Unreal tab: kind cards and home sections on the left, 43 chairs and armchairs as cards in the middle, the selected chair spinning in a live 3D view on the right" width="820">
+<img src="_docs/screenshots/unreal.webp" alt="Unreal tab: kind cards, a style switch set to PBR and the Home tree on the left, brass vases, goblets and bronze statues from the Decor section in the middle, the bronze whale with polycount and size next to a 180 cm person on the right" width="820">
 <br><sub>The "Unreal" tab: home models by purpose, live 3D on the right, drag a tile into the Content Browser</sub>
 </div>
 
@@ -128,13 +128,13 @@ polycount and color, re-download in 1K/2K/4K and a one-click import script for U
 texture settings and an `M_<name>` material).
 
 <div align="center">
-<img src="_docs/screenshots/viewer-texture.webp" alt="3D viewer: a mossy brick texture on a lit sphere, each map viewable separately" width="49%">
-<img src="_docs/screenshots/viewer-model.webp" alt="3D viewer: a wooden chair on a floor with a shadow" width="49%">
+<img src="_docs/screenshots/viewer-texture.webp" alt="3D viewer: a mossy rock texture on a sphere under studio light, each map viewable separately" width="49%">
+<img src="_docs/screenshots/viewer-model.webp" alt="3D viewer: a mid-century leather lounge chair under studio light, with polycount and real size" width="49%">
 <br><sub>3D viewer on Qt Quick 3D: texture on a sphere with every map separately; a model on a floor with a shadow</sub>
 </div>
 
 <div align="center">
-<img src="_docs/screenshots/room.webp" alt="Room draft: carpet floor, concrete walls, a bed, a bench, a table, candelabras and chairs at real scale" width="760">
+<img src="_docs/screenshots/room.webp" alt="Room draft: wooden floor, concrete walls, a sofa, armchairs, a rocking chair, tables, a cabinet, a mirror and plants at real scale, a chandelier under the ceiling" width="760">
 <br><sub>Room draft from a collection: real-scale furniture, floor and walls from downloaded textures, HDRI light</sub>
 </div>
 
@@ -158,7 +158,7 @@ pack** bundles the files, the import script, CREDITS.md and manifest.json. AI as
 `ue_plan_room`, `ue_blender` (returns a render), `ue_import`, `ue_pack` and more.
 
 <div align="center">
-<img src="_docs/screenshots/scene.webp" alt="Room from a description: nine items by section, floor, walls and sky" width="49%">
+<img src="_docs/screenshots/scene.webp" alt="Room from a description: a cozy vintage living room, items by section with previews and an alternative for each" width="49%">
 <img src="_docs/screenshots/blender.webp" alt="Blender render of the same room" width="49%">
 </div>
 
