@@ -123,20 +123,25 @@ class Window(QMainWindow):
         tm.addAction(lib_icon("magnifying-glass"), "Сравнить две картинки...", lambda: self.lib.compare())
         tm.addAction(lib_icon("drawing_pen"), "Векторизация в SVG...", lambda: self.lib.vectorize())
         tm.addSeparator()
-        tm.addAction(lib_icon("sparkles"), "Оформление: тема и акцент...", self.theme_dialog)
         tm.addAction(lib_icon("first-aid-kit"), "Проверка и восстановление...", self.safety)
-        tm.addAction(lib_icon("eye"), "Папка генератора...", self.pick_gen)
         tools.setMenu(tm)
-        tools.setToolTip("Дубли, доктор, чего нет, вес разделов, папка генератора")
+        tools.setToolTip("Дубли, доктор, чего нет, вес разделов, палитра, сравнение, векторизация")
         ch.addWidget(tools)
         find = QPushButton(lib_icon("magnifying-glass"), "Найти везде  Ctrl+P", objectName="ghost")
         find.setToolTip("Команды, разделы, картинки и ассеты Unreal - одной строкой")
         find.clicked.connect(self.palette)
         ch.insertWidget(0, find)
-        ai = QPushButton(lib_icon("sparkles"), "ИИ-помощники", objectName="ghost")
-        ai.setToolTip("Claude, Cursor и другие помощники: подключить, что им можно, что они сделали")
-        ai.clicked.connect(self.agents)
-        ch.addWidget(ai)
+        from ui.ai_drawer import AiDrawer, AiStatusButton
+
+        self.ai_btn = AiStatusButton()  # точка статуса: что помощники делают; щелчок - лента их действий
+        self.ai_drawer = AiDrawer(self)
+        self.ai_btn.clicked.connect(self.ai_drawer.toggle)
+        self.ai_tip = ""
+        ch.addWidget(self.ai_btn)
+        sets = QPushButton(lib_icon("gear"), "Настройки", objectName="ghost")
+        sets.setToolTip("Оформление, входящие и папка генератора, Unreal и 3D, ИИ-помощники (Ctrl+,)")
+        sets.clicked.connect(self.settings)
+        ch.addWidget(sets)
         self.gen_btn = QPushButton(lib_icon("eye"), "", objectName="ghost")
         self.gen_btn.clicked.connect(self.pick_gen)
         ch.addWidget(self.gen_btn)
@@ -214,6 +219,7 @@ class Window(QMainWindow):
             ("Ctrl+3", lambda: self.tabs.setCurrentIndex(2)),
             ("Ctrl+P", self.palette),
             ("F9", self.toggle_live),
+            ("Ctrl+,", self.settings),
             ("Ctrl+I", self.show_weight),
         ):
             key(keys, self, fn, local=False)
@@ -509,6 +515,9 @@ class Window(QMainWindow):
         if theirs or gone:
             self.update_undo()
             self.after_change()
+        if theirs or not getattr(self, "ai_status_t", 0) or time.time() - self.ai_status_t > 30:
+            self.ai_status_t = time.time()  # «только что» стареет само - раз в полминуты пересчитать
+            self.update_ai_status()
         if theirs:
             last = theirs[-1]
             more = "  (и ещё %d)" % (len(theirs) - 1) if len(theirs) > 1 else ""
@@ -604,10 +613,41 @@ class Window(QMainWindow):
         p.show()
         p.q.setFocus()
 
-    def theme_dialog(self):
-        from ui.tools_dialogs import ThemeDialog
+    def settings(self):
+        from ui.settings_dialog import SettingsDialog
 
-        ThemeDialog(self).exec()
+        SettingsDialog(self).exec()
+
+    def theme_dialog(self):  # тема и акцент - в «Настройках»
+        self.settings()
+
+    def update_ai_status(self):
+        """Точка на кнопке «ИИ-помощники»: только что / недавно / тихо / только чтение; подсказка - последнее."""
+        from ui.ai_drawer import ACTIVE, RECENT, agent_entries, ago
+
+        try:
+            last = agent_entries(1)
+        except Exception:
+            last = []
+        ro = not self.cfg.get("ai_write", True)
+        age = time.time() - last[0]["t"] if last else None
+        state = (
+            "readonly"
+            if ro
+            else "active"
+            if age is not None and age < ACTIVE
+            else ("recent" if age is not None and age < RECENT else "idle")
+        )
+        tip = (
+            f"Последнее: {last[0]['who']} - {last[0]['text']} ({ago(last[0]['t'])})"
+            if last
+            else "Помощники пока ничего не делали"
+        )
+        if ro:
+            tip = "Только чтение: помощники ищут и смотрят, но не меняют. " + tip
+        self.ai_tip = tip
+        self.ai_btn.set_state(state, tip + "\nЩелчок - лента действий, отмена, подключение")
+        self.ai_drawer.refresh()
 
     def apply_theme(self):
         """Сменить тему на лету: цвета C меняются на месте, стили пересобираются, фон и плитки перерисовываются."""
@@ -639,7 +679,7 @@ class Window(QMainWindow):
         self.inbox.gen_hint.setText(
             (f"Слежу за папкой генератора: {d}")
             if d
-            else "Можно указать папку генератора (кнопка вверху) - новые картинки будут приходить сами"
+            else "Можно указать папку генератора («Настройки» вверху) - новые картинки будут приходить сами"
         )
         self.say("Слежу за папкой генератора: " + d if d else "Папка генератора не задана")
 
