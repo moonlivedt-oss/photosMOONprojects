@@ -44,7 +44,7 @@ py -3.14 _tools/get_models.py      # модели нейросетей, ~460 М�
 
 ```bash
 _tools\run-tests.cmd                            # все тесты (99 проверок, окно не открывается)
-py -3.14 _tools/cli.py gallery                  # пересобрать Gallery.html - вся библиотека в браузере
+py -3.14 _tools/cli.py done                     # пересобрать done.js - Prompts.html прячет готовые карточки
 py -3.14 _tools/cli.py cut лист.png --grid 4x3  # нарезать лист без окна
 ```
 
@@ -114,7 +114,6 @@ py -3.14 _tools/cli.py cut лист.png --grid 4x3  # нарезать лист 
 | **Фильтры** | ориентация (горизонтальные, вертикальные, квадратные), прозрачный фон, размер, формат; запоминаются |
 | **Версии картинки** | после правки и сжатия справа строка «ВЕРСИИ»: сравнить с текущей или вернуть (Ctrl+Z отменит) |
 | **Найти везде** (Ctrl+P) | команды окна, разделы, картинки (по имени, а если нет - по смыслу) и ассеты Unreal в одной строке |
-| **Галерея** | `Gallery.html` - вся библиотека в браузере: разделы, поиск, размер плиток, копирование пути |
 
 ---
 
@@ -200,7 +199,7 @@ py -3.14 _tools/cli.py cut лист.png --grid 4x3  # нарезать лист 
 
 Вкладка **«Unreal»** (Ctrl+3) - отдельная полка для 3D: она не смешивается с картинками библиотеки.
 Всё лежит в `_Unreal/<вид>/<тема>/<имя>/`: файлы ассета, `preview.webp` и `asset.json` (источник,
-автор, метки, лицензия, подсказка для Unreal). Папка на `_`, поэтому галерея, дубли и поиск её не трогают;
+автор, метки, лицензия, подсказка для Unreal). Папка на `_`, поэтому дубли и поиск её не трогают;
 в git она не попадает (`.gitignore`) - ассеты скачиваются заново кнопкой.
 
 | Вид | Что внутри | Как в Unreal |
@@ -424,7 +423,7 @@ Real-ESRGAN выложен только для PyTorch: `get_models.py` скач
 py -3.14 _tools/cli.py cut лист.png --grid 4x3 --names a,b,c --outline 8 --bg auto
 py -3.14 _tools/cli.py convert папка --to webp --max 1920 [--replace]
 py -3.14 _tools/cli.py dupes [папка]       # одинаковые - в _duplicates, не удаляются
-py -3.14 _tools/cli.py gallery
+py -3.14 _tools/cli.py done                    # done.js для Prompts.html
 py -3.14 _tools/cli.py nobg картинка.jpg                 # -> «картинка без фона.png»
 py -3.14 _tools/cli.py upscale иконка.png --x 4 --kind art   # -> «иконка x4.png»
 py -3.14 _tools/cli.py unreal get hdri все --count 3     # ассеты для Unreal Engine (CC0)
@@ -498,7 +497,7 @@ py -3.14 _tools/cli.py repair restore latest  # вернуть последню�
 <summary><b>Развернуть дерево файлов и назначение модулей</b></summary>
 
 ```
-00 Входящие/            неразобранное (в галерею и поиск не попадает)
+00 Входящие/            неразобранное (в поиск не попадает)
 01 Фоны/ ... 10 .../    разделы; наборы - <раздел>/<набор>/<палитра>/
 _sources/               исходные листы (<год-месяц>), оригиналы до сжатия и правки, _undone для Ctrl+Y
 _Unreal/                ассеты для Unreal Engine: <вид>/<тема>/<имя>/ (не в git)
@@ -510,7 +509,7 @@ AGENTS.md               как ИИ-помощнику работать с би�
 _tools/
   app.py                вход окна
   mcp_server.py         сервер MCP для ИИ-помощников (stdin/stdout, без сторонних пакетов)
-  cli.py                командная строка: cut, convert, dupes, gallery, nobg, upscale, unreal, api
+  cli.py                командная строка: cut, convert, dupes, done, nobg, upscale, unreal, api
   get_models.py         скачать модели поиска по смыслу
   imaging/              ядро без Qt (Pillow + numpy)
     files.py            пути, чтение с поворотом по EXIF, атомарная запись
@@ -525,7 +524,7 @@ _tools/
     doctor.py           проверка библиотеки
     sprites.py          атлас, svg-спрайт, значки программы, лист превью
     jobs.py             задачи для процессов по ядрам
-    gallery.py          сборка Gallery.html и done.js
+    done.py             done.js для Prompts.html (что уже есть по папкам)
   library/              модель библиотеки без Qt - её делят окно, командная строка и сервер MCP
     api.py              операции для помощников: описания, схемы параметров, журнал, отмена
     journal.py          журнал действий в базе: история окна и действия помощников, отмена и возврат
@@ -565,7 +564,7 @@ _tools/
 ```
 
 Не в репозитории (`.gitignore`): `_tools/_models` (модели), `_tools/_thumbs` (кэш миниатюр),
-`_tools/library.db` (база этого компьютера), `_tools/settings.json`, `Gallery.html`, `_tools/done.js`,
+`_tools/library.db` (база этого компьютера), `_tools/settings.json`, `_tools/done.js`,
 `_tools/_ui` (стрелки стилей - окно пишет их цветом темы), `_Unreal/` и кэши `_tools/_unreal_*`,
 `_tools/_backups` (резервные копии - в них ваши метки и настройки), отодвинутые `*.broken-*`.
 

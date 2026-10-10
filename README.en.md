@@ -43,7 +43,7 @@ The interface is in Russian.
 
 ```bash
 _tools\run-tests.cmd                            # all tests (99 checks, no window)
-py -3.14 _tools/cli.py gallery                  # rebuild Gallery.html - the whole library in a browser
+py -3.14 _tools/cli.py done                     # rebuild done.js - Prompts.html hides finished cards
 py -3.14 _tools/cli.py cut sheet.png --grid 4x3  # cut a sheet without the window
 ```
 
@@ -235,7 +235,7 @@ text) is subtracted, so small flat UI parts do not float to the top of every que
 py -3.14 _tools/cli.py cut sheet.png --grid 4x3 --names a,b,c --outline 8 --bg auto
 py -3.14 _tools/cli.py convert folder --to webp --max 1920 [--replace]
 py -3.14 _tools/cli.py dupes [folder]
-py -3.14 _tools/cli.py gallery
+py -3.14 _tools/cli.py done
 py -3.14 _tools/cli.py unreal get tex "Город" --count 6 --res 2k   # Unreal assets: tex | hdri | model | ies
 py -3.14 _tools/cli.py api                                  # assistant tools, JSON output
 py -3.14 _tools/cli.py api search '{"query": "cozy night street"}'

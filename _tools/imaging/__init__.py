@@ -14,6 +14,7 @@ from imaging.cutting import (
     to_square,
 )
 from imaging.doctor import IMPORTED, PROBLEMS, doctor_check, job_doctor
+from imaging.done import build_done
 from imaging.editing import (
     ADJ,
     ADJ_RANGE,
@@ -64,7 +65,6 @@ from imaging.files import (
     upright,
     write_atomic,
 )
-from imaging.gallery import build_gallery
 from imaging.jobs import RETINA, job_compress, job_export, job_image, job_variant
 from imaging.similarity import (
     COLORS,

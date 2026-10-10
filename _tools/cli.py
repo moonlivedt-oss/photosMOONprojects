@@ -5,7 +5,7 @@ py -3.14 cli.py cut sheet.png [more.png ...] [--grid 4x3] [--size 256] [--names 
                               [--bg auto|remove|keep] [--outline 0] [--pad 0.06] [--out DIR]
 py -3.14 cli.py convert FILES/DIRS [--to webp|avif|png|jpg|ico] [--max 1920] [--replace]
 py -3.14 cli.py dupes [DIR]
-py -3.14 cli.py gallery
+py -3.14 cli.py done
 py -3.14 cli.py unreal                       # ассеты Unreal: что скачано, темы
 py -3.14 cli.py repair [fix|backup|list|restore latest]   # проверка и восстановление базы и настроек
 py -3.14 cli.py unreal get tex "Город" --count 6 --res 2k     # tex | hdri | model | ies
@@ -131,11 +131,9 @@ def cmd_dupes(a):
     print(f"Перенесено в _duplicates: {moved}" if moved else "Дублей нет.")
 
 
-def cmd_gallery(_a):
-    counts = K.build_gallery()
-    print(f"Галерея: {sum(counts.values())} картинок")
-    for s, n in counts.items():
-        print(f"  {s}: {n}")
+def cmd_done(_a):
+    n = K.build_done()
+    print(f"done.js для Prompts.html: {n} картинок")
 
 
 def _neural(a, ready, tail, fn):
@@ -352,7 +350,7 @@ def main():
     )
     d = sub.add_parser("dupes", help="одинаковые картинки -> _duplicates (не удаляются)")
     d.add_argument("dir", nargs="?")
-    sub.add_parser("gallery", help="пересобрать Gallery.html")
+    sub.add_parser("done", help="пересобрать done.js для Prompts.html")
     u = sub.add_parser("upscale", help="увеличить нейросетью (Real-ESRGAN) -> '<имя> x4.png' рядом")
     u.add_argument("files", nargs="+")
     u.add_argument("--x", type=int, default=4, choices=[2, 4])
@@ -380,7 +378,7 @@ def main():
         "cut": cmd_cut,
         "convert": cmd_convert,
         "dupes": cmd_dupes,
-        "gallery": cmd_gallery,
+        "done": cmd_done,
         "upscale": cmd_upscale,
         "nobg": cmd_nobg,
         "api": cmd_api,

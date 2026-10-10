@@ -8,8 +8,8 @@ import time
 import traceback
 
 from PyQt6 import sip
-from PyQt6.QtCore import QFile, QFileSystemWatcher, QSize, Qt, QTimer, QUrl
-from PyQt6.QtGui import QDesktopServices, QPainter
+from PyQt6.QtCore import QFile, QFileSystemWatcher, QSize, Qt, QTimer
+from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -108,14 +108,6 @@ class Window(QMainWindow):
         corner = QWidget()
         ch = QHBoxLayout(corner)
         ch.setContentsMargins(0, 0, 8, 4)
-        for text, icon, fn, tip in (
-            ("Галерея", "Компас", self.open_gallery, "Вся библиотека в браузере"),
-            ("Промпты", "Заметка", self.open_prompts, "Промпты для генерации листов"),
-        ):
-            b = QPushButton(lib_icon(icon), text, objectName="ghost")
-            b.setToolTip(tip)
-            b.clicked.connect(fn)
-            ch.addWidget(b)
         # редкие проверки - одной кнопкой с меню, чтобы верхняя строка не была забита
         tools = QPushButton(lib_icon("toolbox"), "Инструменты", objectName="ghost")
         tm = QMenu(self)
@@ -203,7 +195,7 @@ class Window(QMainWindow):
         self.autosave.start()
         self.gal = QTimer(
             self, singleShot=True, interval=1500
-        )  # галерею и отпечатки пересобираем один раз на пачку правок
+        )  # done.js (Prompts.html) и отпечатки пересобираем один раз на пачку правок
         self.gal.timeout.connect(self.rebuild)
         self.sizes = {}  # размеры файлов генератора на прошлом опросе
         self.poll = QTimer(self, interval=2000)
@@ -279,13 +271,12 @@ class Window(QMainWindow):
         self.gal.start()
 
     def rebuild(self):
-        """Галерея пересобирается в фоне: она открывает все картинки библиотеки, и в главном потоке
-        окно замирало на пару секунд (Windows успевала показать белое «Не отвечает»)."""
+        """done.js для Prompts.html - в фоне: обход всей библиотеки не должен подвешивать окно."""
         if getattr(self, "gal_busy", False):
             self.gal.start()  # прошлая сборка ещё идёт - попробуем позже
         else:
             self.gal_busy = True
-            bg(K.build_gallery, lambda _r: setattr(self, "gal_busy", False))
+            bg(K.build_done, lambda _r: setattr(self, "gal_busy", False))
         self.sigs.refresh()
         self.sem.refresh()
 
@@ -725,30 +716,6 @@ class Window(QMainWindow):
         if seen != VERSION:
             self.show_help(NEW if seen or self.cfg.get("size") else "С чего начать")
 
-    def open_gallery(self):
-        """Галерея свежая - открыть сразу; иначе собрать в фоне (1-2 с на большой библиотеке) и открыть."""
-        page = os.path.join(LIB, "Gallery.html")
-
-        def show(res=None):
-            self.gal_busy = False
-            if isinstance(res, Exception):
-                log_error(f"галерея не собралась: {res!r}")
-            QDesktopServices.openUrl(QUrl.fromLocalFile(page))
-
-        if getattr(self, "gal_busy", False):  # сборка уже идёт - открыть, когда закончится
-            QTimer.singleShot(300, self.open_gallery)
-            return
-        if not self.gal.isActive() and os.path.exists(page):
-            show()
-            return
-        self.gal.stop()
-        self.gal_busy = True
-        self.say("Собираю галерею...")
-        bg(K.build_gallery, show)
-
-    def open_prompts(self):
-        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.join(LIB, "Prompts.html")))
-
     def dupes(self):
         if self.sigs.busy:
             self.say("Отпечатки библиотеки ещё считаются - попробуйте через пару секунд")
@@ -781,9 +748,9 @@ class Window(QMainWindow):
             log_error(f"настройки не записались: {ex}")
         if self.gal.isActive():
             try:
-                K.build_gallery()
+                K.build_done()
             except Exception as ex:
-                log_error(f"галерея не собралась: {ex}")
+                log_error(f"done.js не собрался: {ex}")
         e.accept()
 
 

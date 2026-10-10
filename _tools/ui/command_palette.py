@@ -26,8 +26,6 @@ def commands(win):
         ("ИИ-помощники", "claude cursor mcp агенты подключить", "sparkles", win.agents),
         ("Справка", "помощь клавиши f1", "question-mark-bubble", win.show_help),
         ("Проверка и восстановление", "копия бэкап починить сбой база настройки вернуть", "first-aid-kit", win.safety),
-        ("Галерея в браузере", "gallery html", "globe", win.open_gallery),
-        ("Промпты", "prompts генерация", "clipboard", win.open_prompts),
         ("Найти дубли", "одинаковые повторы", "magnifying-glass", win.dupes),
         ("Доктор библиотеки", "проверка проблемы битые", "first-aid-kit", win.doctor),
         ("Чего нет в наборах", "палитры недостающие", "checklist", win.missing),

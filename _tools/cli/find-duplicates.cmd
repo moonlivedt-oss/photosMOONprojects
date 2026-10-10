@@ -3,6 +3,6 @@ rem Ищет одинаковые картинки в этой папке, ли�
 chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
 py -3.14 "%~dp0..\cli.py" dupes
-py -3.14 "%~dp0..\cli.py" gallery
+py -3.14 "%~dp0..\cli.py" done
 echo.
 pause

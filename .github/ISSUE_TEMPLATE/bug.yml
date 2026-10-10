@@ -41,7 +41,7 @@ body:
         - Поиск по смыслу или подсказка меток
         - Редактор, сжатие или выгрузка
         - Командная строка или .cmd
-        - Gallery.html или Prompts.html
+        - Prompts.html
     validations:
       required: true
   - type: input
