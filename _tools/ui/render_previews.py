@@ -105,7 +105,7 @@ class PreviewRenderer(QObject):
             self.done.emit(self.ok)
             return
         self.cur = self.queue.pop(0)
-        self.wait, self.tries = 0, 0
+        self.wait, self.tries, self.frozen = 0, 0, False
         self.root.setProperty("camScale", 1.35)
         load_scene(self.root, self.cur, self.probe)
         # взгляд чуть сверху и сбоку - как на карточках Kenney
@@ -121,7 +121,15 @@ class PreviewRenderer(QObject):
             self.timer.stop()
             QTimer.singleShot(0, self.next)
             return
-        if not self.root.property("fitted") or self.wait < 4:  # пара кадров после подгонки
+        if not self.root.property("fitted"):
+            return
+        if not self.frozen:  # превью - в позе покоя, а не посреди бега: анимации стоп, пара кадров на отрисовку
+            from ui.viewer3d import set_animation
+
+            set_animation(self.root)
+            self.frozen, self.wait = True, 0
+            return
+        if self.wait < 4:  # пара кадров после подгонки
             return
         img = self.view.grabFramebuffer()
         if touches_edge(img) and self.tries < 4:  # модель вылезла за кадр - отъехать и снять заново

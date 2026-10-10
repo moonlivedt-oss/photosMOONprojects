@@ -8,8 +8,8 @@ import os
 from html import escape as esc  # сведения - rich text: имена и метки с сайта не должны стать разметкой
 
 from PIL import Image
-from PyQt6.QtCore import QSize, Qt, QUrl
-from PyQt6.QtGui import QDesktopServices, QIcon
+from PyQt6.QtCore import QObject, QSize, Qt, QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices, QIcon, QQuaternion
 from PyQt6.QtQml import QQmlProperty
 from PyQt6.QtQuickWidgets import QQuickWidget
 from PyQt6.QtWidgets import (
@@ -157,6 +157,88 @@ def map_list(a):
     return [m for m in out if m[1]]
 
 
+# ---------------------------------------------------------------- анимации модели
+# Qt Quick 3D (6.11) сам делает из анимаций FBX по Timeline на каждую и запускает их по кругу: у персонажей
+# Kenney их 30 штук - модель дёргалась. Окно останавливает все и включает одну, выбранную в просмотре 3D.
+def animations(root):
+    """[(имя, Timeline, TimelineAnimation)] загруженной модели; пустые (длина 0) не считаются."""
+    out = []
+    for o in root.findChildren(QObject):
+        if o.metaObject().className() != "QQuickTimelineAnimation" or o.parent() is None:
+            continue
+        if (o.property("duration") or 0) <= 0:
+            continue
+        out.append((o.objectName() or f"анимация {len(out) + 1}", o.parent(), o))
+    return out
+
+
+def _dot(a, b):
+    return a.scalar() * b.scalar() + a.x() * b.x() + a.y() * b.y() + a.z() * b.z()
+
+
+def fix_keyframes(timeline):
+    """Ключи поворота, которые Qt испортил при чтении FBX: одиночный ключ «в никуда» между двумя похожими
+    соседями - на одну рамку кость выворачивало (у персонажей Kenney - второй ключ каждой анимации).
+    Такой ключ заменяется серединой соседей; знаки выравниваются - поворот идёт коротким путём.
+    Один раз на таймлайн (отметка - динамическое свойство libFixed)."""
+    if timeline.property("libFixed"):
+        return 0
+    timeline.setProperty("libFixed", True)
+    fixed = 0
+    for g in timeline.findChildren(QObject):
+        if g.metaObject().className() != "QQuickKeyframeGroup" or g.property("property") != "rotation":
+            continue
+        kfs = [k for k in g.findChildren(QObject) if k.metaObject().className() == "QQuickKeyframe"]
+        kfs.sort(key=lambda k: k.property("frame") or 0)
+        qs = [k.property("value") for k in kfs]
+        if len(qs) < 3 or not all(isinstance(q, QQuaternion) for q in qs):
+            continue
+        for i in range(1, len(qs)):  # q и -q - один поворот; соседи одного знака - интерполяция без кувырка
+            if _dot(qs[i], qs[i - 1]) < 0:
+                qs[i] = -qs[i]
+                kfs[i].setProperty("value", qs[i])
+        for i in range(1, len(qs) - 1):
+            a, q, b = qs[i - 1], qs[i], qs[i + 1]
+            if abs(_dot(a, b)) > 0.95 and abs(_dot(q, a)) < 0.9 and abs(_dot(q, b)) < 0.9:
+                qs[i] = QQuaternion.nlerp(a, b, 0.5)
+                kfs[i].setProperty("value", qs[i])
+                fixed += 1
+    return fixed
+
+
+def set_animation(root, name=None):
+    """Играть одну анимацию (по имени) или ни одной: модель замирает в позе первого кадра первой анимации."""
+    anims = animations(root)
+    for _n, _tl, an in anims:  # всё стоп
+        an.setProperty("running", False)
+    for _n, tl, _an in anims:
+        tl.setProperty("enabled", False)
+    pick = next(((tl, an) for n, tl, an in anims if n == name), None)
+    if pick is None and anims:  # покой: поза первого кадра (обычно idle - стоит ровно)
+        tl = anims[0][1]
+        tl.setProperty("enabled", True)
+        tl.setProperty("currentFrame", tl.property("startFrame") or 0.0)
+        tl.setProperty("enabled", False)
+    elif pick is not None:
+        tl, an = pick
+        fix_keyframes(tl)
+        tl.setProperty("enabled", True)
+        an.setProperty("running", True)
+    return [n for n, _tl, _an in anims]
+
+
+def when_loaded(root, fn, tries=60):
+    """Вызвать fn(), когда модель загрузилась (подогнана под кадр); анимации появляются только тогда."""
+
+    def check(left=tries):
+        if root.property("fitted") or root.property("status"):
+            fn()
+        elif left > 0:
+            QTimer.singleShot(150, lambda: check(left - 1))
+
+    QTimer.singleShot(150, check)
+
+
 def load_scene(root, a, probe="", sky=False):
     """Ассет в сцену viewer3d.qml (её делят большое окно и живой просмотр в панели вкладки).
     probe - HDRI для освещения модели и текстуры; у самого HDRI - он сам."""
@@ -225,6 +307,7 @@ class MiniView(QQuickWidget):
         if self.shown != a["dir"]:
             self.shown = a["dir"]
             load_scene(self.root, a, probe)
+            when_loaded(self.root, lambda: set_animation(self.root))  # в панели модель не дёргается
         return True
 
     def pause(self, on):
@@ -396,6 +479,12 @@ class Viewer3D(QDialog):
         self.try_tile.setToolTip("Сколько раз рисунок повторяется на модели")
         self.try_tile.valueChanged.connect(lambda v: self.set("tiling", float(v)) if self.tryon.currentData() else None)
         block("try", section("ПРИМЕРИТЬ ТЕКСТУРУ"), self.tryon, self.try_tile)
+        self.anim = QComboBox()
+        self.anim.setToolTip("Анимации из файла модели: по умолчанию модель стоит спокойно")
+        self.anim.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.anim.setMinimumContentsLength(14)
+        self.anim.currentIndexChanged.connect(lambda _i: set_animation(self.root, self.anim.currentData()))
+        block("anim", section("АНИМАЦИЯ"), self.anim)
         block("light", section("СВЕТ"), self.env, self.sky)
         block("expo", ("Яркость", self.expo), ("Поворот неба", self.rot))
         block("info", section("СВЕДЕНИЯ"), self.info)
@@ -629,6 +718,7 @@ class Viewer3D(QDialog):
             "expo": True,
             "info": True,
             "try": kind == "model",
+            "anim": False,  # покажется, когда у загруженной модели найдутся анимации
         }
         for name, w in self.blocks.items():
             w.setVisible(vis[name])
@@ -644,12 +734,24 @@ class Viewer3D(QDialog):
         if kind == "model":
             self.fill_tryon()
             self.apply_tryon()
+            when_loaded(self.root, self.fill_anims)
         self.update_info()
         self.reset_view()
         self.show()
         self.raise_()
         self.activateWindow()
         return True
+
+    def fill_anims(self):
+        """Модель загрузилась: все анимации стоп, список - в выбор (если они есть)."""
+        names = set_animation(self.root)
+        self.anim.blockSignals(True)
+        self.anim.clear()
+        self.anim.addItem("Без анимации (поза покоя)", None)
+        for n in names:
+            self.anim.addItem(n, n)
+        self.anim.blockSignals(False)
+        self.blocks["anim"].setVisible(bool(names))
 
     def update_info(self):
         a = self.asset
