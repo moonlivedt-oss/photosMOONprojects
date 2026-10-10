@@ -1086,10 +1086,31 @@ def name_words(a):
     return set(words) | {x + y for x, y in zip(words, words[1:])}  # Night stand -> nightstand
 
 
+def split_compounds(words, vocab):
+    """Слитные имена KayKit: kitchencounter -> + kitchen, pictureframe -> + picture, frame. Часть берётся,
+    если она есть в словаре разделов и не короче 4 букв (bed, car и т. п. внутри слов дают ложные совпадения)."""
+    out = set(words)
+    for w in words:
+        if w in vocab or len(w) < 7:
+            continue
+        for i in range(4, len(w) - 2):
+            if w[:i] in vocab:
+                out.add(w[:i])
+            if len(w) - i >= 4 and w[i:] in vocab:
+                out.add(w[i:])
+    return out
+
+
+_HOME_VOCAB = set()
+
+
 def home_section(a):
     """Раздел «Дома»: сначала по имени модели, потом по меткам и категориям (метки бывают случайными:
     у кресла метка sofa, у вазы - pot)."""
-    for words in (name_words(a), {w.lower() for w in a.get("tags", []) + a.get("categories", [])}):
+    if not _HOME_VOCAB:
+        _HOME_VOCAB.update(k for _sec, keys in HOME_SECTIONS for k in keys)
+    name = split_compounds(name_words(a), _HOME_VOCAB)
+    for words in (name, {w.lower() for w in a.get("tags", []) + a.get("categories", [])}):
         for sec, keys in HOME_SECTIONS:
             if words & keys:
                 return sec

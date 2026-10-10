@@ -52,6 +52,7 @@ STYLES = (
 
 # разделы внутри групп: (раздел, слова) - первое совпадение выигрывает; слова ищутся в имени, потом в метках
 W = lambda s: set(s.split())  # noqa: E731
+_VOCAB = {}  # группа -> все слова её разделов (для split_compounds)
 SECTIONS = {
     "Природа": (
         ("Деревья", W("tree trees pine birch oak palm fir spruce trunk stump log logs sapling willow maple")),
@@ -81,7 +82,7 @@ SECTIONS = {
                 "locomotive carriage tractor sedan suv pickup delivery hatchback race kart"
             ),
         ),
-        ("Индустрия", W("pipe pipes tank container crate pallet conveyor machine generator silo")),
+        ("Индустрия", W("pipe pipes tank container crate pallet conveyor machine generator silo hopper watertower")),
         ("Железная дорога", W("rail rails railroad railroadrail railstraight track tracks")),
         (
             "Дороги",
@@ -104,7 +105,7 @@ SECTIONS = {
             "Улица и детали",
             W(
                 "lamp light bench sign trash bin hydrant fence cone barrier mailbox pole antenna tree planter "
-                "dumpster bollard billboard"
+                "dumpster bollard billboard manhole drain acunit lantern"
             ),
         ),
     ),
@@ -171,7 +172,7 @@ SECTIONS = {
             "Предметы",
             W(
                 "crate barrel terminal computer console chair table container containers pipe cable cables gun "
-                "weapon box cargo cargoa cargob shelves propshelves bed prop"
+                "weapon box cargo cargoa cargob shelves propshelves bed prop barrels machine generator supports"
             ),
         ),
     ),
@@ -187,7 +188,7 @@ SECTIONS = {
             "Снаряжение и одежда",
             W(
                 "sword axe bow shield hair hat outfit helmet mug arrow quiver dagger staff crossbow spellbook wand "
-                "smokebomb blade cane wheelchair defibrillator"
+                "smokebomb blade cane wheelchair defibrillator aid glasses sunglasses mask crutch"
             ),
         ),
         (
@@ -249,6 +250,8 @@ def base_of(theme):
 
 def group_of(a_or_theme):
     theme = a_or_theme if isinstance(a_or_theme, str) else a_or_theme.get("theme", "")
+    if theme == "Ночь и закат" and not isinstance(a_or_theme, str) and a_or_theme.get("kind") == "hdri":
+        return "Природа"  # ночные небеса - поля и горы; модели этой темы (фонари) остаются в Городе
     return _BASE_GROUP.get(base_of(theme), "Разное")
 
 
@@ -290,7 +293,14 @@ def section_of(a):
         if kind == "model":
             return a.get("section") or U.home_section(a)
         th = a.get("theme", "")
-        return th[len("Дом - ") :].capitalize() if th.startswith("Дом - ") else base_of(th)
+        if th.startswith("Дом - "):
+            return th[len("Дом - ") :].capitalize()
+        if kind == "tex":  # текстуры «Интерьера» - в те же разделы, что и текстуры Дома
+            words = _words(a)
+            for sec, keys in HOME_TEX:
+                if words & keys:
+                    return sec
+        return base_of(th)
     if kind != "model":
         return base_of(a.get("theme", "")) or OTHER
     rules = SECTIONS.get(g)
@@ -304,11 +314,23 @@ def section_of(a):
             if any(k in tags for k in keys):
                 return sec
         return OTHER
-    for words in (_words(a), _tags(a)):
+    vocab = _VOCAB.get(g)
+    if vocab is None:
+        vocab = _VOCAB[g] = {k for _sec, keys in rules for k in keys}
+    for words in (U.split_compounds(_words(a), vocab), _tags(a)):
         for sec, keys in rules:
             if words & keys:
                 return sec
     return OTHER
+
+
+# текстуры без раздела (тема «Интерьер») -> разделы текстур Дома; первое совпадение выигрывает
+HOME_TEX = (
+    ("Ткани и кожа", W("fabric leather carpet rug linen wool velvet denim cloth")),
+    ("Плитка и камень", W("tiles tile marble granite terrazzo onyx mosaic stone")),
+    ("Полы", W("floor flooring parquet laminate plank planks wood")),
+    ("Стены", W("wall wallpaper plaster stucco concrete brick bricks")),
+)
 
 
 def group_order():

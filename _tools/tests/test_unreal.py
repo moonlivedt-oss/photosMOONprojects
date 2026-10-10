@@ -90,9 +90,12 @@ class TestHomeSections(unittest.TestCase):
             ("Hood modern", "Кухня и посуда"),
             ("Bed double", "Кровати"),
             ("Table lamp", "Свет"),
+            ("Kitchencounter straight a", "Кухня и посуда"),  # слитные имена KayKit
+            ("Pictureframe small a", "Декор"),
         ):
             self.assertEqual(U.home_section({"name": name}), sec, name)
         self.assertEqual(U.home_section({"name": "Ocean Buoy"}), U.HOME_OTHER)
+        self.assertEqual(U.home_section({"name": "Carton"}), U.HOME_OTHER)  # короткие слова не режутся (car)
         for sec, _keys in U.HOME_SECTIONS:
             self.assertIn(sec, U.HOME_ORDER)
 
