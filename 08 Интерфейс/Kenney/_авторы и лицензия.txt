@@ -1,0 +1,3 @@
+Kenney - https://kenney.nl (поддержать: https://kenney.nl/donate)
+Лицензия: CC0 1.0 - можно использовать где угодно, в том числе в коммерческих проектах, без указания автора.
+Взято из https://github.com/shorepine/kenney (зеркало библиотеки Kenney), крупные версии (Double / 2x).
