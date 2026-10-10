@@ -51,6 +51,7 @@ Item {
     property color tint: "white"          // оттенок примеряемой текстуры
     property real uvRotation: 0           // поворот рисунка, градусы
     property real roughAmount: 1.0        // шероховатость: 1 - как в карте, меньше - глянцевее
+    property bool smooth: true            // камера перелетает к новому кадру, модель проявляется (настройки: анимации)
     property var origMats: []             // [{model, mats}] - вернуть родные материалы
     property real humanHeight: 0          // силуэт человека 180 см в масштабе модели (единицы сцены), 0 - нет
     property bool showHuman: false
@@ -206,21 +207,46 @@ Item {
         width3d = Math.max(dx, dz) * s
         sizeText = [dx, dy, dz].map(function (v) { return v < 10 ? v.toFixed(2) : Math.round(v) }).join(" x ")
         resetView()
+        if (smooth) appear.restart()  // загруженная модель проявляется и чуть «встаёт» на подиум
     }
 
     function resetView() {
         var h = mode === "tex" ? (shape === "plane" ? 0 : 180) : mode === "hdri" ? 0 : height3d
         var human = mode === "model" && showHuman && humanHeight > 0
         if (human) h = Math.max(h, humanHeight)
-        orbit.position = Qt.vector3d(human ? -humanHeight * 0.2 : 0, h / 2, 0)
-        orbit.eulerRotation = mode === "hdri" ? Qt.vector3d(0, 0, 0)
-                            : mode === "tex" && shape === "plane" ? Qt.vector3d(-55, 20, 0) : Qt.vector3d(-16, 32, 0)
+        var pos = Qt.vector3d(human ? -humanHeight * 0.2 : 0, h / 2, 0)
+        var rot = mode === "hdri" ? Qt.vector3d(0, 0, 0)
+                : mode === "tex" && shape === "plane" ? Qt.vector3d(-55, 20, 0) : Qt.vector3d(-16, 32, 0)
         // узкое высокое окно (панель вкладки) - камера дальше, иначе предмет обрезан по бокам
         var aspect = view.width > 0 ? view.height / view.width : 1
         var far = human ? Math.max(1, h / 200, (width3d / 2 + humanHeight * 0.6) / 140) : 1
-        cam.position = Qt.vector3d(0, 0, mode === "hdri" ? 0.01 : 420 * camScale * far * Math.max(1, aspect * 1.05))
+        var camPos = Qt.vector3d(0, 0, mode === "hdri" ? 0.01 : 420 * camScale * far * Math.max(1, aspect * 1.05))
         cam.fieldOfView = mode === "hdri" ? 75 : 40
         if (mode === "hdri") { cam.clipNear = 0.01; cam.clipFar = 1000 }
+        fly.stop()
+        if (!smooth || mode === "hdri" || plain) {
+            orbit.position = pos; orbit.eulerRotation = rot; cam.position = camPos
+            return
+        }
+        // перелёт: по кругу - коротким путём (после вращения мышью угол бывает 400 и больше)
+        var cur = orbit.eulerRotation
+        var dy = (((rot.y - cur.y) % 360) + 540) % 360 - 180
+        flyPos.from = orbit.position; flyPos.to = pos
+        flyRot.from = cur; flyRot.to = Qt.vector3d(rot.x, cur.y + dy, rot.z)
+        flyCam.from = cam.position; flyCam.to = camPos
+        fly.start()
+    }
+
+    ParallelAnimation {
+        id: fly
+        Vector3dAnimation { id: flyPos; target: orbit; property: "position"; duration: 560; easing.type: Easing.OutCubic }
+        Vector3dAnimation { id: flyRot; target: orbit; property: "eulerRotation"; duration: 560; easing.type: Easing.OutCubic }
+        Vector3dAnimation { id: flyCam; target: cam; property: "position"; duration: 560; easing.type: Easing.OutCubic }
+    }
+    ParallelAnimation {
+        id: appear
+        NumberAnimation { target: turn; property: "opacity"; from: 0; to: 1; duration: 420; easing.type: Easing.OutCubic }
+        Vector3dAnimation { target: turn; property: "scale"; from: Qt.vector3d(0.9, 0.9, 0.9); to: Qt.vector3d(1, 1, 1); duration: 520; easing.type: Easing.OutBack }
     }
 
     onModelSourceChanged: { fitted = false; brightened = false; origMats = [] }

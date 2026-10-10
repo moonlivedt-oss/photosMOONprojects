@@ -1,6 +1,7 @@
 """Картинки -> Qt: подложки, плитки, кэш миниатюр (память + диск), значки из библиотеки."""
 
 import hashlib
+import math
 import os
 import time
 from collections import OrderedDict
@@ -480,14 +481,29 @@ class TileDelegate(QStyledItemDelegate):
                     p.drawPixmap(c.adjusted(6, 6, -6, -6), ic, QRectF(ic.rect()))
             p.setOpacity(1)
 
-        if index.data(STAR):  # в избранном - звезда на тёмном кружке
-            c = QRectF(box.x() + 5, box.y() + 5, 24, 24)
+        pop = self.view.pop_amount(index.data(ROLE)) if hasattr(self.view, "pop_amount") else None
+        if index.data(STAR) or (pop and not pop[1]):  # в избранном - звезда на тёмном кружке
+            z = 1.0
+            c0 = QRectF(box.x() + 5, box.y() + 5, 24, 24)
+            if pop:
+                k, on = pop
+                if on:  # выпрыгивает: больше, потом на место; от неё расходится кольцо цвета звезды
+                    z = 1 + 0.55 * math.sin(math.pi * min(1.0, k * 1.4)) * (1 - k)
+                    ring = QColor("#ffd166")
+                    ring.setAlphaF(max(0.0, 0.8 * (1 - k)))
+                    rr = 12 + 22 * k
+                    p.setPen(QPen(ring, 2.5 * (1 - k) + 0.5))
+                    p.setBrush(Qt.BrushStyle.NoBrush)
+                    p.drawEllipse(c0.center(), rr, rr)
+                else:  # убрали из избранного - сжимается в точку
+                    z = max(0.0, 1 - k)
+            c = QRectF(c0.center().x() - 12 * z, c0.center().y() - 12 * z, 24 * z, 24 * z)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(13, 13, 19, 200))
             p.drawEllipse(c)
             star = lib_pix("star", 44)
-            if not star.isNull():
-                p.drawPixmap(c.adjusted(4, 4, -4, -4), star, QRectF(star.rect()))
+            if not star.isNull() and z > 0.05:
+                p.drawPixmap(c.adjusted(4 * z, 4 * z, -4 * z, -4 * z), star, QRectF(star.rect()))
 
         ext = index.data(EXT)
         if ext:  # формат - всегда, бледно; при наведении ярче и с весом

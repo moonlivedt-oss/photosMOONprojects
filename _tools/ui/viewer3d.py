@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
 )
 
 from library import unreal as U
+from ui.animations import MOTION
 from ui.common import HERE, log_error
 from ui.theme import C
 from ui.thumbnails import lib_icon, thumb
@@ -356,6 +357,7 @@ class MiniView(QQuickWidget):
         self.root.setProperty("back", C["bg1"])
         self.root.setProperty("floor", True)
         self.root.setProperty("spin", True)
+        self.root.setProperty("smooth", MOTION["on"])
 
     def show_asset(self, a, probe):
         if self.root is None:
@@ -396,6 +398,7 @@ class Viewer3D(QDialog):
         else:
             self.root.setProperty("back", C["bg0"])
             self.root.setProperty("accent", C["acc"])
+            self.root.setProperty("smooth", MOTION["on"])
             self.size_prop = QQmlProperty(self.root, "sizeText")
             self.size_prop.connectNotifySignal(self.update_info)
 

@@ -1,6 +1,8 @@
 """Левая панель вкладки «Unreal»: сверху карточки видов (у каждого свой цвет), ниже - темы только
 выбранного вида; темы «Дом - ...» собраны в одну раскрывающуюся группу «Дом»."""
 
+import math
+
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
@@ -19,7 +21,7 @@ from library import unreal as U
 from library import unreal_groups as G
 from ui.common import ROLE, human
 from ui.theme import C, font, readable
-from ui.thumbnails import lib_icon, lib_pix
+from ui.thumbnails import lib_icon, lib_pix, mix
 from ui.widgets import filter_tree, make_tree, panel_head, set_shares, tree_item
 
 ALL, FAV = "::all", "::fav"
@@ -197,6 +199,27 @@ class KindCard(QAbstractButton):
         self.f2 = font("num", 8.5)  # «5890 шт., 18.7 ГБ» - ровные цифры Bahnschrift
         self.hint = hint if hint is not None else KIND_HINT[kind]
         self.compact = False
+        # анимации: наведение (hv), выбор (ck), прыжок значка при выборе (bump), бегущие числа (shown)
+        self.hv = self.ck = self.bump = 0.0
+        self.shown, self.num_anim, self.hv_anim, self.ck_anim = "", None, None, None
+        self.toggled.connect(self._checked)
+
+    def _to(self, attr, end, ms):
+        from ui.animations import anim, stop
+
+        stop(getattr(self, attr + "_anim"))
+        setattr(
+            self,
+            attr + "_anim",
+            anim(self, ms, lambda v: (setattr(self, attr, v), self.update()), getattr(self, attr), end),
+        )
+
+    def _checked(self, on):
+        self._to("ck", 1.0 if on else 0.0, 320)
+        if on:  # значок коротко подпрыгивает
+            from ui.animations import anim
+
+            anim(self, 520, lambda v: (setattr(self, "bump", v), self.update()), 0.0, 1.0)
 
     def sizeHint(self):
         return QSize(34, 38) if self.compact else QSize(200, 50)
@@ -214,19 +237,27 @@ class KindCard(QAbstractButton):
         self.setToolTip(f"{self.title}: {self.sub}\n{self.hint}" if self.compact and self.sub else self.hint)
 
     def set_sub(self, text):
-        self.sub = text
+        """Новая подпись: числа в ней бегут от прежних к новым («122 шт.» -> «134 шт.»)."""
+        from ui.animations import anim, stop, tween_text
+
+        old, self.sub = self.shown or self.sub, text
         self._tip()
-        self.update()
+        stop(self.num_anim)
+        if not old or old == text or not self.isVisible():
+            self.shown = text
+            self.update()
+            return
+        self.num_anim = anim(self, 650, lambda k: (setattr(self, "shown", tween_text(old, text, k)), self.update()))
 
     def set_stats(self, n, size):
         self.set_sub(f"{n} шт., {human(size)}" if n else "пусто")
 
     def enterEvent(self, e):
-        self.update()
+        self._to("hv", 1.0, 180)
         super().enterEvent(e)
 
     def leaveEvent(self, e):
-        self.update()
+        self._to("hv", 0.0, 260)
         super().leaveEvent(e)
 
     def paintEvent(self, _e):
@@ -234,19 +265,12 @@ class KindCard(QAbstractButton):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = QRectF(self.rect()).adjusted(1, 2, -1, -2)
         col = QColor(readable(self.color))  # в светлой теме пастель темнее
-        if self.isChecked():  # заливка непрозрачная: живой фон окна не просвечивает и не глушит текст
-            base = QColor(C["bg2"])
-            t = 0.22
-            fill = QColor(
-                round(base.red() + (col.red() - base.red()) * t),
-                round(base.green() + (col.green() - base.green()) * t),
-                round(base.blue() + (col.blue() - base.blue()) * t),
-            )
-            p.setPen(QPen(col, 1.4))
-            p.setBrush(fill)
-        else:
-            p.setPen(QPen(QColor(C["line"]), 1))
-            p.setBrush(QColor(C["bg3"] if self.underMouse() else C["bg2"]))
+        if self.isChecked() and self.ck_anim is None:  # выбрана до первого показа - без анимации
+            self.ck = 1.0
+        # заливка непрозрачная (живой фон не просвечивает): наведение светлее, выбор - в цвет вида
+        fill = mix(mix(QColor(C["bg2"]), QColor(C["bg3"]), self.hv), col, 0.22 * self.ck)
+        p.setPen(QPen(mix(mix(QColor(C["line"]), col, 0.35 * self.hv), col, self.ck), 1 + 0.4 * self.ck))
+        p.setBrush(fill)
         p.drawRoundedRect(r, 10, 10)
         if self.compact:
             p.setPen(Qt.PenStyle.NoPen)  # черта цвета вида снизу, значок по центру
@@ -257,12 +281,14 @@ class KindCard(QAbstractButton):
                 p.drawPixmap(QRectF(r.center().x() - 10, r.center().y() - 13, 20, 20), pm, QRectF(pm.rect()))
             p.end()
             return
-        p.setPen(Qt.PenStyle.NoPen)  # полоска цвета вида слева
+        p.setPen(Qt.PenStyle.NoPen)  # полоска цвета вида слева: у выбранной - во всю высоту
         p.setBrush(col)
-        p.drawRoundedRect(QRectF(r.x() + 5, r.y() + 9, 4, r.height() - 18), 2, 2)
+        sh = (r.height() - 18) * (0.55 + 0.45 * self.ck)
+        p.drawRoundedRect(QRectF(r.x() + 5, r.center().y() - sh / 2, 4, sh), 2, 2)
         pm = lib_pix(self.icon_name, 44)
         if not pm.isNull():
-            p.drawPixmap(QRectF(r.x() + 17, r.center().y() - 11, 22, 22), pm, QRectF(pm.rect()))
+            z = 22 * (1 + 0.16 * math.sin(math.pi * self.bump) * (1 - self.bump * 0.4))
+            p.drawPixmap(QRectF(r.x() + 28 - z / 2, r.center().y() - z / 2, z, z), pm, QRectF(pm.rect()))
         x = int(r.x()) + 48
         w = int(r.right()) - x - 8
         p.setFont(self.f1)
@@ -283,7 +309,7 @@ class KindCard(QAbstractButton):
             w,
             18,
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            p.fontMetrics().elidedText(self.sub, Qt.TextElideMode.ElideRight, w),
+            p.fontMetrics().elidedText(self.shown or self.sub, Qt.TextElideMode.ElideRight, w),
         )
         p.end()
 
@@ -362,9 +388,27 @@ class StyleSegments(QWidget):
     def mousePressEvent(self, e):
         i = self.at(e.position().toPoint())
         if i is not None and self.keys[i] != self.cur:
+            from ui.animations import anim, stop
+
+            self.slide_from = self.pill_rect()  # выделение переезжает с прежнего сегмента на новый
             self.cur = self.keys[i]
-            self.update()
+            stop(getattr(self, "slide", None))
+            self.slide_k = 0.0
+            self.slide = anim(self, 300, lambda v: (setattr(self, "slide_k", v), self.update()))
             self.changed.emit()
+
+    def pill_rect(self):
+        """Где сейчас рисуется выделение: на полпути между прежним и новым сегментом, пока едет."""
+        to = self.cell(self.keys.index(self.cur))
+        a, k = getattr(self, "slide_from", None), getattr(self, "slide_k", 1.0)
+        if a is None or k >= 1:
+            return to
+        return QRectF(
+            a.x() + (to.x() - a.x()) * k,
+            a.y() + (to.y() - a.y()) * k,
+            a.width() + (to.width() - a.width()) * k,
+            a.height() + (to.height() - a.height()) * k,
+        )
 
     def paintEvent(self, _e):
         p = QPainter(self)
@@ -372,6 +416,12 @@ class StyleSegments(QWidget):
         p.setPen(QPen(QColor(C["line"]), 1))
         p.setBrush(QColor(C["bg1"]))
         p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12)
+        cur_col = QColor(readable(C["acc"] if self.cur == "all" else STYLE_LOOK.get(self.cur, ("", C["dim"]))[1]))
+        fill = QColor(cur_col)
+        fill.setAlpha(60)
+        p.setPen(QPen(cur_col, 1.2))
+        p.setBrush(fill)
+        p.drawRoundedRect(self.pill_rect().adjusted(0.5, 0.5, -0.5, -0.5), 9, 9)
         for i, k in enumerate(self.keys):
             r = self.cell(i)
             text, color = STYLE_LOOK.get(k, (k, C["dim"]))
@@ -379,13 +429,7 @@ class StyleSegments(QWidget):
                 color = C["acc"]
             col = QColor(readable(color))
             empty = self.counts.get(k, 1) == 0 and k != self.cur
-            if k == self.cur:
-                fill = QColor(col)
-                fill.setAlpha(60)
-                p.setPen(QPen(col, 1.2))
-                p.setBrush(fill)
-                p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 9, 9)
-            elif i == self.hover:
+            if i == self.hover and k != self.cur:
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(QColor(C["bg3"]))
                 p.drawRoundedRect(r, 9, 9)

@@ -89,6 +89,9 @@ class Window(QMainWindow):
         self.setAcceptDrops(True)
         os.makedirs(INBOX, exist_ok=True)
 
+        from ui import animations
+
+        animations.MOTION["on"] = self.cfg.get("motion", True)  # до первых анимаций
         self.aurora = Aurora(self)
         self.aurora.set_live(self.cfg.get("live_bg", True))
         self.tabs = QTabWidget()
@@ -613,13 +616,22 @@ class Window(QMainWindow):
         p.show()
         p.q.setFocus()
 
-    def settings(self):
+    def settings(self, page="look"):
         from ui.settings_dialog import SettingsDialog
 
-        SettingsDialog(self).exec()
+        SettingsDialog(self, page).exec()
 
     def theme_dialog(self):  # тема и акцент - в «Настройках»
-        self.settings()
+        self.settings("look")
+
+    def apply_motion(self):
+        """«Плавные анимации» из настроек: общий выключатель и камера окна 3D."""
+        from ui import animations
+
+        animations.MOTION["on"] = self.cfg.get("motion", True)
+        for v in (getattr(self.unreal, "mini", None), getattr(self.unreal, "viewer", None)):
+            if v is not None and getattr(v, "root", None) is not None:
+                v.root.setProperty("smooth", animations.MOTION["on"])
 
     def update_ai_status(self):
         """Точка на кнопке «ИИ-помощники»: только что / недавно / тихо / только чтение; подсказка - последнее."""

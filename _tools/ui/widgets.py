@@ -726,6 +726,28 @@ class LibList(QListWidget):
     def reset_anim(self):
         self.hover_row, self.hover, self.born = -1, {}, {}
 
+    POP = 0.6  # секунд: звезда избранного выпрыгивает (или сдувается)
+
+    def pop_star(self, paths, on):
+        """Звезда на плитках этих картинок: on - выпрыгивает с кольцом, иначе - сжимается и исчезает."""
+        from ui.animations import MOTION
+
+        if not MOTION["on"]:
+            return
+        now = time.monotonic()
+        self.pops = getattr(self, "pops", {})
+        for p in paths:
+            self.pops[p] = (now, on)
+        self.anim.start()
+
+    def pop_amount(self, path):
+        """(0..1, on) - как далеко зашла анимация звезды, или None."""
+        got = getattr(self, "pops", {}).get(path)
+        if not got:
+            return None
+        k = (time.monotonic() - got[0]) / self.POP
+        return (min(1.0, k), got[1]) if k < 1 else None
+
     def loaded(self, row):
         self.born[row] = time.monotonic()
         self.anim.start()
@@ -757,6 +779,12 @@ class LibList(QListWidget):
         for row, t in list(self.born.items()):
             if now - t >= self.FADE:
                 del self.born[row]
+            else:
+                busy = True
+        pops = getattr(self, "pops", {})
+        for p, (t, _on) in list(pops.items()):
+            if now - t >= self.POP:
+                del pops[p]
             else:
                 busy = True
         busy = busy or self.shimmer

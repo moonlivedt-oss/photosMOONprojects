@@ -3,6 +3,7 @@
 Всё рисуется само и само останавливается, когда двигать нечего."""
 
 import math
+import re
 import time
 
 from PyQt6.QtCore import (
@@ -47,12 +48,17 @@ from ui.theme import C
 from ui.thumbnails import lib_pix
 
 OUT = QEasingCurve.Type.OutCubic
+MOTION = {"on": True}  # «Плавные анимации» в настройках: выключены - всё встаёт на место сразу
+
+
+def ms_of(ms):
+    return ms if MOTION["on"] else 1
 
 
 def anim(owner, ms, cb, start=0.0, end=1.0, curve=OUT, done=None):
     """Значение от start до end за ms, cb(v) на каждом кадре. Живёт, пока жив owner."""
     a = QVariantAnimation(owner)
-    a.setDuration(ms)
+    a.setDuration(ms_of(ms))
     a.setStartValue(float(start))
     a.setEndValue(float(end))
     a.setEasingCurve(curve)
@@ -61,6 +67,26 @@ def anim(owner, ms, cb, start=0.0, end=1.0, curve=OUT, done=None):
         a.finished.connect(done)
     a.start(QVariantAnimation.DeletionPolicy.DeleteWhenStopped)
     return a
+
+
+_NUM = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def tween_text(old, new, k):
+    """Числа в тексте - на полпути от old к new («5583 шт., 15.4 ГБ» -> «5600 шт., 15.6 ГБ»), если тексты
+    одинаковы по форме; иначе сразу new. k - 0..1."""
+    a, b = _NUM.findall(old or ""), _NUM.findall(new or "")
+    if k >= 1 or not a or len(a) != len(b) or _NUM.sub("#", old) != _NUM.sub("#", new):
+        return new
+    out = []
+    for x, y in zip(a, b):
+        dec = len(y.replace(",", ".").partition(".")[2])
+        fx, fy = float(x.replace(",", ".")), float(y.replace(",", "."))
+        v = fx + (fy - fx) * k
+        txt = f"{v:.{dec}f}" if dec else str(round(v))
+        out.append(txt.replace(".", ",") if "," in y else txt)
+    vals = iter(out)
+    return _NUM.sub(lambda _m: next(vals), new)
 
 
 def stop(a):

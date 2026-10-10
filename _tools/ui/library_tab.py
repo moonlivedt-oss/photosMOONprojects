@@ -1697,7 +1697,8 @@ class LibTab(QWidget):
             self.toggle_fav()
 
     def toggle_fav(self):
-        sel = [os.path.relpath(p, LIB) for p in self.paths()]
+        paths = self.paths()
+        sel = [os.path.relpath(p, LIB) for p in paths]
         if not sel:
             return
         fav = db.favs()
@@ -1706,6 +1707,7 @@ class LibTab(QWidget):
         text = ("В избранном: +%d" if add else "Убрано из избранного: %d") % len(sel)
         self.win.push(text, [["fav", r, r in fav, add] for r in sel])
         self.show_files()
+        self.list.pop_star(paths, add)
         self.win.say(text)
 
     def look(self):
