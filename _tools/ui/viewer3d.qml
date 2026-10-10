@@ -43,7 +43,14 @@ Item {
     property real camScale: 1.0            // дальше камера во столько раз (рендер превью: модель целиком)
     property real modelYaw: 0              // модель стоит спиной - развернуть (градусы, из _unreal_yaw.json)
     property bool linearColors: false     // цвета материалов в файле линейные (Quaternius) - на экран через гамму
-    property bool tryOn: false            // примерка: материал текстуры (texMat) на все части модели
+    property bool tryOn: false            // примерка: материал текстуры (texMat) на детали модели
+    property var parts: []                // детали = разные материалы модели: [{name, count}] - для списка в окне
+    property var partMats: []             // сами материалы деталей (тот же порядок)
+    property var tryMask: []              // номера деталей, на которые надеть; пусто - на все
+    property int flashPart: -1            // подсветить деталь (наведение на строку списка)
+    property color tint: "white"          // оттенок примеряемой текстуры
+    property real uvRotation: 0           // поворот рисунка, градусы
+    property real roughAmount: 1.0        // шероховатость: 1 - как в карте, меньше - глянцевее
     property var origMats: []             // [{model, mats}] - вернуть родные материалы
     property real humanHeight: 0          // силуэт человека 180 см в масштабе модели (единицы сцены), 0 - нет
     property bool showHuman: false
@@ -127,16 +134,40 @@ Item {
         return out
     }
 
+    // детали - уникальные материалы модели (у дивана: ткань, дерево ножек, металл)
+    function collectParts() {
+        restoreMats()
+        var ms = models(loader, []), mats = [], info = []
+        for (var i = 0; i < ms.length; i++) {
+            for (var j = 0; j < ms[i].materials.length; j++) {
+                var m = ms[i].materials[j], k = mats.indexOf(m)
+                if (k < 0) {
+                    mats.push(m)
+                    // имя: материала, иначе меша (у FBX Poly Haven материалы часто без имени)
+                    info.push({name: m.objectName || ms[i].objectName || ("Деталь " + mats.length), count: 1})
+                } else info[k].count += 1
+            }
+        }
+        partMats = mats
+        parts = info
+    }
+
     function applyTryOn() {
         restoreMats()
-        if (!tryOn || mode !== "model" || loader.status !== RuntimeLoader.Success) return
+        var on = tryOn || flashPart >= 0
+        if (!on || mode !== "model" || loader.status !== RuntimeLoader.Success) return
         var saved = []
         var ms = models(loader, [])
         for (var i = 0; i < ms.length; i++) {
-            var keep = []
-            for (var j = 0; j < ms[i].materials.length; j++) keep.push(ms[i].materials[j])
+            var keep = [], now = []
+            for (var j = 0; j < ms[i].materials.length; j++) {
+                var orig = ms[i].materials[j], k = partMats.indexOf(orig)
+                keep.push(orig)
+                var wear = tryOn && (tryMask.length === 0 || tryMask.indexOf(k) >= 0)
+                now.push(k >= 0 && k === flashPart ? flashMat : (wear ? texMat : orig))
+            }
             saved.push({model: ms[i], mats: keep})
-            ms[i].materials = [texMat]
+            ms[i].materials = now
         }
         origMats = saved
     }
@@ -147,12 +178,15 @@ Item {
     }
 
     onTryOnChanged: applyTryOn()
+    onTryMaskChanged: applyTryOn()
+    onFlashPartChanged: applyTryOn()
 
     function fit() {
         if (fitted || mode !== "model" || loader.status !== RuntimeLoader.Success) return
         fitted = true
         if (linearColors && !brightened) { brighten(loader); brightened = true }  // подгонка бывает повторной
         matte(loader)
+        collectParts()
         if (tryOn) applyTryOn()
         turn.eulerRotation = Qt.vector3d(0, modelYaw, 0)
         loader.scale = Qt.vector3d(1, 1, 1)
@@ -389,10 +423,10 @@ Item {
                 materials: PrincipledMaterial {
                     id: texMat
                     lighting: PrincipledMaterial.FragmentLighting
-                    baseColor: root.baseMap != "" ? "white" : "#999999"
+                    baseColor: root.baseMap != "" ? root.tint : "#999999"
                     baseColorMap: root.baseMap != "" ? tBase : null
                     normalMap: root.normalMap != "" ? tNorm : null
-                    roughness: 1.0
+                    roughness: root.roughAmount
                     roughnessMap: root.roughMap != "" ? tRough : null
                     roughnessChannel: root.chan(root.roughChannel)
                     metalness: root.metalMap != "" ? 1.0 : 0.0
@@ -405,14 +439,21 @@ Item {
                     heightAmount: root.heightAmount
                     cullMode: root.shape === "plane" ? Material.NoCulling : Material.BackFaceCulling
                 }
+                PrincipledMaterial {  // подсветка детали при наведении на её строку в окне
+                    id: flashMat
+                    lighting: PrincipledMaterial.FragmentLighting
+                    baseColor: root.accent
+                    emissiveFactor: Qt.vector3d(0.35, 0.3, 0.45)
+                    roughness: 0.6
+                }
             }
         }
-        Texture { id: tBase; source: root.baseMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tNorm; source: root.normalMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tRough; source: root.roughMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tMetal; source: root.metalMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tAo; source: root.aoMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
-        Texture { id: tHeight; source: root.heightMap; scaleU: root.tiling; scaleV: root.tiling }
+        Texture { id: tBase; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.baseMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tNorm; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.normalMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tRough; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.roughMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tMetal; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.metalMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tAo; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.aoMap; scaleU: root.tiling; scaleV: root.tiling; generateMipmaps: true; mipFilter: Texture.Linear }
+        Texture { id: tHeight; rotationUV: root.uvRotation; pivotU: 0.5; pivotV: 0.5; source: root.heightMap; scaleU: root.tiling; scaleV: root.tiling }
     }
 
     // каркас поверх - средствами отладчика сцены

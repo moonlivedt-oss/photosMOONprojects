@@ -9,7 +9,7 @@ from html import escape as esc  # сведения - rich text: имена и м
 
 from PIL import Image
 from PyQt6.QtCore import QObject, QSize, Qt, QTimer, QUrl
-from PyQt6.QtGui import QDesktopServices, QIcon, QQuaternion
+from PyQt6.QtGui import QColor, QDesktopServices, QIcon, QPixmap, QQuaternion
 from PyQt6.QtQml import QQmlProperty
 from PyQt6.QtQuickWidgets import QQuickWidget
 from PyQt6.QtWidgets import (
@@ -17,11 +17,13 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -575,16 +577,19 @@ class Viewer3D(QDialog):
             self.maps,
         )
         block("hdri", section("ПАНОРАМА"), self.balls, self.unwrap)
-        self.tryon = QComboBox()
-        self.tryon.setToolTip("Надеть скачанную текстуру на всю модель: ткань на диван, дерево на стол")
-        self.tryon.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self.tryon.setMinimumContentsLength(14)
-        self.tryon.currentIndexChanged.connect(self.apply_tryon)
-        self.try_tile = QSpinBox(minimum=1, maximum=16, value=2, prefix="Повтор x")
-        self.try_tile.setToolTip("Сколько раз рисунок повторяется на модели")
-        self.try_tile.valueChanged.connect(lambda v: self.set("tiling", float(v)) if self.tryon.currentData() else None)
-        self.try_tile.setEnabled(False)  # у родных материалов повтора нет
-        block("try", section("ПРИМЕРИТЬ ТЕКСТУРУ"), self.tryon, self.try_tile)
+        self.build_tryon()
+        block(
+            "try",
+            section("ПРИМЕРИТЬ ТЕКСТУРУ"),
+            self.try_find,
+            self.try_chips,
+            self.tryon,
+            self.parts_lbl,
+            self.parts,
+            (self.try_tile, self.try_rot),
+            (self.try_tint, self.try_cmp),
+            ("Блеск", self.try_gloss),
+        )
         self.anim = QComboBox()
         self.anim.setToolTip("Анимации из файла модели: по умолчанию модель стоит спокойно")
         self.anim.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
@@ -667,6 +672,9 @@ class Viewer3D(QDialog):
     def eventFilter(self, obj, e):
         if obj is self.quick and e.type() == e.Type.Resize:
             self.place_hud()
+        parts = getattr(self, "parts", None)  # фильтр ставится раньше, чем создан список деталей
+        if parts is not None and obj is parts.viewport() and e.type() == e.Type.Leave:  # мышь ушла со списка
+            self.set("flashPart", -1)
         return super().eventFilter(obj, e)
 
     def place_hud(self):
@@ -733,18 +741,91 @@ class Viewer3D(QDialog):
             self.set("probe", url(path))
 
     # ------------------------------------------------------------ примерка текстуры на модель
+    # ------------------------------------------------------------ примерка текстуры
+    TRY_KINDS = (
+        ("fit", "Подходит", ""),
+        ("all", "Все", ""),
+        (
+            "fabric",
+            "Ткани",
+            "fabric leather carpet linen wool velvet cloth jacquard denim cotton knit fleece corduroy rug",
+        ),
+        ("wood", "Дерево", "wood wooden plank planks parquet oak bark laminate timber"),
+        ("stone", "Камень", "stone rock marble tile tiles brick bricks concrete granite cobblestone plaster terrazzo"),
+        ("metal", "Металл", "metal rust rusty iron steel corrugated aluminium copper brass"),
+    )
+
+    def build_tryon(self):
+        """Примерка: поиск, фильтр по материалу, сетка превью, детали модели, повтор, поворот, оттенок, блеск."""
+        from ui.widgets import Flow
+
+        self.try_find = QLineEdit(placeholderText="Найти текстуру: дуб, бархат, мрамор...")
+        self.try_find.setClearButtonEnabled(True)
+        self.try_find.textChanged.connect(self.filter_tryon)
+        self.try_chips = QWidget()
+        flow = Flow(self.try_chips, 4)
+        self.try_kind = QButtonGroup(self)
+        self.try_kind.setExclusive(True)
+        for kind, text, _w in self.TRY_KINDS:
+            b = QPushButton(text, objectName="chip", checkable=True)
+            b.setProperty("key", kind)
+            self.try_kind.addButton(b)
+            flow.addWidget(b)
+        self.try_kind.buttons()[1].setChecked(True)
+        self.try_kind.buttonClicked.connect(lambda _b: self.filter_tryon())
+        self.tryon = QListWidget()
+        self.tryon.setViewMode(QListWidget.ViewMode.IconMode)
+        self.tryon.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.tryon.setMovement(QListWidget.Movement.Static)
+        self.tryon.setIconSize(QSize(52, 52))
+        self.tryon.setGridSize(QSize(80, 96))
+        self.tryon.setWordWrap(True)
+        self.tryon.setUniformItemSizes(True)
+        self.tryon.setFixedHeight(214)
+        self.tryon.setToolTip("Щелчок - надеть на модель; сначала - подходящие ей по смыслу")
+        self.tryon.currentItemChanged.connect(lambda *_: self.apply_tryon())
+        self.parts_lbl = QLabel("Детали: на что надеть", objectName="dim")
+        self.parts = QListWidget()
+        self.parts.setMaximumHeight(124)
+        self.parts.setMouseTracking(True)
+        self.parts.setToolTip("Снимите галочку - деталь останется в родном материале; наведение - подсветка детали")
+        self.parts.itemChanged.connect(lambda _it: self.apply_mask())
+        self.parts.itemEntered.connect(lambda it: self.set("flashPart", self.parts.row(it)))
+        self.parts.viewport().installEventFilter(self)
+        self.try_tile = QDoubleSpinBox(minimum=0.25, maximum=16, value=2, singleStep=0.25, prefix="Повтор x")
+        self.try_tile.setDecimals(2)
+        self.try_tile.setToolTip("Сколько раз рисунок повторяется на детали")
+        self.try_tile.valueChanged.connect(lambda v: (self.set("tiling", float(v)), self.save_tryon()))
+        self.try_rot = QSpinBox(minimum=0, maximum=345, singleStep=15, suffix="°", wrapping=True)
+        self.try_rot.setToolTip("Повернуть рисунок: доски вдоль, а не поперёк")
+        self.try_rot.valueChanged.connect(lambda v: (self.set("uvRotation", float(v)), self.save_tryon()))
+        self.try_tint = QPushButton(lib_icon("color-palette"), "Оттенок")
+        self.try_tint.setToolTip("Подкрасить текстуру; правый щелчок - без оттенка")
+        self.try_tint.clicked.connect(self.pick_tint)
+        self.try_tint.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.try_tint.customContextMenuRequested.connect(lambda _p: self.set_tint("#ffffff"))
+        self.try_cmp = QPushButton(lib_icon("eye"), "Было")
+        self.try_cmp.setToolTip("Держите - родные материалы, отпустите - примерка")
+        self.try_cmp.pressed.connect(lambda: self.set("tryOn", False))
+        self.try_cmp.released.connect(lambda: self.set("tryOn", self.tryon_data() is not None))
+        self.try_gloss = QSlider(Qt.Orientation.Horizontal, minimum=0, maximum=90, value=0)
+        self.try_gloss.setToolTip("Глянец: 0 - как в карте шероховатости, дальше - глаже и с бликами")
+        self.try_gloss.valueChanged.connect(lambda v: (self.set("roughAmount", 1 - v / 100), self.save_tryon()))
+        self.tint = "#ffffff"
+        self.try_restoring = False
+
+    def tryon_data(self):
+        it = self.tryon.currentItem()
+        return it.data(Qt.ItemDataRole.UserRole) if it else None
+
     def fill_tryon(self):
-        """Список для примерки: сначала подходящие этой модели (ткань для дивана, дерево для стола - по смыслу),
-        потом все текстуры. Пересобирается для каждой модели."""
+        """Сетка для примерки: родные, шахматка, подходящие этой модели по смыслу, потом все текстуры."""
         model = self.asset or {}
         if self.tryon.count() and self.tryon.property("for") == model.get("dir"):
             return
         self.tryon.setProperty("for", model.get("dir"))
         self.tryon.blockSignals(True)
         self.tryon.clear()
-        self.tryon.addItem(lib_icon("dice_3D"), "Родные материалы", None)
-        self.tryon.addItem(lib_icon("menuGrid"), "Шахматка - проверить развёртку UV", "checker")
-        self.tryon.insertSeparator(self.tryon.count())
         order = ("Дом - ткани и кожа", "Дом - полы", "Дом - стены", "Дом - плитка и камень")
         tex = [a for a in self.tab.items if a.get("kind") == "tex"]
         tex.sort(key=lambda a: (order.index(a["theme"]) if a.get("theme") in order else 9, a.get("name", "")))
@@ -757,29 +838,52 @@ class Viewer3D(QDialog):
                 fit = unreal_sem.materials_for(sem, model.get("section") or U.home_section(model), tex)
             except Exception as e:
                 log_error("viewer3d tryon: %r" % e)
+        self.try_fit = {a["dir"] for a in fit}
 
-        def add(a, suffix=""):
+        def add(icon, text, data, tip=""):
+            it = QListWidgetItem(icon, text)
+            it.setData(Qt.ItemDataRole.UserRole, data)
+            it.setToolTip(tip or text)
+            it.setSizeHint(QSize(80, 96))
+            self.tryon.addItem(it)
+
+        add(lib_icon("dice_3D"), "Родные", None, "Родные материалы модели")
+        add(lib_icon("menuGrid"), "Шахматка", "checker", "Шахматка - проверить развёртку UV")
+        for a in fit + [x for x in tex if x["dir"] not in self.try_fit]:
             prev = os.path.join(a["dir"], "preview.webp")
-            icon = QIcon(thumb(prev, 48)) if os.path.exists(prev) else QIcon()
-            self.tryon.addItem(icon, a.get("name", "") + suffix, a)
-
-        for a in fit:
-            add(a, "  - подходит")
-        if fit:
-            self.tryon.insertSeparator(self.tryon.count())
-        for a in tex:
-            add(a)
-        self.tryon.setToolTip(
-            "Надеть скачанную текстуру на всю модель. Сначала - подходящие ей по смыслу"
-            + (f" ({model.get('section')})" if model.get("section") else "")
-        )
+            icon = QIcon(thumb(prev, 52)) if os.path.exists(prev) else QIcon()
+            tip = a.get("name", "") + ("  - подходит этой модели" if a["dir"] in self.try_fit else "")
+            add(icon, a.get("name", ""), a, tip)
+        self.tryon.setCurrentRow(0)
         self.tryon.blockSignals(False)
+        self.filter_tryon()
+
+    def filter_tryon(self):
+        """Поиск и фильтр по материалу; «Родные» и «Шахматка» видны всегда."""
+        q = self.try_find.text().strip().lower().replace("ё", "е")
+        b = self.try_kind.checkedButton()
+        key = b.property("key") if b else "all"
+        words = set(dict((k, w) for k, _t, w in self.TRY_KINDS).get(key, "").split())
+        fit = getattr(self, "try_fit", set())
+        for i in range(self.tryon.count()):
+            it = self.tryon.item(i)
+            a = it.data(Qt.ItemDataRole.UserRole)
+            if not isinstance(a, dict):
+                it.setHidden(False)
+                continue
+            hay = " ".join([a.get("name", ""), a.get("theme", ""), *a.get("tags", [])]).lower()
+            ok = (not q or q in hay) and (
+                key == "all" or (key == "fit" and a["dir"] in fit) or bool(words & set(hay.replace(",", " ").split()))
+            )
+            it.setHidden(not ok)
 
     def apply_tryon(self):
-        t = self.tryon.currentData()
-        self.try_tile.setEnabled(bool(t))
-        if not t or not self.asset or self.asset.get("kind") != "model":
+        t = self.tryon_data()
+        for w in (self.try_tile, self.try_rot, self.try_tint, self.try_cmp, self.try_gloss, self.parts):
+            w.setEnabled(t is not None)
+        if t is None or not self.asset or self.asset.get("kind") != "model":
             self.set("tryOn", False)
+            self.save_tryon()
             return
         if t == "checker":
             mats = {k: "" for k in ("normalMap", "roughMap", "metalMap", "aoMap", "heightMap")}
@@ -789,9 +893,108 @@ class Viewer3D(QDialog):
         for k, v in mats.items():
             self.set(k, url(v) if k.endswith("Map") else v)
         self.set("tiling", float(self.try_tile.value()))
+        self.set("uvRotation", float(self.try_rot.value()))
+        self.set("roughAmount", 1 - self.try_gloss.value() / 100)
+        self.set("tint", QColor(self.tint))
         self.set("heightAmount", 0.0)
         self.set("tryOn", False)  # заново - чтобы подхватить новые карты
         self.set("tryOn", True)
+        self.save_tryon()
+
+    # --- детали модели (разные материалы): галочки - на что надеть
+    def fill_parts(self):
+        parts = self.root.property("parts") if self.root is not None else None
+        if hasattr(parts, "toVariant"):
+            parts = parts.toVariant()
+        parts = list(parts or [])
+        self.parts.blockSignals(True)
+        self.parts.clear()
+        for p in parts:
+            name = str(p.get("name", "")) if isinstance(p, dict) else str(p)
+            n = int(p.get("count", 1)) if isinstance(p, dict) else 1
+            it = QListWidgetItem(name + (f"  ({n} шт.)" if n > 1 else ""))
+            it.setData(Qt.ItemDataRole.UserRole, name)
+            it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            it.setCheckState(Qt.CheckState.Checked)
+            self.parts.addItem(it)
+        self.parts.blockSignals(False)
+        many = len(parts) > 1
+        self.parts.setVisible(many)
+        self.parts_lbl.setVisible(many)
+        saved = self.cfg.get("ue_tryon", {}).get((self.asset or {}).get("dir", ""), {})
+        if many and saved.get("off"):
+            self.parts.blockSignals(True)
+            for i in range(self.parts.count()):
+                if self.parts.item(i).data(Qt.ItemDataRole.UserRole) in saved["off"]:
+                    self.parts.item(i).setCheckState(Qt.CheckState.Unchecked)
+            self.parts.blockSignals(False)
+        self.apply_mask()
+
+    def apply_mask(self):
+        on = [i for i in range(self.parts.count()) if self.parts.item(i).checkState() == Qt.CheckState.Checked]
+        all_on = len(on) == self.parts.count()
+        self.set("tryMask", [] if all_on else (on or [-1]))  # ни одной - не надевать никуда
+        self.save_tryon()
+
+    def pick_tint(self):
+        from PyQt6.QtWidgets import QColorDialog
+
+        c = QColorDialog.getColor(QColor(self.tint), self, "Оттенок текстуры")
+        if c.isValid():
+            self.set_tint(c.name())
+
+    def set_tint(self, color):
+        self.tint = color
+        pm = QPixmap(14, 14)
+        pm.fill(QColor(color))
+        self.try_tint.setIcon(QIcon(pm) if color.lower() != "#ffffff" else lib_icon("color-palette"))
+        self.set("tint", QColor(color))
+        self.save_tryon()
+
+    def save_tryon(self):
+        """Примерка запоминается для каждой модели: открыли снова - та же текстура, детали и настройки."""
+        if self.try_restoring or not self.asset or self.asset.get("kind") != "model":
+            return
+        store = self.cfg.setdefault("ue_tryon", {})
+        t = self.tryon_data()
+        if t is None:
+            store.pop(self.asset["dir"], None)
+            return
+        off = [
+            self.parts.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(self.parts.count())
+            if self.parts.item(i).checkState() != Qt.CheckState.Checked
+        ]
+        store[self.asset["dir"]] = {
+            "tex": "checker" if t == "checker" else t["dir"],
+            "off": off,
+            "tiling": self.try_tile.value(),
+            "rot": self.try_rot.value(),
+            "tint": self.tint,
+            "gloss": self.try_gloss.value(),
+        }
+
+    def restore_tryon(self):
+        """Прошлая примерка этой модели (до загрузки - текстура и настройки, детали - после)."""
+        saved = self.cfg.get("ue_tryon", {}).get(self.asset["dir"])
+        self.try_restoring = True
+        try:
+            self.try_tile.setValue(saved.get("tiling", 2) if saved else 2)
+            self.try_rot.setValue(saved.get("rot", 0) if saved else 0)
+            self.try_gloss.setValue(saved.get("gloss", 0) if saved else 0)
+            self.set_tint(saved.get("tint", "#ffffff") if saved else "#ffffff")
+            row = 0
+            if saved:
+                for i in range(self.tryon.count()):
+                    d = self.tryon.item(i).data(Qt.ItemDataRole.UserRole)
+                    if d == saved["tex"] or (isinstance(d, dict) and d["dir"] == saved["tex"]):
+                        row = i
+                        break
+            self.tryon.blockSignals(True)
+            self.tryon.setCurrentRow(row)
+            self.tryon.blockSignals(False)
+        finally:
+            self.try_restoring = False
 
     # ------------------------------------------------------------ карты и развёртка
     def fill_maps(self, a):
@@ -888,9 +1091,15 @@ class Viewer3D(QDialog):
         if kind == "tex":
             self.fill_maps(a)
             self.set("tryOn", False)
+            for k, v in (("tint", QColor("#ffffff")), ("uvRotation", 0.0), ("roughAmount", 1.0), ("tryMask", [])):
+                self.set(k, v)  # у текстуры на шаре - без настроек примерки
         if kind == "model":
+            self.set("tryMask", [])
+            self.set("flashPart", -1)
             self.fill_tryon()
+            self.restore_tryon()
             self.apply_tryon()
+            when_loaded(self.root, self.fill_parts)
             self.want_anim = anim
             when_loaded(self.root, self.fill_anims)
         self.update_info()
