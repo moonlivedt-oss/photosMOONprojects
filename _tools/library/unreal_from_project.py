@@ -36,7 +36,7 @@ MEGASCANS = os.path.join(os.path.expanduser("~"), "Documents", "Megascans Librar
 STAGE = os.path.join(HERE, "_ue_stage")  # временный проект для выгрузки из библиотеки Megascans
 
 SCRIPT = r"""# Выгрузка моделей папок проекта в FBX (библиотека картинок). Редактор без окна, в конце закрывается.
-import json, os
+import json, os, re
 import unreal
 
 JOBS = {jobs!r}  # [[путь /Game/..., папка выгрузки]]
@@ -54,11 +54,58 @@ def export(obj, path, options=None):
     return unreal.Exporter.run_asset_export_task(t)
 
 
-for ROOT, OUT in JOBS:
-    res = {{"meshes": [], "previews": [], "errors": []}}
-    paths = list(eal.list_assets(ROOT, recursive=True, include_folder=False))
+# текстуры MetaHuman для просмотровой копии (library/mh_view): только нужные - без LOD и служебных масок
+TEX = re.compile(
+    r"^(FaceColor_MAIN|FaceNormal_MAIN|FaceRoughness_MAIN|BodyBaseColor|T_Sclera_D|T_Iris_A_M|"
+    r"T_Teeth_BaseColor_Baked|teeth_color_map_001|(fe)?male_body_normal_map|.+_CardsAtlas_Attribute|"
+    r"Eyelashes_.+_Coverage)$",
+    re.I,
+)
+common_done = set()
+
+
+def wanted(name, folder):
+    if TEX.match(name):
+        return True
+    parts = folder.split("/")  # одежда: нормаль и AO в Materials/<Вещь>
+    return bool(re.search(r"_(N|AO)$", name)) and len(parts) >= 2 and parts[-2] == "Materials"
+
+
+def export_textures(root, out):
+    n = 0
+    for p in eal.list_assets(root, recursive=True, include_folder=False):
+        ad = eal.find_asset_data(p)
+        name, folder = str(ad.asset_name), str(ad.package_path)
+        if str(ad.asset_class_path.asset_name) != "Texture2D" or not wanted(name, folder):
+            continue
+        rel = folder.split("/MetaHumans/", 1)[-1]
+        base = os.path.join(out, "textures", *rel.split("/"), name)
+        os.makedirs(os.path.dirname(base), exist_ok=True)
+        try:
+            obj = ad.get_asset()
+            if export(obj, base + ".png") or export(obj, base + ".tga"):
+                n += 1
+        except Exception as e:
+            unreal.log_warning("Библиотека: текстура " + name + ": " + str(e))
+    unreal.log("Библиотека: выгружено текстур " + str(n) + " из " + root)
+    return n
+
+
+for job in JOBS:
+    ROOT, OUT = job[0], job[1]
+    mode = job[2] if len(job) > 2 else "meshes"  # meshes | textures | both
+    res = {{"meshes": [], "previews": [], "errors": [], "textures": 0}}
+    if mode in ("textures", "both"):
+        res["textures"] = export_textures(ROOT, OUT)
+        common = ROOT.rsplit("/", 1)[0] + "/Common"
+        if "/MetaHumans/" in ROOT + "/" and common not in common_done and eal.does_directory_exist(common):
+            common_done.add(common)  # общая папка - один раз на запуск, в выгрузку первой задачи
+            res["textures"] += export_textures(common, OUT)
+    paths = list(eal.list_assets(ROOT, recursive=True, include_folder=False)) if mode != "textures" else []
     # одежда MetaHuman лежит в общей папке (MetaHumans/Common): её модели - по связям Blueprint персонажа
     seen, todo = set(), [str(eal.find_asset_data(p).package_name) for p in paths if "/BP_" in p]
+    if mode == "textures":
+        todo = []
     for _depth in range(3):
         nxt = []
         for pkg in todo:
@@ -108,8 +155,9 @@ def game_path(project, folder):
     return "/Game" + ("" if rel == "." else "/" + rel.replace(os.sep, "/"))
 
 
-def export_folders(project, folders, log=None, timeout=3600):
-    """Unreal выгружает модели папок в FBX. -> [(папка выгрузки, сведения export.json или None)]."""
+def export_folders(project, folders, log=None, timeout=3600, modes=None):
+    """Unreal выгружает модели папок в FBX. modes - на папку: "meshes" (по умолчанию), "textures" (только
+    текстуры MetaHuman для просмотра) или "both". -> [(папка выгрузки, сведения export.json или None)]."""
     project = os.path.realpath(project)  # короткое имя 8.3 Unreal не сопоставит с Content
     if E.editor_running(project):
         raise RuntimeError("Редактор Unreal с этим проектом открыт - закройте его, выгрузку делает Unreal в фоне")
@@ -121,7 +169,7 @@ def export_folders(project, folders, log=None, timeout=3600):
     for i, f in enumerate(folders):
         out = os.path.join(base, str(i))
         os.makedirs(out)
-        jobs.append([game_path(project, f), out])
+        jobs.append([game_path(project, f), out, (modes or {}).get(f, "meshes")])
     script = os.path.join(base, "export_from_project.py")
     with open(script, "w", encoding="utf-8") as fh:
         fh.write(SCRIPT.format(jobs=jobs))
@@ -147,7 +195,7 @@ def export_folders(project, folders, log=None, timeout=3600):
             raise TimeoutError("Unreal не закончил выгрузку за %d мин" % (timeout // 60))
     p.wait()
     out = []
-    for _root, d in jobs:
+    for _root, d, _mode in jobs:
         info_path = os.path.join(d, "export.json")
         info = None
         if os.path.exists(info_path):
@@ -206,10 +254,13 @@ def put_metahuman(name, meshes, info, aid, origin, theme=None, preview_png=None)
             prev = next((p["file"] for p in info["previews"] if p["ok"] and os.path.exists(p["file"])), None)
             if prev:
                 _preview(prev, dst)
-    from library import blender_preview
+    from library import blender_preview, mh_view
 
-    view = None  # для 3D окна - все части одним GLB без морфов, подкрашенные по портрету
-    if blender_preview.make_view_model(
+    view = None  # для 3D окна - все части одним GLB без морфов: с текстурами, если они выгружены,
+    # иначе подкрашенные по портрету
+    if mh_view.has_textures(os.path.basename(dst)) and mh_view.make_view(dst, meta_main=main)[0]:
+        view = "_view.glb"
+    if view is None and blender_preview.make_view_model(
         [os.path.join(dst, m) for m in main],
         os.path.join(dst, "_view.glb"),
         colors=blender_preview.portrait_colors(os.path.join(dst, "preview.webp")),
@@ -335,25 +386,74 @@ def _merge(src, dst):
                 shutil.copy2(os.path.join(d, f), os.path.join(out, f))
 
 
-def import_megascans(items=None, batch=6, log=None, stop=None):
-    """MetaHuman из библиотеки Megascans -> ассеты. Уже добавленные (тот же id или то же имя) пропускаются.
-    -> {"added": [папки], "skipped": [имена], "errors": [..]}."""
+TEX_SIDE = 2048  # текстуры для просмотра - не больше 2K (лицо и тело в 8K - сотни МБ на персонажа)
+
+
+def collect_textures(out, root=None):
+    """Выгруженные Unreal текстуры (out/textures/<Имя>|Common/...) -> root (_Unreal/_export/MetaHumans),
+    уменьшенные до 2K, в PNG. -> сколько."""
+    from library import mh_view
+
+    root = root or mh_view.EXPORT
+    src = os.path.join(out, "textures")
+    n = 0
+    for d, _sub, files in os.walk(src):
+        for f in files:
+            stem, ext = os.path.splitext(f)
+            if ext.lower() not in (".png", ".tga"):
+                continue
+            dst = os.path.join(root, os.path.relpath(d, src), stem + ".png")
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            try:
+                with Image.open(os.path.join(d, f)) as im:
+                    im.load()
+                    if max(im.size) > TEX_SIDE:
+                        k = TEX_SIDE / max(im.size)
+                        im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+                    im.save(dst + ".part.png")
+                os.replace(dst + ".part.png", dst)
+                n += 1
+            except OSError:
+                pass
+    return n
+
+
+def needs_textures(asset_dir):
+    """MetaHuman из библиотеки без выгруженных текстур - их копия для 3D окна ещё цветами с портрета."""
+    from library import mh_view
+
+    return not mh_view.has_textures(os.path.basename(asset_dir.rstrip("\\/")))
+
+
+def import_megascans(items=None, batch=6, log=None, stop=None, textures=True):
+    """MetaHuman из библиотеки Megascans -> ассеты. Уже добавленные (тот же id или то же имя) пропускаются;
+    textures - заодно текстуры для 3D окна: у новых - вместе с моделями, у добавленных раньше без текстур -
+    только текстуры, и их копия _view.glb пересобирается. -> {"added", "retextured", "skipped", "errors"}."""
+    from library import mh_view
+
     items = [a for a in (items or megascans_list()) if a["type"] == "metahuman-preset"]
     have = U.assets(U.ROOT)
-    have_ids = {a.get("id") for a in have}
-    have_names = {a.get("name", "").lower() for a in have}
-    todo = [a for a in items if f"megascans-{a['id']}" not in have_ids and f"{a['name']} (metahuman)".lower() not in have_names]
-    res = {"added": [], "skipped": [a["name"] for a in items if a not in todo], "errors": []}
-    if not todo:
+    by_id = {a.get("id"): a for a in have}
+    by_name = {a.get("name", "").lower(): a for a in have}
+
+    def existing(a):
+        return by_id.get(f"megascans-{a['id']}") or by_name.get(f"{a['name']} (metahuman)".lower())
+
+    todo = [a for a in items if existing(a) is None]
+    retex = [a for a in items if textures and existing(a) is not None and needs_textures(existing(a)["dir"])]
+    res = {"added": [], "retextured": [], "errors": []}
+    res["skipped"] = [a["name"] for a in items if a not in todo and a not in retex]
+    work = [(a, "both" if textures else "meshes") for a in todo] + [(a, "textures") for a in retex]
+    if not work:
         return res
     proj = _stage_project()
     content = os.path.join(STAGE, "Content", "MetaHumans")
-    for i in range(0, len(todo), batch):
+    for i in range(0, len(work), batch):
         if stop is not None and stop.is_set():
             break
-        part = todo[i : i + batch]
+        part = work[i : i + batch]
         folders = []
-        for a in part:  # персонаж и общая Common - во временный проект
+        for a, mode in part:  # персонаж и общая Common - во временный проект
             src = os.path.join(a["dir"], "Tier0", "asset_ue", "MetaHumans")
             if not os.path.isdir(os.path.join(src, a["name"])):
                 res["errors"].append(f"{a['name']}: нет папки персонажа в загрузке Bridge")
@@ -362,12 +462,21 @@ def import_megascans(items=None, batch=6, log=None, stop=None):
                 log(f"копирую {a['name']}")
             _merge(os.path.join(src, "Common"), os.path.join(content, "Common"))
             shutil.copytree(os.path.join(src, a["name"]), os.path.join(content, a["name"]), dirs_exist_ok=True)
-            folders.append((a, os.path.join(content, a["name"])))
+            folders.append((a, mode, os.path.join(content, a["name"])))
         if not folders:
             continue
         try:
-            outs = export_folders(proj, [f for _a, f in folders], log)
-            for (a, _f), (_out, info) in zip(folders, outs):
+            outs = export_folders(proj, [f for _a, _m, f in folders], log, modes={f: m for _a, m, f in folders})
+            for out, _info in outs:  # текстуры - до сборки ассетов: put_metahuman их подхватит
+                collect_textures(out)
+            for (a, mode, _f), (_out, info) in zip(folders, outs):
+                if mode == "textures":
+                    old = existing(a)
+                    if mh_view.has_textures(os.path.basename(old["dir"])) and mh_view.make_view(old["dir"])[0]:
+                        res["retextured"].append(old["dir"])
+                    else:
+                        res["errors"].append(f"{a['name']}: текстуры не выгрузились")
+                    continue
                 meshes = [m for m in (info or {}).get("meshes", []) if m["ok"] and os.path.exists(m["file"])]
                 if not meshes:
                     res["errors"].append(f"{a['name']}: Unreal не выгрузил модели")
@@ -377,9 +486,9 @@ def import_megascans(items=None, batch=6, log=None, stop=None):
                 )
             shutil.rmtree(os.path.dirname(outs[0][0]), ignore_errors=True)
         except Exception as e:
-            res["errors"].append("; ".join(a["name"] for a, _f in folders) + f": {e}")
+            res["errors"].append("; ".join(a["name"] for a, _m, _f in folders) + f": {e}")
         finally:
-            for _a, f in folders:  # персонажей - прочь из временного проекта, Common остаётся до следующей пачки
+            for _a, _m, f in folders:  # персонажей - прочь из временного проекта, Common остаётся до следующей пачки
                 shutil.rmtree(f, ignore_errors=True)
     shutil.rmtree(STAGE, ignore_errors=True)  # временный проект - несколько ГБ: создаётся заново при надобности
     return res

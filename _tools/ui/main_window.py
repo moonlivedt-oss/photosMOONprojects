@@ -628,6 +628,11 @@ class Window(QMainWindow):
         fill_tree(self.inbox.tree)
         self.lib.refresh()
         self.unreal.nav.fill_themes()
+        self.unreal.describe()  # карточка ассета: цвета плашек и ссылок - из темы
+        for v, back in ((self.unreal.mini, "bg1"), (self.unreal.viewer, "bg0")):  # фон 3D-сцен
+            if v is not None and getattr(v, "root", None) is not None:
+                v.root.setProperty("back", theme.C[back])
+                v.root.setProperty("accent", theme.C["acc"])
         for w in QApplication.instance().allWidgets():
             w.update()
 

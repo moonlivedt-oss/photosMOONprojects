@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick3D
 import QtQuick3D.Helpers
 import QtQuick3D.AssetUtils
+import QtQuick.Shapes
 
 Item {
     id: root
@@ -44,7 +45,13 @@ Item {
     property bool linearColors: false     // цвета материалов в файле линейные (Quaternius) - на экран через гамму
     property bool tryOn: false            // примерка: материал текстуры (texMat) на все части модели
     property var origMats: []             // [{model, mats}] - вернуть родные материалы
-    property bool fitted: false            // подгонка под кадр - один раз на загрузку: смена масштаба
+    property real humanHeight: 0          // силуэт человека 180 см в масштабе модели (единицы сцены), 0 - нет
+    property bool showHuman: false
+    property real width3d: 200             // ширина модели на сцене - человек встаёт сбоку
+    property string title: ""              // подпись поверх сцены (большое окно)
+    property string subtitle: ""
+    property bool brightened: false        // линейные цвета уже переведены (один раз на загрузку)
+    property bool fitted: false           // подгонка под кадр - один раз на загрузку: смена масштаба
                                            // меняет рамку модели, и без флага подгонка шла по кругу (дрожь)            // высота того, что на полу - вокруг середины крутится камера
 
     function chan(i) { return [Material.R, Material.G, Material.B, Material.A][i] }
@@ -91,6 +98,26 @@ Item {
         }
     }
 
+    // в FBX без шероховатости assimp ставит 0 - зеркало: на ярком небе модель белёсая, в бликах
+    // (персонажи Kenney). Unreal в таком случае берёт 0.5 - здесь так же; стекло (прозрачное) не трогаем
+    function matte(n) {
+        var kids = n.children || []
+        for (var i = 0; i < kids.length; i++) {
+            var c = kids[i]
+            if (c.materials !== undefined) {
+                for (var j = 0; j < c.materials.length; j++) {
+                    var m = c.materials[j]
+                    if (m && m.roughness !== undefined && m.roughness < 0.05 && m.metalness < 0.5
+                            && m.opacity >= 0.99 && !m.roughnessMap) {
+                        m.roughness = 0.7
+                        m.specularAmount = 0.25
+                    }
+                }
+            }
+            if (c.mapPositionToScene !== undefined) matte(c)
+        }
+    }
+
     function models(n, out) {
         var kids = n.children || []
         for (var i = 0; i < kids.length; i++) {
@@ -124,7 +151,8 @@ Item {
     function fit() {
         if (fitted || mode !== "model" || loader.status !== RuntimeLoader.Success) return
         fitted = true
-        if (linearColors) brighten(loader)
+        if (linearColors && !brightened) { brighten(loader); brightened = true }  // подгонка бывает повторной
+        matte(loader)
         if (tryOn) applyTryOn()
         turn.eulerRotation = Qt.vector3d(0, modelYaw, 0)
         loader.scale = Qt.vector3d(1, 1, 1)
@@ -141,32 +169,72 @@ Item {
         // по центру по x и z, низом на пол
         loader.position = Qt.vector3d(-(lo.x + dx / 2) * s, -lo.y * s, -(lo.z + dz / 2) * s)
         height3d = dy * s
+        width3d = Math.max(dx, dz) * s
         sizeText = [dx, dy, dz].map(function (v) { return v < 10 ? v.toFixed(2) : Math.round(v) }).join(" x ")
         resetView()
     }
 
     function resetView() {
         var h = mode === "tex" ? (shape === "plane" ? 0 : 180) : mode === "hdri" ? 0 : height3d
-        orbit.position = Qt.vector3d(0, h / 2, 0)
+        var human = mode === "model" && showHuman && humanHeight > 0
+        if (human) h = Math.max(h, humanHeight)
+        orbit.position = Qt.vector3d(human ? -humanHeight * 0.2 : 0, h / 2, 0)
         orbit.eulerRotation = mode === "hdri" ? Qt.vector3d(0, 0, 0)
                             : mode === "tex" && shape === "plane" ? Qt.vector3d(-55, 20, 0) : Qt.vector3d(-16, 32, 0)
         // узкое высокое окно (панель вкладки) - камера дальше, иначе предмет обрезан по бокам
         var aspect = view.width > 0 ? view.height / view.width : 1
-        cam.position = Qt.vector3d(0, 0, mode === "hdri" ? 0.01 : 420 * camScale * Math.max(1, aspect * 1.05))
+        var far = human ? Math.max(1, h / 200, (width3d / 2 + humanHeight * 0.6) / 140) : 1
+        cam.position = Qt.vector3d(0, 0, mode === "hdri" ? 0.01 : 420 * camScale * far * Math.max(1, aspect * 1.05))
         cam.fieldOfView = mode === "hdri" ? 75 : 40
         if (mode === "hdri") { cam.clipNear = 0.01; cam.clipFar = 1000 }
     }
 
-    onModelSourceChanged: { fitted = false; origMats = [] }
+    onModelSourceChanged: { fitted = false; brightened = false; origMats = [] }
     onModeChanged: { if (mode !== "model") height3d = 200; resetView() }
     onShapeChanged: resetView()
+    onShowHumanChanged: resetView()
 
+    // фон: глубокий градиент, мягкое пятно света за моделью в цвет акцента и виньетка по краям
     Rectangle {
         anchors.fill: parent
         visible: !root.plain
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.lighter(root.back, 1.9) }
-            GradientStop { position: 1.0; color: root.back }
+            GradientStop { position: 0.0; color: Qt.lighter(root.back, 1.55) }
+            GradientStop { position: 0.62; color: root.back }
+            GradientStop { position: 1.0; color: Qt.darker(root.back, 1.35) }
+        }
+    }
+    Shape {
+        anchors.fill: parent
+        visible: !root.plain
+        ShapePath {
+            strokeWidth: 0
+            strokeColor: "transparent"
+            fillGradient: RadialGradient {
+                centerX: root.width / 2; centerY: root.height * 0.42
+                centerRadius: Math.max(root.width, root.height) * 0.55
+                focalX: centerX; focalY: centerY
+                GradientStop { position: 0.0; color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.16) }
+                GradientStop { position: 0.5; color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.05) }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
+            PathRectangle { x: 0; y: 0; width: root.width; height: root.height }
+        }
+    }
+    Shape {
+        anchors.fill: parent
+        visible: !root.plain
+        ShapePath {
+            strokeWidth: 0
+            strokeColor: "transparent"
+            fillGradient: RadialGradient {
+                centerX: root.width / 2; centerY: root.height / 2
+                centerRadius: Math.hypot(root.width, root.height) * 0.62
+                focalX: centerX; focalY: centerY
+                GradientStop { position: 0.55; color: "transparent" }
+                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.45) }
+            }
+            PathRectangle { x: 0; y: 0; width: root.width; height: root.height }
         }
     }
 
@@ -241,6 +309,54 @@ Item {
         InfiniteGrid {
             visible: root.floor && root.mode !== "hdri"
             gridInterval: 25
+        }
+        // подиум: низкий диск под моделью и светящийся край в цвет акцента
+        Node {
+            visible: root.floor && root.mode === "model"
+            property real r: Math.max(1.2, root.width3d * 0.012 + 0.2)
+            Model {
+                source: "#Cylinder"
+                position: Qt.vector3d(0, -0.5, 0)
+                scale: Qt.vector3d(parent.r + 0.04, 0.012, parent.r + 0.04)
+                castsShadows: false
+                materials: PrincipledMaterial {
+                    baseColor: root.accent
+                    emissiveFactor: Qt.vector3d(root.accent.r * 0.9, root.accent.g * 0.9, root.accent.b * 0.9)
+                    lighting: PrincipledMaterial.NoLighting
+                }
+            }
+            Model {
+                source: "#Cylinder"
+                position: Qt.vector3d(0, -0.2, 0)
+                scale: Qt.vector3d(parent.r, 0.012, parent.r)
+                receivesShadows: true
+                castsShadows: false
+                materials: PrincipledMaterial {
+                    baseColor: Qt.lighter(root.back, 1.7)
+                    roughness: 0.55
+                    metalness: 0.0
+                }
+            }
+        }
+
+        // человек 180 см для масштаба: простая фигура (единицы - сантиметры, масштаб - humanHeight / 180)
+        Node {
+            visible: root.showHuman && root.humanHeight > 0 && root.mode === "model"
+            position: Qt.vector3d(-(root.width3d / 2 + root.humanHeight * 0.3), 0, root.width3d * 0.15)
+            scale: Qt.vector3d(root.humanHeight / 180, root.humanHeight / 180, root.humanHeight / 180)
+            property var mat: PrincipledMaterial {
+                baseColor: Qt.rgba(root.accent.r * 0.5 + 0.35, root.accent.g * 0.5 + 0.35, root.accent.b * 0.5 + 0.35, 1)
+                roughness: 0.6
+                opacity: 0.72
+                alphaMode: PrincipledMaterial.Blend
+            }
+            Model { source: "#Sphere"; position: Qt.vector3d(0, 166, 0); scale: Qt.vector3d(0.23, 0.26, 0.23); materials: parent.mat }
+            Model { source: "#Cylinder"; position: Qt.vector3d(0, 148, 0); scale: Qt.vector3d(0.11, 0.1, 0.11); materials: parent.mat }
+            Model { source: "#Cylinder"; position: Qt.vector3d(0, 118, 0); scale: Qt.vector3d(0.36, 0.5, 0.2); materials: parent.mat }
+            Model { source: "#Cylinder"; position: Qt.vector3d(-9, 46, 0); scale: Qt.vector3d(0.13, 0.9, 0.13); materials: parent.mat }
+            Model { source: "#Cylinder"; position: Qt.vector3d(9, 46, 0); scale: Qt.vector3d(0.13, 0.9, 0.13); materials: parent.mat }
+            Model { source: "#Cylinder"; position: Qt.vector3d(-23, 112, 0); eulerRotation.z: -6; scale: Qt.vector3d(0.09, 0.62, 0.09); materials: parent.mat }
+            Model { source: "#Cylinder"; position: Qt.vector3d(23, 112, 0); eulerRotation.z: 6; scale: Qt.vector3d(0.09, 0.62, 0.09); materials: parent.mat }
         }
 
         Node {
@@ -343,6 +459,19 @@ Item {
             Text { id: flatLbl; anchors.centerIn: parent; text: root.flatTitle; color: "#eceaf6"; font.pixelSize: 13 }
         }
         MouseArea { anchors.fill: parent; acceptedButtons: Qt.NoButton }
+    }
+
+    // название поверх сцены (большое окно): крупно имя, под ним вид и раздел, тонкая черта акцента
+    Column {
+        visible: root.title !== "" && root.flat == ""
+        anchors { left: parent.left; top: parent.top; leftMargin: 22; topMargin: 18 }
+        spacing: 4
+        Rectangle { width: 34; height: 3; radius: 2; color: root.accent }
+        Text {
+            text: root.title; color: root.back.hslLightness > 0.5 ? "#1e1c28" : "#f4f2fb"; font.pixelSize: 26; font.weight: Font.DemiBold
+            style: Text.Raised; styleColor: "#40000000"
+        }
+        Text { text: root.subtitle; color: root.back.hslLightness > 0.5 ? "#5c586e" : Qt.rgba(1, 1, 1, 0.55); font.pixelSize: 13; font.letterSpacing: 0.5 }
     }
 
     // пока грузится или если не открылось

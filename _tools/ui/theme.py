@@ -213,6 +213,19 @@ QLabel#chip{background:$bg3;border-radius:8px;padding:3px 9px;color:$text;font-s
 QPushButton#chip{background:$bg3;border:1px solid $line;border-radius:8px;padding:2px 9px;color:$text;font-size:9pt}
 QPushButton#chip:hover{border-color:$acc;color:$selt}
 QPushButton#chip:disabled{color:$dim;background:transparent}
+QLabel#body{color:$text}
+QFrame#spec{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 $bg2,stop:1 $bg1);border:1px solid $line;border-radius:14px}
+QFrame#vline{background:$line2;border:0;margin:4px 0}
+QLabel#statv{font-size:13pt;font-weight:700;background:transparent}
+QLabel#statk{color:$dim;font-size:8pt;background:transparent}
+QLabel#sect{color:$dim;font-size:8pt;font-weight:700;letter-spacing:1px;border-left:2px solid $acc;padding-left:7px}
+QLabel#where{font-size:9pt;font-weight:600}
+QFrame#hud{background:rgba(20,20,28,0.78);border:1px solid rgba(255,255,255,0.10);border-radius:20px}
+QPushButton#hudb{background:transparent;border:0;border-radius:14px;padding:6px;min-width:22px}
+QPushButton#hudb:hover{background:rgba(255,255,255,0.08)}
+QPushButton#hudb:checked{background:$accd;border:1px solid $acc}
+QPushButton#hudb:disabled{background:transparent}
+QScrollArea#card,QScrollArea#card>QWidget>QWidget{background:transparent;border:0}
 QLabel#pic{background:$bg2;border:1px solid $line;border-radius:12px}
 QLabel#overlay{background:$bg0;border:3px dashed $acc;border-radius:22px;color:$text;font-size:17pt;font-weight:700}
 

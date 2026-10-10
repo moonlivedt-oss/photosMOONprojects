@@ -472,13 +472,19 @@ def ue_from_project(project, folder, theme=None):
 @tool(
     "ue_from_megascans",
     "Всё, что пользователь скачал через Quixel Bridge в Documents/Megascans Library (MetaHuman), - в библиотеку: "
-    "Unreal выгружает в FBX во временном проекте (долго: минуты на каждые шесть). Уже добавленные пропускаются.",
+    "Unreal выгружает в FBX во временном проекте (долго: минуты на каждые шесть). Уже добавленные пропускаются; "
+    "у добавленных без текстур выгружаются только текстуры для 3D-просмотра.",
     write=True,
 )
 def ue_from_megascans():
     from library import unreal_from_project as P
 
     res = P.import_megascans(log=lambda t: report(0, None, t))
-    if res["added"]:
+    if res["added"] or res["retextured"]:
         ui_bridge.ue_changed()
-    return {"added": len(res["added"]), "skipped": res["skipped"], "errors": res["errors"]}
+    return {
+        "added": len(res["added"]),
+        "retextured": len(res["retextured"]),
+        "skipped": res["skipped"],
+        "errors": res["errors"],
+    }

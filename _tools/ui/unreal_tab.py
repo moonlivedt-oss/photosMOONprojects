@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSlider,
     QSpinBox,
     QSplitter,
@@ -36,9 +37,10 @@ from ui.common import ROLE, THUMB, bg, human, in_main, log_error, reveal
 from ui.thumbnails import lib_icon, swatch, thumb
 from ui.unreal_catalog import CatalogDialog
 from ui.unreal_nav import ALL, FAV, HOME_PREFIX, KIND_LOOK, SET, SETS, THEME_ICON, Nav, kind_color, theme_label
+from ui.unreal_panel import AssetCard, HeroView, count_text, mosaic
 from ui.unreal_tiles import ASSET, CARD, CardList, card_of
 from ui.viewer3d import MiniView, Viewer3D, studio_probe, viewable
-from ui.widgets import PicView, key
+from ui.widgets import key
 
 SHORT = {"tex": "Текстура", "hdri": "HDRI", "model": "Модель", "ies": "IES"}
 
@@ -206,10 +208,8 @@ class UnrealTab(QWidget):
         side = QWidget(objectName="panel")
         sv = QVBoxLayout(side)
         sv.setContentsMargins(12, 12, 12, 12)
-        self.pic = PicView("Выберите ассет")
-        self.mini = MiniView() if self.cfg.get("ue_live", True) else None
-        if self.mini is not None:
-            self.mini.hide()
+        self.pic = HeroView("Выберите ассет")  # превью на подиуме, по высоте картинки
+        self.mini = self.make_mini() if self.cfg.get("ue_live", True) else None
         self.live = QPushButton(lib_icon("dice_3D"), "", objectName="tool", checkable=True)
         self.live.setToolTip("Живой 3D здесь, в панели: модель вращается, тянуть мышью - поворот")
         self.live.setChecked(self.mini is not None)
@@ -220,11 +220,12 @@ class UnrealTab(QWidget):
         self.hover_t = QTimer(self, singleShot=True, interval=600)
         self.hover_t.timeout.connect(self.hover_mini)
         self.hover_row, self.hover_on = -1, False
-        self.name = QLabel(objectName="head", wordWrap=True)
-        self.meta = QLabel(objectName="dim", wordWrap=True)
-        self.meta.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.files = QLabel(objectName="dim", wordWrap=True)
-        self.files.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.name = QLabel(objectName="title", wordWrap=True)
+        self.name.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.card = AssetCard()
+        self.card.tag_clicked.connect(self.q.setText)
+        self.card.anim_clicked.connect(lambda n: self.current() and self.view3d(self.current()[0], anim=n))
+        self.card.said.connect(self.win.say)
         self.note = QLineEdit(placeholderText="Заметка: где использую, что поменять...")
         self.note.setToolTip("Своя заметка к ассету - по ней тоже ищется")
         self.note.editingFinished.connect(self.save_note)
@@ -236,8 +237,6 @@ class UnrealTab(QWidget):
         self.how.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.how.setVisible(self.how_btn.isChecked())
         self.how_btn.toggled.connect(lambda on: (self.how.setVisible(on), self.cfg.__setitem__("ue_how_open", on)))
-        self.chips = QHBoxLayout()  # вид, разрешение, вес, полигоны - плашками
-        self.chips.setSpacing(5)
         self.btns = []
 
         def tool(tip, icon, fn):
@@ -279,27 +278,35 @@ class UnrealTab(QWidget):
         ):
             icons.addWidget(b)
         icons.addStretch(1)
-        hint = QLabel("Плитку можно перетащить прямо в Content Browser", objectName="faint", wordWrap=True)
-        sv.addWidget(self.pic, 1)
+        sv.addWidget(self.pic)
         if self.mini is not None:
-            sv.addWidget(self.mini, 1)
+            sv.addWidget(self.mini)
         nh = QHBoxLayout()
         nh.addWidget(self.name, 1)
         nh.addWidget(self.live, 0, Qt.AlignmentFlag.AlignTop)
         nh.addWidget(self.star, 0, Qt.AlignmentFlag.AlignTop)
         sv.addLayout(nh)
-        sv.addLayout(self.chips)
-        sv.addWidget(self.meta)
+        # сведения прокручиваются, кнопки действий всегда внизу на месте
+        body = QWidget()
+        bv = QVBoxLayout(body)
+        bv.setContentsMargins(0, 0, 4, 0)
+        bv.setSpacing(8)
+        bv.addWidget(self.card)
+        bv.addWidget(self.how_btn, 0, Qt.AlignmentFlag.AlignLeft)
+        bv.addWidget(self.how)
+        bv.addStretch(1)
+        scroll = QScrollArea(objectName="card")
+        scroll.setWidget(body)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        sv.addWidget(scroll, 1)
         sv.addWidget(self.note)
         main = QHBoxLayout()
         main.addWidget(self.look, 1)
         main.addWidget(imp)
         sv.addLayout(main)
         sv.addLayout(icons)
-        sv.addWidget(self.how_btn)
-        sv.addWidget(self.how)
-        sv.addWidget(self.files)
-        sv.addWidget(hint)
 
         split = QSplitter()
         split.addWidget(self.nav)
@@ -633,7 +640,7 @@ class UnrealTab(QWidget):
             sec = a.get("_s") or a.get("section") or theme_label(a.get("theme", ""))
             sub = sec + (f", {a['source']}" if a.get("source") in U.LOW_POLY else "")
             if a.get("polycount"):
-                sub += f", {a['polycount'] // 1000 or 1}k полиг."
+                sub += f", {count_text(a['polycount'])} полиг."
             if self.problems is not None:
                 sub = next((why for x, why in self.problems if x is a), sub)
             li.setData(
@@ -682,23 +689,32 @@ class UnrealTab(QWidget):
         sel = self.list.selectedItems()
         return [it.data(ASSET) for it in sel]
 
-    def view3d(self, a):
-        """Двойной щелчок и «Смотреть в 3D». IES в 3D не показать - тогда файл в проводнике."""
+    def view3d(self, a, anim=None):
+        """Двойной щелчок и «Смотреть в 3D» (anim - сразу играть эту анимацию).
+        IES в 3D не показать - тогда файл в проводнике."""
         if not viewable(a):
             files = drag_files(a)
             reveal(files[0] if files else a["dir"])
             return
         if self.viewer is None:
             self.viewer = Viewer3D(self)
-        if not self.viewer.show_asset(a):
+        if not self.viewer.show_asset(a, anim=anim):
             self.win.say("3D-просмотр не запустился - подробности в _tools/_errors.log")
 
     def toggle_live(self, on):
         self.cfg["ue_live"] = on
         if on and self.mini is None:
-            self.mini = MiniView()
-            self.pic.parentWidget().layout().insertWidget(1, self.mini, 1)
+            self.mini = self.make_mini()
+            self.pic.parentWidget().layout().insertWidget(1, self.mini)
         self.describe()
+
+    def make_mini(self):
+        """Живой 3D в панели - высотой с квадрат по ширине панели (как превью), не во всю высоту."""
+        m = MiniView()
+        m.setMinimumHeight(240)
+        m.setMaximumHeight(360)
+        m.hide()
+        return m
 
     def hover_on_row(self, row):
         self.hover_row = row
@@ -760,76 +776,29 @@ class UnrealTab(QWidget):
         on = bool(cur) and all(a.get("id") in self.favs() for a in cur)
         self.star.setToolTip("Убрать из избранного (Ctrl+D)" if on else "В избранное (Ctrl+D)")
         self.star.setChecked(on)
-        self.set_chips([])
+        self.how_btn.setVisible(len(cur) == 1)
+        self.how.setVisible(len(cur) == 1 and self.how_btn.isChecked())
         if not cur:
             self.pic.set_pixmap(None)
+            self.pic.set_tones([])
             self.name.setText("")
-            self.meta.setText(
-                "Ассеты для Unreal Engine: PBR-текстуры, небо HDRI, модели, профили света.\n"
-                "Источники - Poly Haven, ambientCG, Kenney, Quaternius; лицензия CC0: можно в любые проекты."
-            )
-            self.files.setText("")
-            self.how.setText("")
+            self.card.show_empty(self.items)
             return
         if len(cur) > 1:
-            self.pic.set_pixmap(None)
+            prevs = [os.path.join(a["dir"], "preview.webp") for a in cur[:4]]
+            self.pic.set_pixmap(mosaic([p for p in prevs if os.path.exists(p)]))
+            self.pic.set_tones([])
             self.name.setText(f"Выбрано: {len(cur)}")
-            self.set_chips([human(sum(a.get("size", 0) for a in cur))])
-            self.meta.setText("Перетащите все разом в Content Browser или «В Unreal...».")
-            self.files.setText("")
-            self.how.setText("")
+            self.card.show_many(cur)
             return
         a = cur[0]
         prev = os.path.join(a["dir"], "preview.webp")
         self.pic.set_pixmap(thumb(prev, 512) if os.path.exists(prev) else QPixmap())
         self.name.setText(a.get("name", ""))
-        chips = [SHORT.get(a.get("kind"), "?")]
-        if a.get("res"):
-            chips.append(a["res"].upper())
-        chips.append(human(a.get("size", 0)))
-        if a.get("polycount"):
-            chips.append(f"{a['polycount'] // 1000 or 1}k полиг.")
-        if a.get("dimensions_mm"):
-            chips.append(" x ".join(f"{x / 10:g}" for x in a["dimensions_mm"]) + " см")
-        elif a.get("dims_cm"):  # из FBX: таким придёт в Unreal без масштаба при импорте
-            chips.append(" x ".join(f"{x:.0f}" for x in a["dims_cm"]) + " см")
-        if a.get("rigged"):
-            chips.append("скелет" + (f", {len(a['animations'])} анимац." if a.get("animations") else ""))
-        self.set_chips(chips)
-        lines = [theme_label(a.get("theme", "")) + (f", {a['section']}" if a.get("section") else "")]
-        if a.get("description"):
-            lines.append(a["description"])
-        src = a.get("source", "")
-        authors = [x for x in a.get("authors", []) if x != src]
-        if authors:
-            src += ", " + ", ".join(authors)
-        lines.append(src + ", CC0" if U.is_cc0(a) else src + ". " + a.get("license", ""))
-        if a.get("tags"):
-            lines.append("Метки: " + ", ".join(a["tags"][:8]))
-        dims = a.get("dims_cm")
-        if dims and not a.get("dimensions_mm") and (max(dims) < 10 or max(dims) > 5000):
-            lines.append(  # Kenney и KayKit бывают в метрах: в Unreal модель придёт крошечной или огромной
-                f"Размер при импорте как есть: {max(dims):.0f} см - похоже, нужен Import Uniform Scale "
-                + ("100" if max(dims) < 10 else "0.01")
-            )
-        if a.get("animations"):
-            names = a["animations"]
-            lines.append(f"Анимации ({len(names)}): " + ", ".join(names[:12]) + (" ..." if len(names) > 12 else ""))
         used = self.cfg.get("ue_used", {}).get(a.get("id"), [])
-        if used:  # куда ассет уже уходил: копия, импорт, пакет
-            lines.append("Использовано в: " + "; ".join(os.path.basename(x.rstrip("/\\")) or x for x in used[-3:]))
-        self.meta.setText("\n".join(lines))
-        self.files.setText("")
+        cols = self.card.show_asset(a, new=added(a) > self.since > 0, used=used)
+        self.pic.set_tones(cols)
         self.how.setText(U.howto(a) + "\n\nФайлы: " + ", ".join(a.get("main", [])))
-
-    def set_chips(self, items):
-        while self.chips.count():
-            w = self.chips.takeAt(0).widget()
-            if w:
-                w.deleteLater()
-        for text in items:
-            self.chips.addWidget(QLabel(text, objectName="chip"))
-        self.chips.addStretch(1)
 
     def open_dir(self):
         for a in self.current()[:5]:
@@ -1263,11 +1232,24 @@ class UnrealTab(QWidget):
         if not items:
             QMessageBox.information(self, "Megascans", f"В {P.MEGASCANS} нет скачанных MetaHuman.")
             return
+        have = {a.get("name", "").lower(): a for a in self.items}
+        old = [have.get(f"{a['name']} (metahuman)".lower()) for a in items]
+        new = sum(o is None for o in old)
+        bare = sum(o is not None and P.needs_textures(o["dir"]) for o in old)
+        if not new and not bare:
+            QMessageBox.information(self, "Megascans", f"Все MetaHuman ({len(items)}) уже в библиотеке, с текстурами.")
+            return
+        what = []
+        if new:
+            what.append(f"новых: {new} - модели и текстуры")
+        if bare:
+            what.append(f"добавленных раньше без текстур: {bare} - только текстуры для 3D-просмотра")
         ok = QMessageBox.question(
             self,
             "Megascans",
-            f"В библиотеке Megascans MetaHuman: {len(items)}. Unreal выгрузит новых в FBX во временном проекте "
-            "(по паре минут на шесть персонажей; проекты не меняются). Начать?",
+            "Unreal выгрузит из библиотеки Megascans во временном проекте:\n"
+            + "\n".join(what)
+            + "\n\nПо паре минут на шесть персонажей, редактор не откроется, ваши проекты не меняются. Начать?",
         )
         if ok != QMessageBox.StandardButton.Yes:
             return
@@ -1279,7 +1261,7 @@ class UnrealTab(QWidget):
                 QMessageBox.warning(self, "Megascans", f"Не получилось: {res}")
                 return
             self.win.say(
-                f"MetaHuman добавлено: {len(res['added'])}, уже были: {len(res['skipped'])}"
+                f"MetaHuman добавлено: {len(res['added'])}, с текстурами теперь: {len(res.get('retextured', []))}"
                 + (f", не вышло: {len(res['errors'])}" if res["errors"] else "")
             )
             if res["errors"]:

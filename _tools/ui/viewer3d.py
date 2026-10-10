@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -33,7 +34,7 @@ from PyQt6.QtWidgets import (
 )
 
 from library import unreal as U
-from ui.common import HERE, human, log_error
+from ui.common import HERE, log_error
 from ui.theme import C
 from ui.thumbnails import lib_icon, thumb
 from ui.widgets import key
@@ -95,6 +96,33 @@ def gl_normal(path):
 def channel(path, i):
     """Один канал упакованной карты (ARM) серым - чтобы посмотреть его отдельно."""
     return cached(path, f"ch{i}", lambda im: im.split()[i])
+
+
+def checker():
+    """Шахматка для проверки развёртки: клетки 8x8 разных оттенков по строкам и подписи A1..H8 -
+    видно растяжение, швы и перевёрнутые куски UV."""
+    dst = os.path.join(CACHE, "uv_checker_v1.png")
+    if os.path.exists(dst):
+        return dst
+    from PIL import ImageDraw, ImageFont
+
+    n, cell = 8, 128
+    im = Image.new("RGB", (n * cell, n * cell))
+    d = ImageDraw.Draw(im)
+    font = ImageFont.load_default(size=34)
+    hues = ["#e5484d", "#f08c3a", "#f2c94c", "#4cb782", "#3fb6c9", "#5b7cff", "#9b6bff", "#e05fb0"]
+    for y in range(n):
+        base = Image.new("RGB", (1, 1), hues[y]).getpixel((0, 0))
+        for x in range(n):
+            k = 1.0 if (x + y) % 2 else 0.55
+            col = tuple(int(c * k) for c in base)
+            d.rectangle([x * cell, y * cell, (x + 1) * cell - 1, (y + 1) * cell - 1], fill=col)
+            d.text((x * cell + 12, y * cell + 10), f"{'ABCDEFGH'[x]}{y + 1}", fill=(255, 255, 255), font=font)
+            d.line([x * cell + 12, y * cell + 54, x * cell + 60, y * cell + 54], fill=(255, 255, 255), width=4)
+    os.makedirs(CACHE, exist_ok=True)
+    im.save(dst + ".tmp.png")
+    os.replace(dst + ".tmp.png", dst)
+    return dst
 
 
 def texture_files(a):
@@ -228,6 +256,29 @@ def set_animation(root, name=None):
     return [n for n, _tl, _an in anims]
 
 
+def set_speed(root, k):
+    """Скорость анимаций (1 - как в файле): длительность каждой - от исходной, запомненной при первом вызове."""
+    for _n, _tl, an in animations(root):
+        base = an.property("libDuration")
+        if not base:
+            base = an.property("duration")
+            an.setProperty("libDuration", base)
+        running = an.property("running")
+        if running:
+            an.setProperty("running", False)
+        an.setProperty("duration", max(1, int(base / max(0.05, k))))
+        if running:
+            an.setProperty("running", True)
+
+
+def refit(root):
+    """Подогнать модель под кадр заново, когда она точно загружена: при смене модели первая подгонка
+    могла взять рамку прошлой (статус загрузчика ещё «готово») - модель выходила мелкой."""
+    if root.property("mode") == "model":
+        root.setProperty("fitted", False)
+        root.fit()
+
+
 def when_loaded(root, fn, tries=60):
     """Вызвать fn(), когда модель загрузилась (подогнана под кадр); анимации появляются только тогда."""
 
@@ -310,7 +361,8 @@ class MiniView(QQuickWidget):
         if self.shown != a["dir"]:
             self.shown = a["dir"]
             load_scene(self.root, a, probe)
-            when_loaded(self.root, lambda: set_animation(self.root))  # в панели модель не дёргается
+            # в панели модель не дёргается; подгонка - по позе покоя
+            when_loaded(self.root, lambda: (set_animation(self.root), refit(self.root)))
         return True
 
     def pause(self, on):
@@ -320,7 +372,7 @@ class MiniView(QQuickWidget):
 
 
 def section(text):
-    return QLabel(text, objectName="faint")
+    return QLabel(text, objectName="sect")
 
 
 class Viewer3D(QDialog):
@@ -362,47 +414,96 @@ class Viewer3D(QDialog):
         lv.addWidget(self.strip_lbl)
         lv.addWidget(self.strip, 1)
 
-        # --- верх: имя, подпись, соседние
-        self.title = QLabel(objectName="head")
-        self.sub = QLabel(objectName="dim")
+        # --- верх: соседние и счёт; имя и раздел - крупно поверх сцены (viewer3d.qml)
         self.prev_b = QPushButton(lib_icon("arrowLeft"), "", objectName="tool")
         self.prev_b.setToolTip("Предыдущий (стрелка влево)")
         self.prev_b.clicked.connect(lambda: self.step(-1))
         self.next_b = QPushButton(lib_icon("arrowRight"), "", objectName="tool")
         self.next_b.setToolTip("Следующий (стрелка вправо)")
         self.next_b.clicked.connect(lambda: self.step(1))
+        self.counter = QLabel(objectName="dim")
+        hint = QLabel(
+            "Тянуть - вращать, колесо - ближе, правая кнопка - сдвиг, стрелки - соседний ассет",
+            objectName="faint",
+        )
         top = QHBoxLayout()
         top.addWidget(self.prev_b)
         top.addWidget(self.next_b)
         top.addSpacing(6)
-        top.addWidget(self.title)
-        top.addWidget(self.sub, 1)
-        hint = QLabel(
-            "Тянуть - вращать, колесо - ближе, правая кнопка - сдвиг, F - вид заново, "
-            "Пробел - вращение, W - каркас, G - пол, стрелки - соседний ассет",
-            objectName="faint",
-            wordWrap=True,
-        )
+        top.addWidget(self.counter)
+        top.addStretch(1)
+        top.addWidget(hint)
+
+        # --- плавающая панель поверх сцены: вид, вращение, каркас, пол, человек, снимок
+        self.hud = QFrame(self.quick, objectName="hud")
+        hl = QHBoxLayout(self.hud)
+        hl.setContentsMargins(8, 6, 8, 6)
+        hl.setSpacing(4)
+
+        def hud_btn(icon, tip, checkable=False):
+            b = QPushButton(lib_icon(icon), "", objectName="hudb", checkable=checkable)
+            b.setToolTip(tip)
+            b.setIconSize(QSize(20, 20))
+            hl.addWidget(b)
+            return b
+
+        self.reset_b = hud_btn("arrow_counterclockwise", "Вид заново (F)")
+        self.reset_b.clicked.connect(self.reset_view)
+        self.spin = hud_btn("rotate_horizontal_up", "Вращать, как на подставке (Пробел)", True)
+        self.spin.toggled.connect(lambda v: self.set("spin", v))
+        self.wire = hud_btn("menuGrid", "Каркас - сетка полигонов (W)", True)
+        self.wire.toggled.connect(lambda v: self.set("wire", v))
+        self.floor = hud_btn("card", "Подиум, тень и сетка (G)", True)
+        self.floor.setChecked(self.cfg.get("ue_floor", True))
+        self.floor.toggled.connect(self.toggle_floor)
+        self.set("floor", self.floor.isChecked())
+        self.human = hud_btn("user-silhouette", "Человек 180 см рядом - сравнить размер (H)", True)
+        self.human.setChecked(self.cfg.get("ue_human", False))
+        self.human.toggled.connect(self.toggle_human)
+        sep = QFrame(objectName="vline")
+        sep.setFixedWidth(1)
+        hl.addWidget(sep)
+        self.shot_b = hud_btn("camera", "Снимок того, что видно сейчас")
+        self.shot_b.clicked.connect(self.screenshot)
+        self.quick.installEventFilter(self)
+
+        # --- шкала анимации под сценой
+        self.tl = None  # (Timeline, TimelineAnimation) играющей анимации
+        self.play_b = QPushButton(objectName="tool")
+        self.play_b.setToolTip("Пауза / играть")
+        self.play_b.clicked.connect(self.toggle_play)
+        self.frame_s = QSlider(Qt.Orientation.Horizontal)
+        self.frame_s.setToolTip("Кадр анимации - тянуть, чтобы посмотреть по кадрам")
+        self.frame_s.sliderMoved.connect(self.scrub)
+        self.frame_lbl = QLabel(objectName="dim")
+        self.frame_lbl.setMinimumWidth(70)
+        self.speed_c = QComboBox()
+        for t, v in (("x0.25", 0.25), ("x0.5", 0.5), ("x1", 1.0), ("x1.5", 1.5), ("x2", 2.0)):
+            self.speed_c.addItem(t, v)
+        self.speed_c.setCurrentIndex(2)
+        self.speed_c.setToolTip("Скорость анимации")
+        self.speed_c.currentIndexChanged.connect(lambda _i: self.anim_speed())
+        self.timeline = QFrame(objectName="spec")
+        tlay = QHBoxLayout(self.timeline)
+        tlay.setContentsMargins(8, 4, 10, 4)
+        self.tl_name = QLabel(objectName="statk")
+        for w in (self.play_b, self.tl_name):
+            tlay.addWidget(w)
+        tlay.addWidget(self.frame_s, 1)
+        tlay.addWidget(self.frame_lbl)
+        tlay.addWidget(self.speed_c)
+        self.timeline.hide()
+        self.tick = QTimer(self, interval=40)
+        self.tick.timeout.connect(self.follow_frame)
+
         mid = QWidget()
         mv = QVBoxLayout(mid)
         mv.setContentsMargins(0, 0, 0, 0)
         mv.addLayout(top)
         mv.addWidget(self.quick, 1)
-        mv.addWidget(hint)
+        mv.addWidget(self.timeline)
 
         # --- панель справа
-        self.reset_b = QPushButton(lib_icon("arrow_counterclockwise"), "Вид заново")
-        self.reset_b.setToolTip("Вернуть камеру (F)")
-        self.reset_b.clicked.connect(self.reset_view)
-        self.spin = QCheckBox("Вращать (Пробел)")
-        self.spin.toggled.connect(lambda v: self.set("spin", v))
-        self.wire = QCheckBox("Каркас (W)")
-        self.wire.setToolTip("Сетка полигонов")
-        self.wire.toggled.connect(lambda v: self.set("wire", v))
-        self.floor = QCheckBox("Пол, тень и сетка (G)")
-        self.floor.setChecked(self.cfg.get("ue_floor", True))
-        self.floor.toggled.connect(self.toggle_floor)
-        self.set("floor", self.floor.isChecked())
         self.shape = QComboBox()
         for t, v, ic in (("Шар", "sphere", "dot_large"), ("Куб", "cube", "dice_3D"), ("Плоскость", "plane", "card")):
             self.shape.addItem(lib_icon(ic), t, v)
@@ -431,12 +532,14 @@ class Viewer3D(QDialog):
         self.sky.toggled.connect(lambda v: self.set("showSky", v))
         self.expo = self.slider(10, 400, 100, "Яркость неба", lambda v: self.set("exposure", v / 100))
         self.rot = self.slider(0, 360, 0, "Поворот неба", lambda v: self.set("skyRotation", float(v)))
-        self.info = QLabel(objectName="dim", wordWrap=True)
-        self.info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.info.setOpenExternalLinks(True)
-        shot = QPushButton(lib_icon("camera"), "Снимок")
-        shot.setToolTip("Сохранить картинку того, что видно сейчас")
-        shot.clicked.connect(self.screenshot)
+        from ui.unreal_panel import AssetCard
+
+        self.info = AssetCard(compact=True)
+        self.info.anim_clicked.connect(self.pick_anim)
+        self.info.tag_clicked.connect(lambda t: (self.tab.q.setText(t), self.tab.win.raise_()))
+        self.info.said.connect(lambda s: self.tab.win.say(s))
+        self.how = QLabel(objectName="dim", wordWrap=True)
+        self.how.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         files = QPushButton(lib_icon("folder"), "Файлы")
         files.clicked.connect(lambda: self.asset and QDesktopServices.openUrl(QUrl.fromLocalFile(self.asset["dir"])))
         proj = QPushButton(lib_icon("export"), "В проект...")
@@ -463,7 +566,6 @@ class Viewer3D(QDialog):
             self.blocks[name] = w
             pv.addWidget(w)
 
-        block("view", section("ВИД"), self.reset_b, self.spin, self.wire, self.floor)
         block(
             "tex",
             section("ФИГУРА"),
@@ -481,19 +583,21 @@ class Viewer3D(QDialog):
         self.try_tile = QSpinBox(minimum=1, maximum=16, value=2, prefix="Повтор x")
         self.try_tile.setToolTip("Сколько раз рисунок повторяется на модели")
         self.try_tile.valueChanged.connect(lambda v: self.set("tiling", float(v)) if self.tryon.currentData() else None)
+        self.try_tile.setEnabled(False)  # у родных материалов повтора нет
         block("try", section("ПРИМЕРИТЬ ТЕКСТУРУ"), self.tryon, self.try_tile)
         self.anim = QComboBox()
         self.anim.setToolTip("Анимации из файла модели: по умолчанию модель стоит спокойно")
         self.anim.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.anim.setMinimumContentsLength(14)
-        self.anim.currentIndexChanged.connect(lambda _i: set_animation(self.root, self.anim.currentData()))
+        self.anim.currentIndexChanged.connect(self.play_anim)
+        self.want_anim = None  # анимация, которую просили сыграть сразу после загрузки (щелчок в панели)
         block("anim", section("АНИМАЦИЯ"), self.anim)
         block("light", section("СВЕТ"), self.env, self.sky)
         block("expo", ("Яркость", self.expo), ("Поворот неба", self.rot))
-        block("info", section("СВЕДЕНИЯ"), self.info)
+        block("info", section("СВЕДЕНИЯ"), self.info, self.how)
         pv.addStretch(1)
         btns = QHBoxLayout()
-        for b in (shot, files, proj):
+        for b in (files, proj):
             btns.addWidget(b)
         pv.addLayout(btns)
         scroll = QScrollArea()
@@ -524,6 +628,7 @@ class Viewer3D(QDialog):
             ("Space", self.spin.toggle),
             ("W", self.wire.toggle),
             ("G", self.floor.toggle),
+            ("H", self.human.toggle),
             ("Escape", self.close),
         ):
             key(seq, self, fn)
@@ -547,6 +652,29 @@ class Viewer3D(QDialog):
         self.cfg["ue_floor"] = v
         self.set("floor", v)
 
+    def toggle_human(self, v):
+        self.cfg["ue_human"] = v
+        self.set("showHuman", v)
+
+    def human_height(self, a):
+        """Рост человека 180 см в единицах сцены: модель вписана в 200 по большей стороне, а её размер
+        в см известен (dims_cm из FBX или размеры с сайта). Нет размера - 0 (кнопка неактивна)."""
+        from ui.unreal_panel import HUMAN_CM, dims_cm
+
+        d = dims_cm(a) if a.get("kind") == "model" else None
+        return HUMAN_CM * 200 / max(d) if d and max(d) > 0 else 0.0
+
+    def eventFilter(self, obj, e):
+        if obj is self.quick and e.type() == e.Type.Resize:
+            self.place_hud()
+        return super().eventFilter(obj, e)
+
+    def place_hud(self):
+        """Плавающая панель - по центру внизу сцены."""
+        self.hud.adjustSize()
+        self.hud.move((self.quick.width() - self.hud.width()) // 2, self.quick.height() - self.hud.height() - 14)
+        self.hud.raise_()
+
     # ------------------------------------------------------------ лента
     def fill_strip(self, current):
         """Те же ассеты, что сейчас во вкладке (раздел, поиск), только те, что можно посмотреть."""
@@ -566,7 +694,7 @@ class Viewer3D(QDialog):
             it.setToolTip(f"{SHORT.get(a.get('kind'), '')}, {a.get('theme', '')}")
             self.strip.addItem(it)
         self.strip.blockSignals(False)
-        self.strip_lbl.setText(f"{len(lst)} шт. - как во вкладке")
+        self.strip_lbl.setText(f"ТАКИЕ ЖЕ, КАК ВО ВКЛАДКЕ: {len(lst)}")
 
     def strip_pick(self, row):
         if 0 <= row < len(self.assets) and self.assets[row] is not self.asset:
@@ -615,6 +743,8 @@ class Viewer3D(QDialog):
         self.tryon.blockSignals(True)
         self.tryon.clear()
         self.tryon.addItem(lib_icon("dice_3D"), "Родные материалы", None)
+        self.tryon.addItem(lib_icon("menuGrid"), "Шахматка - проверить развёртку UV", "checker")
+        self.tryon.insertSeparator(self.tryon.count())
         order = ("Дом - ткани и кожа", "Дом - полы", "Дом - стены", "Дом - плитка и камень")
         tex = [a for a in self.tab.items if a.get("kind") == "tex"]
         tex.sort(key=lambda a: (order.index(a["theme"]) if a.get("theme") in order else 9, a.get("name", "")))
@@ -647,10 +777,16 @@ class Viewer3D(QDialog):
 
     def apply_tryon(self):
         t = self.tryon.currentData()
+        self.try_tile.setEnabled(bool(t))
         if not t or not self.asset or self.asset.get("kind") != "model":
             self.set("tryOn", False)
             return
-        for k, v in materials(t).items():
+        if t == "checker":
+            mats = {k: "" for k in ("normalMap", "roughMap", "metalMap", "aoMap", "heightMap")}
+            mats["baseMap"] = checker()
+        else:
+            mats = materials(t)
+        for k, v in mats.items():
             self.set(k, url(v) if k.endswith("Map") else v)
         self.set("tiling", float(self.try_tile.value()))
         self.set("heightAmount", 0.0)
@@ -699,9 +835,15 @@ class Viewer3D(QDialog):
             self.set("flat", QUrl())
 
     # ------------------------------------------------------------ показать
-    def show_asset(self, a, from_strip=False):
+    def show_asset(self, a, from_strip=False, anim=None):
         if self.root is None:
             return False
+        if anim and self.asset is not None and self.asset["dir"] == a["dir"] and self.anim.count() > 1:
+            self.pick_anim(anim)  # модель уже открыта - только включить анимацию
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            return True
         self.asset = a
         kind = a.get("kind")
         if not from_strip:
@@ -711,10 +853,22 @@ class Viewer3D(QDialog):
                     self.strip.blockSignals(True)
                     self.strip.setCurrentRow(i)
                     self.strip.blockSignals(False)
-        self.title.setText(a.get("name", ""))
-        self.sub.setText("   " + " / ".join(b for b in (U.KINDS.get(kind, ("", ""))[1], a.get("theme", "")) if b))
+        self.set("title", a.get("name", ""))
+        self.set("subtitle", "  /  ".join(b for b in (U.KINDS.get(kind, ("", ""))[1], a.get("theme", "")) if b))
+        row = next((i for i, x in enumerate(self.assets) if x["dir"] == a["dir"]), -1)
+        self.counter.setText(f"{row + 1} из {len(self.assets)}" if row >= 0 else "")
+        hh = self.human_height(a)
+        self.set("humanHeight", hh)
+        self.human.setEnabled(hh > 0)
+        self.human.setToolTip(
+            "Человек 180 см рядом - сравнить размер (H)" if hh > 0 else "Размер модели в сантиметрах неизвестен"
+        )
+        self.set("showHuman", self.human.isChecked() and hh > 0)
+        for b in (self.spin, self.wire, self.floor, self.human):
+            b.setVisible(kind != "hdri")
+        self.place_hud()
+        self.stop_timeline()
         vis = {
-            "view": kind != "hdri",
             "tex": kind == "tex",
             "hdri": kind == "hdri",
             "light": kind != "hdri",
@@ -737,6 +891,7 @@ class Viewer3D(QDialog):
         if kind == "model":
             self.fill_tryon()
             self.apply_tryon()
+            self.want_anim = anim
             when_loaded(self.root, self.fill_anims)
         self.update_info()
         self.reset_view()
@@ -748,6 +903,7 @@ class Viewer3D(QDialog):
     def fill_anims(self):
         """Модель загрузилась: все анимации стоп, список - в выбор (если они есть)."""
         names = set_animation(self.root)
+        refit(self.root)
         self.anim.blockSignals(True)
         self.anim.clear()
         self.anim.addItem("Без анимации (поза покоя)", None)
@@ -755,41 +911,88 @@ class Viewer3D(QDialog):
             self.anim.addItem(n, n)
         self.anim.blockSignals(False)
         self.blocks["anim"].setVisible(bool(names))
+        want, self.want_anim = self.want_anim, None
+        if want and self.anim.findData(want) > 0:
+            self.anim.setCurrentIndex(self.anim.findData(want))
+
+    def pick_anim(self, name):
+        """Щелчок по анимации в сведениях: выбрать её в списке (там же она и заиграет)."""
+        i = self.anim.findData(name)
+        if i > 0:
+            self.anim.setCurrentIndex(i)
+
+    def play_anim(self, _i=0):
+        name = self.anim.currentData()
+        set_animation(self.root, name)
+        self.anim_speed()
+        self.stop_timeline()
+        pick = next(((tl, an) for n, tl, an in animations(self.root) if n == name), None) if name else None
+        if pick is None:
+            return
+        self.tl = pick
+        tl = pick[0]
+        lo, hi = int(tl.property("startFrame") or 0), int(tl.property("endFrame") or 0)
+        self.frame_s.setRange(lo, max(lo + 1, hi))
+        self.tl_name.setText(name.upper())
+        self.timeline.show()
+        self.play_icons(True)
+        self.tick.start()
+
+    def stop_timeline(self):
+        self.tick.stop()
+        self.tl = None
+        self.timeline.hide()
+
+    def play_icons(self, playing):
+        from ui.unreal_panel import play_icon
+
+        self.play_b.setIcon(lib_icon("pause") if playing else play_icon(C["acc"]))
+
+    def toggle_play(self):
+        if self.tl is None:
+            return
+        an = self.tl[1]
+        paused = bool(an.property("paused")) or not an.property("running")
+        if not an.property("running"):
+            an.setProperty("running", True)
+        an.setProperty("paused", not paused)
+        self.play_icons(paused)
+
+    def scrub(self, frame):
+        """Тянут шкалу: анимация на паузе, кадр - с ползунка."""
+        if self.tl is None:
+            return
+        tl, an = self.tl
+        if not an.property("paused"):
+            an.setProperty("paused", True)
+            self.play_icons(False)
+        tl.setProperty("currentFrame", float(frame))
+        self.frame_lbl.setText(f"кадр {frame}")
+
+    def follow_frame(self):
+        if self.tl is None or self.frame_s.isSliderDown():
+            return
+        f = self.tl[0].property("currentFrame") or 0
+        self.frame_s.setValue(int(f))
+        self.frame_lbl.setText(f"кадр {int(f)}")
+
+    def anim_speed(self):
+        if self.root is not None:
+            set_speed(self.root, self.speed_c.currentData() or 1.0)
 
     def update_info(self):
         a = self.asset
         if not a:
             return
-        rows = []
-        if a.get("res"):
-            rows.append(f"Разрешение: {a['res'].upper()}")
-        rows.append(f"Вес: {human(a.get('size', 0))}")
-        if a.get("polycount"):
-            rows.append("Полигонов: " + f"{a['polycount']:,}".replace(",", " "))
-        if a.get("dimensions_mm"):
-            rows.append("Размер: " + " x ".join(f"{x / 10:g}" for x in a["dimensions_mm"]) + " см")
-        elif self.root is not None and self.root.property("sizeText"):
-            rows.append(f"Габариты: {self.root.property('sizeText')} (единицы файла)")
-        if a.get("description"):
-            rows.append(esc(a["description"]))
-        src = a.get("source", "")
-        authors = [x for x in a.get("authors", []) if x != src]
-        if authors:
-            src += ", " + ", ".join(authors)
-        src = esc(src)
-        if a.get("url"):
-            src = f'<a href="{esc(a["url"])}" style="color:{C["acc"]}">{src}</a>'
-        rows.append(src)
-        rows.append("Лицензия: CC0" if U.is_cc0(a) else "Лицензия: " + esc(a.get("license", "")))
-        if a.get("tags"):
-            rows.append("Метки: " + esc(", ".join(a["tags"][:12])))
+        size = self.root.property("sizeText") if self.root is not None else ""
+        self.info.show_asset(a, size_text=size or "")
         # имя файла без пробелов не переносится и раздвигает панель - по одному в строку, длинные с многоточием
         names = [os.path.basename(m) for m in a.get("main", [])]
-        rows.append("Файлы:<br>" + "<br>".join(esc(n if len(n) <= 34 else n[:16] + "..." + n[-15:]) for n in names))
+        rows = ["<b>Файлы</b><br>" + "<br>".join(esc(n if len(n) <= 34 else n[:16] + "..." + n[-15:]) for n in names)]
         how = U.howto(a)
         if how:
-            rows.append(f"<br><b>Как в Unreal.</b> {esc(how)}")
-        self.info.setText("<br>".join(r for r in rows if r))
+            rows.append(f"<b>Как в Unreal.</b> {esc(how)}")
+        self.how.setText("<br><br>".join(rows))
 
     # ------------------------------------------------------------ кнопки
     def screenshot(self):

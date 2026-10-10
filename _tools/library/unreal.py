@@ -306,6 +306,14 @@ KENNEY_HOWTO = (
 )
 
 
+# новые наборы Kenney: цвета в текстуре из папки Textures рядом с FBX (colormap.png или скины персонажей)
+KENNEY_TEX_HOWTO = (
+    "Перетащите .fbx в Content Browser вместе с папкой Textures (FBX ищет текстуру рядом), в окне импорта "
+    "оставьте Import Materials и Import Textures. Если модель вышла крошечной - Import Uniform Scale 100 "
+    "(Kenney меряет в метрах, Unreal - в сантиметрах)."
+)
+
+
 QUATERNIUS_HOWTO = (
     "Перетащите .fbx в Content Browser, в окне импорта оставьте Import Materials - цвета у Quaternius "
     "в материалах, текстур нет. Если модель вышла крошечной - Import Uniform Scale 100."
@@ -330,7 +338,7 @@ def howto(a):
     if a.get("source") == "KayKit":
         return KAYKIT_HOWTO
     if a.get("source") == "Kenney":
-        return KENNEY_HOWTO
+        return KENNEY_TEX_HOWTO if a.get("extra") else KENNEY_HOWTO
     if a.get("source") == "Quaternius":
         return QUATERNIUS_HOWTO
     return a.get("howto") or HOWTO.get(a.get("kind"), "")
@@ -493,6 +501,19 @@ def kenney_candidates(pack, categories=("furniture",)):
     return out
 
 
+def kenney_description(extra):
+    """Описание модели Kenney по текстурам рядом: общая colormap.png, свои текстуры (скины персонажей) или никаких."""
+    if any(os.path.basename(x).lower() == "colormap.png" for x in extra):
+        how = " с цветами в общей текстуре colormap.png"
+    elif extra and all(os.path.basename(x).lower().startswith("texture-") for x in extra):
+        how = f" с текстурой-раскраской из папки Textures ({len(extra)} сменных вариантов)"
+    elif extra:
+        how = f" с текстурами из папки Textures ({len(extra)} шт.)"
+    else:
+        how = " с цветами в вершинах, без текстур"
+    return "Простая low-poly модель" + how + " - для прототипов и черновой расстановки."
+
+
 def fetch_kenney(cand, dst):
     """FBX набора + общая текстура цветов (у новых наборов FBX ссылается на Textures/colormap.png -
     без неё модель белая) + превью (Isometric у старых наборов, Previews у новых)."""
@@ -525,9 +546,7 @@ def fetch_kenney(cand, dst):
         "tags": ["low-poly", "kenney", kit],
         "categories": cand.get("categories") or ["furniture"],
         "main": [fn],
-        "description": "Простая low-poly модель"
-        + (" с цветами в общей текстуре colormap.png" if extra else " с цветами в вершинах, без текстур")
-        + " - для прототипов и черновой расстановки.",
+        "description": kenney_description(extra),
     }
     if extra:
         meta["extra"] = extra  # не импортируются отдельно, но едут рядом с FBX

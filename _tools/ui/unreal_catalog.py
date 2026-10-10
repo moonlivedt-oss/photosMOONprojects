@@ -25,6 +25,7 @@ from library import unreal as U
 from ui.common import CLOSING, HERE, PIX, ROLE, THUMB, bg, in_main, log_error
 from ui.thumbnails import lib_icon, remember, thumb_key, tile_image
 from ui.unreal_nav import THEME_ICON, theme_label
+from ui.unreal_panel import count_text
 from ui.unreal_tiles import ASSET, CARD, CardList, card_of
 
 THUMBS = os.path.join(HERE, "_thumbs", "ue_catalog")
@@ -196,7 +197,7 @@ class CatalogDialog(QDialog):
             info = c["info"]
             sub = ", ".join(info.get("categories", [])[:2])
             if info.get("polycount"):
-                sub += f", {info['polycount'] // 1000}k полиг."
+                sub += f", {count_text(info['polycount'])} полиг."
             it = QListWidgetItem(c["name"])
             it.setData(ASSET, c)
             it.setData(ROLE, "")
