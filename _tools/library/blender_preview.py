@@ -85,6 +85,102 @@ def render(fbx_files, dst, cfg=None, timeout=600):
     return True
 
 
+# ---------------------------------------------------------------- модель с четырёх сторон (для помощника)
+VIEWS = (("спереди", 0, 0.15), ("справа", 90, 0.15), ("сзади", 180, 0.15), ("сверху", 35, 1.05))
+
+VIEWS_SCRIPT = r"""
+import bpy, math, mathutils
+FILES, OUT, VIEWS, SIDE = {files!r}, {out!r}, {views!r}, {side!r}
+bpy.ops.wm.read_factory_settings(use_empty=True)
+for f in FILES:
+    try:
+        bpy.ops.import_scene.fbx(filepath=f, use_anim=False)
+    except Exception as e:
+        print("Библиотека: не открылся", f, e)
+objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+lo = mathutils.Vector((1e9, 1e9, 1e9)); hi = -lo
+for o in objs:
+    for c in o.bound_box:
+        w = o.matrix_world @ mathutils.Vector(c)
+        lo = mathutils.Vector(map(min, lo, w)); hi = mathutils.Vector(map(max, hi, w))
+center, size = (lo + hi) / 2, max((hi - lo).length, 1e-3)
+for m in bpy.data.materials:
+    if m.use_nodes:
+        bsdf = m.node_tree.nodes.get("Principled BSDF")
+        if bsdf and not bsdf.inputs["Base Color"].is_linked:
+            bsdf.inputs["Base Color"].default_value = (0.55, 0.55, 0.58, 1)
+world = bpy.data.worlds.new("w"); world.color = (0.5, 0.5, 0.52); bpy.context.scene.world = world
+cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
+bpy.context.scene.collection.objects.link(cam)
+cam.data.lens = 50
+bpy.context.scene.camera = cam
+key = bpy.data.objects.new("key", bpy.data.lights.new("key", "SUN"))
+key.data.energy = 3.0
+bpy.context.scene.collection.objects.link(key)
+sc = bpy.context.scene
+sc.render.engine = "BLENDER_EEVEE"
+sc.render.resolution_x = sc.render.resolution_y = SIDE
+sc.render.film_transparent = True
+d = size * 1.55
+for i, (name, ang, up) in enumerate(VIEWS):
+    a = math.radians(ang)
+    cam.location = center + mathutils.Vector((math.sin(a) * d, -math.cos(a) * d, up * d))
+    cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
+    key.rotation_euler = (center - (cam.location + mathutils.Vector((d * 0.4, 0, d * 0.6)))).to_track_quat("-Z", "Y").to_euler()
+    sc.render.filepath = OUT + "_%d.png" % i
+    bpy.ops.render.render(write_still=True)
+"""
+
+
+def views(fbx_files, cache, cfg=None, side=384, timeout=600):
+    """Модель с четырёх сторон листом 2x2 с подписями (спереди, справа, сзади, сверху) -> PIL.Image или None.
+    cache - путь файла: лист пересчитывается, только если FBX новее."""
+    from PIL import ImageDraw
+
+    newest = max((os.path.getmtime(f) for f in fbx_files if os.path.exists(f)), default=0)
+    if os.path.exists(cache) and os.path.getmtime(cache) >= newest:
+        with Image.open(cache) as im:
+            return im.convert("RGB")
+    exe = B.find_blender(cfg)
+    if not exe:
+        return None
+    tmp = tempfile.mkdtemp(prefix="bl_views_")
+    base = os.path.join(tmp, "v")
+    script = os.path.join(tmp, "views.py")
+    with open(script, "w", encoding="utf-8") as fh:
+        fh.write(VIEWS_SCRIPT.format(files=[os.path.realpath(f) for f in fbx_files], out=base, views=VIEWS, side=side))
+    subprocess.run(
+        [exe, "-b", "--factory-startup", "--python", script],
+        capture_output=True,
+        timeout=timeout,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    cap, pad = 26, 8
+    sheet = Image.new("RGB", (2 * side + 3 * pad, 2 * (side + cap) + 3 * pad), (21, 21, 28))
+    d = ImageDraw.Draw(sheet)
+    from imaging.sprites import _font
+
+    font = _font(15)  # с кириллицей
+    got = 0
+    for i, (name, _a, _u) in enumerate(VIEWS):
+        png = f"{base}_{i}.png"
+        x, y = pad + (i % 2) * (side + pad), pad + (i // 2) * (side + cap + pad)
+        tile = Image.new("RGBA", (side, side), (44, 44, 56, 255))
+        if os.path.exists(png):
+            with Image.open(png) as im:
+                tile.alpha_composite(im.convert("RGBA").resize((side, side)))
+            got += 1
+        sheet.paste(tile.convert("RGB"), (x, y))
+        d.text((x + side / 2, y + side + 5), name, fill=(220, 218, 232), font=font, anchor="ma")
+    if not got:
+        return None
+    try:
+        sheet.save(cache, quality=88)
+    except OSError:
+        pass
+    return sheet
+
+
 VIEW_SCRIPT = r"""
 import bpy
 FILES, OUT = {files!r}, {out!r}

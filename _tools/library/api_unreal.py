@@ -429,6 +429,61 @@ def ue_compare(ids):
 
 
 @tool(
+    "ue_views",
+    "Изучить ассет со всех сторон одним листом: модель - с четырёх сторон (спереди, справа, сзади, сверху; рендер "
+    "Blender в фоне, первый раз - до минуты, потом из кэша), текстура - все её карты с подписями (цвет, нормаль, "
+    "шероховатость...), HDRI - панорама. Для «как это выглядит сзади», «подойдёт ли сбоку».",
+    {"id": {"type": "string"}},
+    ["id"],
+)
+def ue_views(id):  # noqa: A002
+    a = _by_ids([id])[0]
+    kind = a.get("kind")
+    if kind == "model":
+        from library import blender_preview
+
+        fbx = [os.path.join(a["dir"], *m.split("/")) for m in a.get("main", []) if m.lower().endswith(".fbx")]
+        if not fbx:
+            raise ApiError("У модели нет FBX - смотрите ue_view (превью).")
+        im = blender_preview.views(fbx, os.path.join(a["dir"], "_views.webp"))
+        if im is None:
+            raise ApiError("Blender не найден или модель не открылась - ue_view покажет обычное превью.")
+        return Picture(im, f"{a.get('name', '')} ({_key(a)}): спереди, справа, сзади, сверху.\n" + _as_text(_brief(a)))
+    if kind == "tex":
+        from library.unreal_import import role_of
+
+        names = {
+            "color": "цвет",
+            "normal": "нормаль",
+            "arm": "AO/шероховатость/металл",
+            "rough": "шероховатость",
+            "metal": "металл",
+            "ao": "AO",
+            "height": "высота",
+        }
+        files = [
+            f
+            for f in sorted(os.listdir(a["dir"]))
+            if f.lower().endswith((".jpg", ".jpeg", ".png")) and not f.startswith("preview") and role_of(f)
+        ]
+        ims, labels = [], []
+        for f in files[:9]:
+            try:
+                with Image.open(os.path.join(a["dir"], f)) as im:
+                    im.draft("RGB", (512, 512))
+                    ims.append(im.convert("RGB").resize((256, 256)))
+                labels.append(names.get(role_of(f), f))
+            except OSError:
+                continue
+        prev = _preview(a)
+        if prev is not None:
+            ims.insert(0, prev)
+            labels.insert(0, "на шаре")
+        return Picture(sheet(ims, labels), f"{a.get('name', '')} ({_key(a)}): " + ", ".join(labels))
+    return ue_view([id])
+
+
+@tool(
     "ue_view",
     "Посмотреть превью ассетов Unreal листом с номерами (по id из ue_search).",
     {"ids": {"type": "array", "items": {"type": "string"}}},

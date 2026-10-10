@@ -111,6 +111,7 @@ class Api(unittest.TestCase):
             "ue_kit",
             "ue_similar",
             "ue_compare",
+            "ue_views",
             "versions",
             "restore_version",
         ):
