@@ -90,7 +90,6 @@ class UnrealTab(QWidget):
         scene = QPushButton(lib_icon("sparkles"), "Подборка по описанию...", objectName="ghost")
         scene.setToolTip("ИИ соберёт комнату из скачанного: «уютная спальня в скандинавском стиле»")
         scene.clicked.connect(self.scene)
-        self.scene_btn = scene
         cat = QPushButton(lib_icon("globe"), "Каталог...", objectName="ghost")
         cat.setToolTip("Весь каталог Poly Haven с картинками: отметить нужное и скачать")
         cat.clicked.connect(self.catalog)

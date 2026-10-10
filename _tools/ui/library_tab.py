@@ -808,7 +808,7 @@ class LibTab(QWidget):
                 ("Недавние", RECENT, "hourglass", "#6cb8ff", "последние сохранённые картинки"),
                 ("Избранное", FAV, "star", "#ff8ac9", "отмечено звездой (Ctrl+D)"),
                 ("Наборы", SETS, "color-palette", "#a897ff", "папки с палитрами - одной обложкой"),
-                ("Тяжёлые", HEAVY, "zip-archive", "#f0a35e", "тяжелее 500 КБ - можно сжать"),
+                ("Тяжёлые", HEAVY, "zip-archive", "#f0a35e", f"тяжелее {HEAVY_KB} КБ - можно сжать"),
             )
         ):
             c = KindCard(role, (text, icon, color), hint)

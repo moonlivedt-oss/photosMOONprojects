@@ -53,11 +53,6 @@ def dims_cm(a):
     return a.get("dims_cm") or None
 
 
-def dims_text(a):
-    d = dims_cm(a)
-    return " x ".join(f"{x:.0f}" if x >= 10 else f"{x:g}" for x in d) if d else ""
-
-
 def license_look(a):
     """(подпись, цвет, подсказка) плашки лицензии."""
     if U.is_cc0(a):
