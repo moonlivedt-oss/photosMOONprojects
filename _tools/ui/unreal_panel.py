@@ -7,7 +7,7 @@ import math
 import os
 from html import escape as esc
 
-from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QPointF, QRect, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QBrush,
     QColor,
@@ -21,14 +21,14 @@ from PyQt6.QtGui import (
     QPolygonF,
     QRadialGradient,
 )
-from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QLayout, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 import imaging as K
 from library import unreal as U
 from ui.common import human, log_error
 from ui.theme import C, readable
 from ui.unreal_nav import KIND_LOOK, theme_label
-from ui.widgets import PicView
+from ui.widgets import Flow, PicView
 
 KIND_NAME = {"tex": "Текстура", "hdri": "HDRI", "model": "Модель", "ies": "Свет IES"}
 KIND_MANY = {"model": "моделей", "tex": "текстур", "hdri": "HDRI", "ies": "профилей IES"}
@@ -477,61 +477,6 @@ class PaletteBar(QWidget):
 
 
 # ---------------------------------------------------------------- раскладка и мелкие виджеты
-class Flow(QLayout):
-    """Раскладка «строками с переносом» - для плашек и меток."""
-
-    def __init__(self, parent=None, gap=5):
-        super().__init__(parent)
-        self.items, self.gap = [], gap
-        self.setContentsMargins(0, 0, 0, 0)
-
-    def addItem(self, item):
-        self.items.append(item)
-
-    def count(self):
-        return len(self.items)
-
-    def itemAt(self, i):
-        return self.items[i] if 0 <= i < len(self.items) else None
-
-    def takeAt(self, i):
-        return self.items.pop(i) if 0 <= i < len(self.items) else None
-
-    def expandingDirections(self):
-        return Qt.Orientation(0)
-
-    def hasHeightForWidth(self):
-        return True
-
-    def heightForWidth(self, w):
-        return self.place(QRect(0, 0, w, 0), True)
-
-    def setGeometry(self, r):
-        super().setGeometry(r)
-        self.place(r, False)
-
-    def sizeHint(self):
-        return self.minimumSize()
-
-    def minimumSize(self):
-        s = QSize()
-        for it in self.items:
-            s = s.expandedTo(it.minimumSize())
-        return s
-
-    def place(self, r, test):
-        x, y, line = r.x(), r.y(), 0
-        for it in self.items:
-            hint = it.sizeHint()
-            if x + hint.width() > r.right() + 1 and line > 0:
-                x, y, line = r.x(), y + line + self.gap, 0
-            if not test:
-                it.setGeometry(QRect(QPoint(x, y), hint))
-            x += hint.width() + self.gap
-            line = max(line, hint.height())
-        return y + line - r.y()
-
-
 def pill(text, color, tip=""):
     w = QLabel(text)
     c = QColor(readable(color))

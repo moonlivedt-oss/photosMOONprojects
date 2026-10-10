@@ -1,12 +1,15 @@
 """Мелкие общие виджеты: дерево разделов, списки плиток, горячие клавиши, выбор папки."""
 
 import os
+import re
 import time
 
 from PyQt6.QtCore import (
     QEasingCurve,
     QMimeData,
+    QPoint,
     QPointF,
+    QRect,
     QRectF,
     QSize,
     Qt,
@@ -34,9 +37,13 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHeaderView,
     QInputDialog,
+    QLayout,
     QListWidget,
     QPushButton,
     QSizePolicy,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -49,6 +56,62 @@ from library.sorting import PLANNED
 from ui.common import CLOSING, FAV, HEAVY, LIB, PIX, RECENT, ROLE, SETS, SMART, TAG, bg, clean_name
 from ui.theme import C, readable
 from ui.thumbnails import TileDelegate, lib_icon, lib_pix, remember, thumb_key, tile_image
+
+
+class Flow(QLayout):
+    """Раскладка «строками с переносом» - для плашек и меток."""
+
+    def __init__(self, parent=None, gap=5):
+        super().__init__(parent)
+        self.items, self.gap = [], gap
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item):
+        self.items.append(item)
+
+    def count(self):
+        return len(self.items)
+
+    def itemAt(self, i):
+        return self.items[i] if 0 <= i < len(self.items) else None
+
+    def takeAt(self, i):
+        return self.items.pop(i) if 0 <= i < len(self.items) else None
+
+    def expandingDirections(self):
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, w):
+        return self.place(QRect(0, 0, w, 0), True)
+
+    def setGeometry(self, r):
+        super().setGeometry(r)
+        self.place(r, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        s = QSize()
+        for it in self.items:
+            s = s.expandedTo(it.minimumSize())
+        return s
+
+    def place(self, r, test):
+        x, y, line = r.x(), r.y(), 0
+        for it in self.items:
+            hint = it.sizeHint()
+            if x + hint.width() > r.right() + 1 and line > 0:
+                x, y, line = r.x(), y + line + self.gap, 0
+            if not test:
+                it.setGeometry(QRect(QPoint(x, y), hint))
+            x += hint.width() + self.gap
+            line = max(line, hint.height())
+        return y + line - r.y()
+
 
 # ---------------------------------------------------------------- дерево разделов
 _counts = [0.0, {}]
@@ -138,7 +201,9 @@ def fill_tree(tree, planned=True, recent=False):
             ("Наборы", SETS, "color-palette"),
             ("Тяжёлые", HEAVY, "zip-archive"),
         ):
-            tree_item(tree, text, role, lib_icon(icon)).setHidden(True)
+            it = tree_item(tree, text, role, lib_icon(icon))
+            it.setData(0, HIDDEN, True)  # и поиск по дереву их не показывает
+            it.setHidden(True)
         try:
             tags = db.all_tags().most_common(40)
         except Exception:
@@ -187,6 +252,7 @@ def fill_tree(tree, planned=True, recent=False):
             it.setText(1, "новый")
             it.setToolTip(0, "Папки пока нет - появится при первом сохранении в неё")
             it.setForeground(0, QColor("#7d7a8c"))
+    set_shares(tree)
     select_path(tree, keep)
 
 
@@ -207,8 +273,106 @@ def select_path(tree, path):
     return walk(tree.invisibleRootItem())
 
 
+SHARE = Qt.ItemDataRole.UserRole + 40  # доля числа среди соседей (0..1) - полоска под числом
+HIDDEN = Qt.ItemDataRole.UserRole + 41  # служебная строка, всегда скрыта
+NUM = re.compile(r"^(\d\d) (.+)$")  # «06 Иллюстрации»: номер - для порядка, рисуется мелко и бледно
+
+
+class NameDelegate(QStyledItemDelegate):
+    """Имя в дереве: номер раздела («06 ») бледным, само имя - обычным; длинное имя не теряет главное."""
+
+    def paint(self, p, opt, index):
+        m = NUM.match(index.data() or "")
+        if not m:
+            return super().paint(p, opt, index)
+        opt = QStyleOptionViewItem(opt)  # своя копия: вид отдаёт тот же объект следующему столбцу (числу)
+        self.initStyleOption(opt, index)
+        opt.text = ""
+        style = opt.widget.style() if opt.widget else None
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, p, opt.widget)
+        r = style.subElementRect(QStyle.SubElement.SE_ItemViewItemText, opt, opt.widget)
+        p.save()
+        f = QFont(opt.font)
+        f.setPointSizeF(max(6.5, f.pointSizeF() - 1.5))
+        p.setFont(f)
+        p.setPen(QColor(C["faint"]))
+        num = m.group(1)
+        w = p.fontMetrics().horizontalAdvance(num) + 6
+        p.drawText(r.adjusted(2, 0, 0, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, num)
+        p.setFont(opt.font)
+        sel = opt.state & QStyle.StateFlag.State_Selected
+        fg = index.data(Qt.ItemDataRole.ForegroundRole)
+        p.setPen(QColor(C["selt"]) if sel else (fg.color() if fg is not None else QColor(C["text"])))
+        rest = r.adjusted(2 + w, 0, 0, 0)
+        name = p.fontMetrics().elidedText(m.group(2), Qt.TextElideMode.ElideRight, rest.width())
+        p.drawText(rest, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, name)
+        p.restore()
+
+
+class CountDelegate(QStyledItemDelegate):
+    """Число справа и под ним тонкая полоска - доля среди соседей: сразу видно, где 1436, а где 160."""
+
+    def paint(self, p, opt, index):
+        super().paint(p, opt, index)
+        share = index.data(SHARE)
+        if not share:
+            return
+        fg = index.data(Qt.ItemDataRole.ForegroundRole)
+        col = QColor(fg.color() if fg is not None else QColor(C["acc"]))
+        col.setAlpha(150)
+        r = QRectF(opt.rect).adjusted(6, 0, -6, 0)
+        w = max(2.0, r.width() * min(1.0, share))
+        p.save()
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(col)
+        p.drawRoundedRect(QRectF(r.right() - w, r.bottom() - 4, w, 2), 1, 1)
+        p.restore()
+
+
+def set_shares(tree):
+    """Доли чисел среди соседей (у каждого родителя - своя шкала). Строки без роли («Все группы») - без полоски."""
+
+    def walk(parent):
+        kids = [parent.child(i) for i in range(parent.childCount())]
+        nums = []
+        for it in kids:
+            t = it.text(1)
+            nums.append(int(t) if t.isdigit() and it.data(0, ROLE) else 0)
+        top = max(nums, default=0)
+        for it, n in zip(kids, nums):
+            it.setData(1, SHARE, n / top if top and n else None)
+            walk(it)
+
+    walk(tree.invisibleRootItem())
+
+
+def filter_tree(tree, text):
+    """Оставить строки, где есть text (и их родителей; у найденного видны все его разделы)."""
+    text = text.strip().lower().replace("ё", "е")
+
+    def walk(it, parent_hit=False):
+        own = bool(text) and text in it.text(0).lower().replace("ё", "е")
+        any_kid = False
+        for i in range(it.childCount()):
+            any_kid |= walk(it.child(i), parent_hit or own)
+        show = not text or own or any_kid or parent_hit
+        if it.flags() == Qt.ItemFlag.NoItemFlags:  # подписи групп («РАЗДЕЛЫ») - только без поиска
+            show = not text
+        it.setHidden(not show or bool(it.data(0, HIDDEN)))
+        if text and any_kid:
+            it.setExpanded(True)
+        return show and it.flags() != Qt.ItemFlag.NoItemFlags
+
+    root = tree.invisibleRootItem()
+    for i in range(root.childCount()):
+        walk(root.child(i))
+
+
 def make_tree():
     t = QTreeWidget()
+    t.setItemDelegateForColumn(0, NameDelegate(t))
+    t.setItemDelegateForColumn(1, CountDelegate(t))
     t.setHeaderHidden(True)
     t.setColumnCount(2)  # имя и число картинок справа: длинное имя не съедает число
     t.header().setStretchLastSection(False)

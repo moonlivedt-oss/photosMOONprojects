@@ -82,6 +82,7 @@ from ui.widgets import (
     PicView,
     TagHints,
     fill_tree,
+    filter_tree,
     forget_counts,
     key,
     make_tree,
@@ -766,7 +767,15 @@ class LibTab(QWidget):
         rv = QVBoxLayout(mid)
         rv.setContentsMargins(0, 0, 0, 0)
         rv.addLayout(bar)
-        rv.addWidget(self.title)
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.addWidget(self.title, 1)
+        self.squeeze = QPushButton(lib_icon("zip-archive"), "Сжать все", objectName="primary")
+        self.squeeze.setToolTip("Открыть сжатие сразу для всех тяжёлых картинок (оригиналы уходят в _sources)")
+        self.squeeze.clicked.connect(self.compress_all)
+        self.squeeze.hide()
+        title_row.addWidget(self.squeeze)
+        rv.addLayout(title_row)
         # общий поиск: подходящие по смыслу ассеты Unreal - полосой над картинками
         self.ue_box = QWidget()
         ub = QVBoxLayout(self.ue_box)
@@ -800,7 +809,9 @@ class LibTab(QWidget):
         lv.setContentsMargins(0, 0, 0, 0)
         lv.setSpacing(4)
         lv.addWidget(QLabel("БЫСТРЫЙ ДОСТУП", objectName="faint"))
-        grid = QGridLayout()
+        self.quick_box = QWidget()  # карточки: столбиком, на широкой панели - сеткой 2x2 (place_quick)
+        grid = self.quick_grid = QGridLayout(self.quick_box)
+        grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(4)
         self.quick = {}
         for i, (text, role, icon, color, hint) in enumerate(
@@ -812,17 +823,19 @@ class LibTab(QWidget):
             )
         ):
             c = KindCard(role, (text, icon, color), hint)
-            c.set_sub(
-                {RECENT: "последние сохранённые", FAV: "отмечено звездой", SETS: "по палитрам", HEAVY: "можно сжать"}[
-                    role
-                ]
-            )
             c.clicked.connect(lambda _c=False, r=role: self.show_section(r))
             self.quick[role] = c
             grid.addWidget(c, i, 0)
-        lv.addLayout(grid)
+        self.quick_cols = 1
+        lv.addWidget(self.quick_box)
         lv.addSpacing(6)
+        self.find_sec = QLineEdit(placeholderText="Найти раздел или метку...")
+        self.find_sec.setClearButtonEnabled(True)
+        self.find_sec.textChanged.connect(lambda t: filter_tree(self.tree, t))
+        lv.addWidget(self.find_sec)
         lv.addWidget(self.tree, 1)
+        left.installEventFilter(self)  # ширина панели -> карточки столбиком или сеткой
+        self.left = left
         self.tree.currentItemChanged.connect(self.sync_quick)
         self.split = QSplitter()
         for w in (left, mid, self.preview):
@@ -874,6 +887,9 @@ class LibTab(QWidget):
         self.tree.blockSignals(False)
         cur = self.tree.currentItem()
         self.here = cur.data(0, ROLE) if cur else None
+        if self.find_sec.text():
+            filter_tree(self.tree, self.find_sec.text())
+        self.quick_stats()
         self.leave_similar()
 
     def cycle_back(self):
@@ -906,6 +922,10 @@ class LibTab(QWidget):
     # --- навигация
     def eventFilter(self, obj, e):
         t = e.type()
+        if obj is getattr(self, "left", None):
+            if t == QEvent.Type.Resize:
+                self.place_quick(obj.width())
+            return False
         if obj is self.q and t in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.Drop):
             return self.search_drop(e, t)
         if t == QEvent.Type.MouseButtonPress and e.button() == Qt.MouseButton.BackButton:
@@ -1014,6 +1034,50 @@ class LibTab(QWidget):
     def show_filter_count(self):
         n = sum(1 for k, v in self.filt.items() if v != FILTER_DEFAULT[k])
         self.filt_btn.setText(f"Фильтры: {n}" if n else "Фильтры")
+
+    def place_quick(self, width):
+        """Шире 380 - карточки сеткой 2x2 (дереву остаётся больше места), уже - столбиком."""
+        cols = 2 if width >= 380 else 1
+        if cols == self.quick_cols:
+            return
+        self.quick_cols = cols
+        for i, c in enumerate(self.quick.values()):
+            self.quick_grid.removeWidget(c)
+            self.quick_grid.addWidget(c, i // cols, i % cols)
+
+    def quick_stats(self):
+        """Живые цифры на карточках быстрого доступа: за неделю, в избранном, наборов, тяжёлых и сколько весят."""
+        week, heavy, heavy_size = time.time() - 7 * 86400, 0, 0
+        new = 0
+        for f in K.images_in(LIB):
+            try:
+                st = os.stat(f)
+            except OSError:
+                continue
+            new += st.st_mtime > week
+            if st.st_size > HEAVY_KB * 1024:
+                heavy += 1
+                heavy_size += st.st_size
+        try:
+            favs = len(db.favs())
+        except Exception:
+            favs = 0
+        try:
+            sets = len(find_sets())
+        except Exception:
+            sets = 0
+        q = self.quick
+        q[RECENT].set_sub(f"за неделю: {new} шт." if new else "за неделю ничего")
+        q[FAV].set_sub(f"{favs} шт." if favs else "пока пусто (Ctrl+D)")
+        q[SETS].set_sub(plural(sets, "набор", "набора", "наборов") if sets else "пока нет")
+        q[HEAVY].set_sub(f"{heavy} шт., {human(heavy_size)}" if heavy else "всё сжато")
+        self.heavy_n = heavy
+
+    def compress_all(self):
+        """«Сжать все» в разделе «Тяжёлые» - все показанные плитки разом."""
+        files = self.all_shown()
+        if files:
+            self.compress(files)
 
     def sync_quick(self, it, _prev=None):
         role = it.data(0, ROLE) if it else None
@@ -1402,6 +1466,7 @@ class LibTab(QWidget):
         self.title.setText(
             "%s   <span style='color:#8a879a;font-weight:400'>%d</span>" % (html.escape(head), n) if head else ""
         )
+        self.squeeze.setVisible(root == HEAVY and n > 0 and not words and not code)
         if n:
             self.list.empty = ""
         elif words or code:
