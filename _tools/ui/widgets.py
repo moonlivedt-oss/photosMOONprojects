@@ -463,6 +463,7 @@ class LibList(QListWidget):
     Здесь же живут анимации плиток: наведение (hover_amount) и проявление после загрузки (fade_amount)."""
 
     zoom = pyqtSignal(int)
+    hovered = pyqtSignal(int)  # строка под мышью (-1 - ни одной): вкладка Unreal крутит модель в панели
     FADE = 0.28  # секунд на проявление загруженной плитки
 
     def __init__(self, side):
@@ -591,6 +592,7 @@ class LibList(QListWidget):
         if row != self.hover_row:
             self.hover_row = row
             self.anim.start()
+            self.hovered.emit(row)
 
     def mouseMoveEvent(self, e):
         super().mouseMoveEvent(e)

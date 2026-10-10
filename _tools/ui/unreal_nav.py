@@ -255,6 +255,7 @@ class Nav(QWidget):
     """kind - ALL / FAV / вид; theme - None (все темы) / HOME / имя темы."""
 
     changed = pyqtSignal()
+    node_menu = pyqtSignal(object, str)  # правый щелчок по группе или разделу: (ключ узла, подпись)
 
     def __init__(self, cfg):
         super().__init__()
@@ -288,6 +289,8 @@ class Nav(QWidget):
         v.addWidget(self.style)
         self.tree = make_tree()
         self.tree.currentItemChanged.connect(self.pick_theme)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._node_menu)
         v.addWidget(self.tree, 1)
 
     # ------------------------------------------------------------
@@ -427,9 +430,15 @@ class Nav(QWidget):
         self.changed.emit()
 
     # ------------------------------------------------------------
-    def chosen(self):
+    def _node_menu(self, pos):
+        it = self.tree.itemAt(pos)
+        if it is not None:
+            self.node_menu.emit(it.data(0, ROLE), it.text(0))
+
+    def chosen(self, theme=False):
+        """Ассеты выбранного узла дерева (или узла theme - для меню по правому щелчку)."""
         lst = self.of_kind(self.kind)
-        th = self.theme
+        th = self.theme if theme is False else theme
         if th and th.startswith(SET):
             ids = set(self.sets().get(th[len(SET) :], []))
             return [a for a in lst if a.get("id") in ids]

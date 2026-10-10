@@ -170,3 +170,76 @@ def check(items=None):
         for a in group[1:]:
             out.append((a, f"повтор: {keep.get('name', '')} ({keep.get('source', '')}) - можно убрать"))
     return out
+
+
+# ---------------------------------------------------------------- полигоны, размеры, скелет (из FBX)
+META_STORE = os.path.join(os.path.dirname(CACHE), "_unreal_meta.json")
+
+
+def _fbx_of(a):
+    return next((m for m in a.get("main", []) if m.lower().endswith(".fbx")), None)
+
+
+def _meta_key(a):
+    m = _fbx_of(a)
+    if not m:
+        return None
+    t = a.get("_t")  # время asset.json из обхода assets(): перекачанный ассет - новые сведения
+    if t is None:
+        try:
+            t = os.path.getmtime(os.path.join(a["dir"], "asset.json"))
+        except OSError:
+            return None
+    return f"{os.path.relpath(a['dir'], ROOT)}|{m}|{t:.0f}"
+
+
+def load_meta():
+    try:
+        with open(META_STORE, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def build_meta(items, cache=None, progress=None, stop=None):
+    """Треугольники, размеры, скелет и анимации моделей (library/fbx_meta) - досчитываются новые.
+    asset.json не трогается: иначе «Новое» и поиск по смыслу сочли бы ассет изменённым. -> {ключ: сведения}."""
+    from library import fbx_meta
+
+    cache = load_meta() if cache is None else cache
+    todo = [a for a in items if a.get("kind") == "model" and _meta_key(a) not in cache]
+    for i, a in enumerate(todo):
+        if stop is not None and stop.is_set():
+            break
+        k = _meta_key(a)
+        if k is None:
+            continue
+        try:
+            cache[k] = fbx_meta.read(os.path.join(a["dir"], *_fbx_of(a).split("/"))) or {}
+        except Exception:
+            cache[k] = {}
+        if progress and i % 100 == 0:
+            progress(i, len(todo))
+    if todo:
+        with _lock:
+            K.write_atomic(META_STORE, json.dumps(cache, ensure_ascii=False), "utf-8")
+    return cache
+
+
+def apply_meta(items, cache=None):
+    """Сведения из FBX - в ассеты (в памяти): polycount (если каталог его не дал), dims_cm, rigged, animations."""
+    cache = load_meta() if cache is None else cache
+    for a in items:
+        if a.get("kind") != "model":
+            continue
+        m = cache.get(_meta_key(a) or "")
+        if not m:
+            continue
+        if not a.get("polycount") and m.get("triangles"):
+            a["polycount"] = m["triangles"]
+        if m.get("dims_cm") and not a.get("dimensions_mm"):
+            a["dims_cm"] = m["dims_cm"]
+        a["rigged"] = bool(m.get("rigged"))
+        if m.get("animations"):
+            a["animations"] = m["animations"]
+    return items

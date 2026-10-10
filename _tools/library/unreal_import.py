@@ -54,6 +54,7 @@ def plan(assets, dst):
         jobs.append(
             {
                 "kind": a.get("kind") or "",
+                "rigged": bool(a.get("rigged")),
                 "name": name,
                 "files": files,
                 "dest": f"{GAME_ROOT}/{SUB.get(a.get('kind'), 'Misc')}/{name}",
@@ -87,7 +88,7 @@ def role_of(fn):
     return ""
 
 
-def task(path, dest):
+def task(path, dest, skeletal=False):
     t = unreal.AssetImportTask()
     t.filename = path
     t.destination_path = dest
@@ -98,7 +99,10 @@ def task(path, dest):
         ui = unreal.FbxImportUI()
         ui.import_materials = True
         ui.import_textures = True
-        ui.import_as_skeletal = False
+        ui.import_as_skeletal = skeletal  # персонаж со скелетом - Skeletal Mesh и его анимации
+        ui.import_animations = skeletal
+        if skeletal:
+            ui.mesh_type_to_import = unreal.FBXImportType.FBXIT_SKELETAL_MESH
         t.options = ui
     return t
 
@@ -132,7 +136,7 @@ def make_material(name, dest, maps):
 
 done = 0
 for job in JOBS:
-    tasks = [task(p, job["dest"]) for p in job["files"]]
+    tasks = [task(p, job["dest"], job.get("rigged", False)) for p in job["files"]]
     tools.import_asset_tasks(tasks)
     if job["kind"] == "tex":
         maps = {{}}

@@ -7,7 +7,7 @@ import threading
 import time
 
 from PyQt6.QtCore import Qt, QTimer, QUrl, pyqtSignal
-from PyQt6.QtGui import QDesktopServices, QPixmap
+from PyQt6.QtGui import QCursor, QDesktopServices, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -130,6 +130,7 @@ class UnrealTab(QWidget):
             ("до 5k - игра, много копий", 5000),
             ("до 20k", 20000),
             ("до 100k", 100000),
+            ("Со скелетом и анимациями", -1),
         ):
             self.poly.addItem(lib_icon("dice_3D"), t, v)
         self.poly.setToolTip("Только лёгкие модели: чем меньше полигонов, тем быстрее сцена в Unreal")
@@ -165,6 +166,8 @@ class UnrealTab(QWidget):
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self.menu)
         self.list.itemSelectionChanged.connect(self.describe)
+        self.list.hovered.connect(self.hover_on_row)
+        self.nav.node_menu.connect(self.node_menu)
         self.list.itemDoubleClicked.connect(lambda it: self.view3d(it.data(ASSET)))
         self.viewer = None
         self.list.empty = "Здесь пусто - нажмите «Скачать ещё...»"
@@ -209,6 +212,10 @@ class UnrealTab(QWidget):
         self.live.toggled.connect(self.toggle_live)
         self.mini_t = QTimer(self, singleShot=True, interval=300)  # не грузить модель на каждый щелчок
         self.mini_t.timeout.connect(self.update_mini)
+        # навели на плитку и задержались - модель крутится в панели, ушли - снова выбранная
+        self.hover_t = QTimer(self, singleShot=True, interval=600)
+        self.hover_t.timeout.connect(self.hover_mini)
+        self.hover_row, self.hover_on = -1, False
         self.name = QLabel(objectName="head", wordWrap=True)
         self.meta = QLabel(objectName="dim", wordWrap=True)
         self.meta.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -333,8 +340,14 @@ class UnrealTab(QWidget):
                 self.ai_sections()  # векторы уже посчитаны - разложить «Мелочи» сразу
             self.draw_previews()
             self.build_colors()
+            self.build_meta()
 
-        bg(U.assets, done)
+        def load():
+            from library import unreal_extra as X
+
+            return X.apply_meta(U.assets())  # полигоны, размеры, скелет из FBX - уже посчитанные
+
+        bg(load, done)
 
     def draw_previews(self):
         """Моделям без картинки (Quaternius) превью рисуется 3D-сценой - по одной, окно не замирает."""
@@ -479,7 +492,9 @@ class UnrealTab(QWidget):
     def filters(self, lst):
         """Полигоны (только модели) и цвет превью."""
         poly = self.poly.currentData()
-        if poly:
+        if poly == -1:  # персонажи и животные со скелетом - для анимаций в Unreal
+            lst = [a for a in lst if a.get("rigged")]
+        elif poly:
             lst = [a for a in lst if a.get("kind") == "model" and (a.get("polycount") or 0) <= poly]
         code = self.color.currentData()
         if code:
@@ -500,6 +515,33 @@ class UnrealTab(QWidget):
                     self.show_assets()
 
         bg(lambda: X.build_colors(items), done)
+
+    def build_meta(self):
+        """Полигоны, размеры и скелет моделей из FBX - в фоне, только новые (5000 FBX - около минуты)."""
+        from library import unreal_extra as X
+
+        if getattr(self, "meta_busy", False):
+            return
+        cache = X.load_meta()
+        missing = [a for a in self.items if a.get("kind") == "model" and X._meta_key(a) not in cache]
+        if not missing:
+            return
+        self.meta_busy = True
+        items = list(self.items)
+
+        def prog(v):
+            if not self.q.text().strip():
+                self.info.setText(f"считаю полигоны и размеры моделей: {v[0]} из {v[1]}")
+
+        def done(res):
+            self.meta_busy = False
+            if isinstance(res, Exception):
+                log_error("unreal meta: %r" % res)
+                return
+            X.apply_meta(self.items, res)
+            self.show_assets()
+
+        bg(lambda: X.build_meta(items, cache, lambda d, t: in_main(prog, (d, t))), done)
 
     # ------------------------------------------------------------ особые списки
     def leave_special(self, quiet=False):
@@ -654,6 +696,29 @@ class UnrealTab(QWidget):
             self.pic.parentWidget().layout().insertWidget(1, self.mini, 1)
         self.describe()
 
+    def hover_on_row(self, row):
+        self.hover_row = row
+        if row >= 0:
+            self.hover_t.start()
+        else:
+            self.hover_t.stop()
+            if self.hover_on:  # вернуть панель к выбранному
+                self.hover_on = False
+                self.describe()
+
+    def hover_mini(self):
+        it = self.list.item(self.hover_row) if self.hover_row >= 0 else None
+        a = it.data(ASSET) if it is not None else None
+        if not a or self.mini is None or not self.live.isChecked() or a.get("kind") not in CAN_VIEW:
+            return
+        if a in self.current():
+            return
+        self.hover_on = True
+        self.mini.setVisible(True)
+        self.mini.pause(False)
+        self.pic.setVisible(False)
+        self.mini.show_asset(a, studio_probe(self.items, self.cfg))
+
     def update_mini(self):
         cur = self.current()
         if self.mini is None or len(cur) != 1:
@@ -726,6 +791,10 @@ class UnrealTab(QWidget):
             chips.append(f"{a['polycount'] // 1000 or 1}k полиг.")
         if a.get("dimensions_mm"):
             chips.append(" x ".join(f"{x / 10:g}" for x in a["dimensions_mm"]) + " см")
+        elif a.get("dims_cm"):  # из FBX: таким придёт в Unreal без масштаба при импорте
+            chips.append(" x ".join(f"{x:.0f}" for x in a["dims_cm"]) + " см")
+        if a.get("rigged"):
+            chips.append("скелет" + (f", {len(a['animations'])} анимац." if a.get("animations") else ""))
         self.set_chips(chips)
         lines = [theme_label(a.get("theme", "")) + (f", {a['section']}" if a.get("section") else "")]
         if a.get("description"):
@@ -737,6 +806,15 @@ class UnrealTab(QWidget):
         lines.append(src + ", CC0" if "CC0" in a.get("license", "") else src)
         if a.get("tags"):
             lines.append("Метки: " + ", ".join(a["tags"][:8]))
+        dims = a.get("dims_cm")
+        if dims and not a.get("dimensions_mm") and (max(dims) < 10 or max(dims) > 5000):
+            lines.append(  # Kenney и KayKit бывают в метрах: в Unreal модель придёт крошечной или огромной
+                f"Размер при импорте как есть: {max(dims):.0f} см - похоже, нужен Import Uniform Scale "
+                + ("100" if max(dims) < 10 else "0.01")
+            )
+        if a.get("animations"):
+            names = a["animations"]
+            lines.append(f"Анимации ({len(names)}): " + ", ".join(names[:12]) + (" ..." if len(names) > 12 else ""))
         used = self.cfg.get("ue_used", {}).get(a.get("id"), [])
         if used:  # куда ассет уже уходил: копия, импорт, пакет
             lines.append("Использовано в: " + "; ".join(os.path.basename(x.rstrip("/\\")) or x for x in used[-3:]))
@@ -927,6 +1005,29 @@ class UnrealTab(QWidget):
             self.describe()
 
         bg(lambda: unreal_pack.pack(assets, dst, name.strip(), zip_it), done)
+
+    def node_menu(self, key, label):
+        """Правый щелчок по группе или разделу дерева: всё в нём разом (со стилем и фильтром полигонов)."""
+        lst = self.filters(self.nav.chosen(key))
+        if not lst:
+            return
+        m = QMenu(self)
+        n = len(lst)
+        title = label.strip() or "Подборка"
+        head = m.addAction(f"{title}: {n} шт., {human(sum(a.get('size', 0) for a in lst))}")
+        head.setEnabled(False)
+        m.addSeparator()
+        m.addAction(lib_icon("export"), "Импорт в Unreal...", lambda: self.import_assets(lst))
+        m.addAction(lib_icon("folder"), "Пакет для проекта...", lambda: self.pack_assets(lst, title))
+        m.addAction(lib_icon("folder"), "Копировать в проект...", lambda: self.copy_to_project(lst))
+        sets = m.addMenu(lib_icon("bookmark"), "В подборку")
+        for name in sorted(self.nav.sets()):
+            sets.addAction(name, lambda nm=name: self.add_to_set(nm, lst))
+        sets.addAction(lib_icon("plus"), "Новая подборка...", lambda: self.add_to_set(None, lst))
+        models = [a for a in lst if a.get("kind") == "model"]
+        if models and len(models) <= 60:  # больше - Blender будет собирать сцену слишком долго
+            m.addAction(lib_icon("dice_3D"), "Открыть в Blender", lambda: self.open_blender(models, title))
+        m.exec(QCursor.pos())
 
     def import_ue(self):
         self.import_assets(self.current())

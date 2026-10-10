@@ -14,7 +14,7 @@ AI assistants (Claude, Cursor) search, view and edit pictures - every change sho
 an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D viewer
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
-![version](https://img.shields.io/badge/version-2.4.0-cba6f7)
+![version](https://img.shields.io/badge/version-2.5.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
 ![tests](https://img.shields.io/badge/tests-99%20ok-a6e3a1)

@@ -10,6 +10,7 @@ py -3.14 cli.py unreal                       # ассеты Unreal: что ск�
 py -3.14 cli.py repair [fix|backup|list|restore latest]   # проверка и восстановление базы и настроек
 py -3.14 cli.py unreal get tex "Город" --count 6 --res 2k     # tex | hdri | model | ies
 py -3.14 cli.py unreal archives [--path X.zip]  # скачанные вручную архивы (_Unreal/_Архивы) -> модели
+py -3.14 cli.py unreal index                 # досчитать всё заранее: поиск по смыслу, цвета, полигоны, повторы
 py -3.14 cli.py api                          # операции для ИИ-помощников и скриптов (JSON)
 py -3.14 cli.py api search '{"query": "ночной город"}'
 py -3.14 cli.py api view '{"paths": ["04 Иконки/x.webp"]}' --out preview.png
@@ -216,6 +217,32 @@ def unreal_previews():
         print("  готово:", render_all(todo, studio_probe(items, {})))
 
 
+def unreal_index():
+    """Всё, что окно иначе досчитывало бы в фоне при каждом запуске, - один раз заранее."""
+    import time
+
+    from library import unreal as U
+    from library import unreal_extra as X
+    from library import unreal_sem
+
+    items = U.assets()
+    t = time.time()
+    meta = X.build_meta(items, progress=lambda d, n: print(f"  FBX: {d} из {n}", flush=True))
+    print(f"Полигоны и размеры: {len(meta)} ({time.time() - t:.0f} с)")
+    t = time.time()
+    X.build_colors(items)
+    X.build_sigs([a for a in items if a.get("kind") == "model"])
+    print(f"Цвета и отпечатки превью ({time.time() - t:.0f} с)")
+    if unreal_sem.available():
+        t = time.time()
+        sem = unreal_sem.AssetSem()
+        todo = len(sem.missing(items))
+        sem.build(items, lambda d, n: d % 160 == 0 and print(f"  поиск по смыслу: {d} из {n}", flush=True))
+        print(f"Поиск по смыслу: досчитано {todo} ({time.time() - t:.0f} с)")
+    else:
+        print("Поиск по смыслу: нет моделей (get_models.py clip)")
+
+
 def cmd_unreal(a):
     """Ассеты для Unreal Engine: _Unreal/<вид>/<тема>/<имя>."""
     from library import unreal as U
@@ -237,6 +264,9 @@ def cmd_unreal(a):
         return
     if a.action == "previews":
         unreal_previews()
+        return
+    if a.action == "index":
+        unreal_index()
         return
     if a.action == "archives":
         from library import unreal_local as L
@@ -336,7 +366,7 @@ def main():
     ap.add_argument("--who", default="ИИ (командная строка)", help="кто действует - так подписано в журнале")
     ap.add_argument("--help-tool", action="store_true", help="описание и схема параметров операции")
     ue = sub.add_parser("unreal", help="ассеты для Unreal Engine (CC0): текстуры, HDRI, модели, IES")
-    ue.add_argument("action", nargs="?", default="list", choices=["list", "get", "previews", "archives"])
+    ue.add_argument("action", nargs="?", default="list", choices=["list", "get", "previews", "archives", "index"])
     ue.add_argument("kind", nargs="?", default="tex", help="tex | hdri | model | ies")
     ue.add_argument("theme", nargs="?", help="тема или «все»")
     ue.add_argument("--count", type=int, default=4)

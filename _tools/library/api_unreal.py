@@ -16,7 +16,9 @@ ASSET_LIMIT = 40
 
 
 def _items():
-    return G.annotate(U.assets())
+    from library import unreal_extra as X
+
+    return G.annotate(X.apply_meta(U.assets()))
 
 
 def _key(a):
@@ -38,9 +40,12 @@ def _brief(a):
         "source": a.get("source", ""),
         "size_mb": round(a.get("size", 0) / 2**20, 1),
     }
-    for k in ("res", "polycount"):
+    for k in ("res", "polycount", "dims_cm"):
         if a.get(k):
             out[k] = a[k]
+    if a.get("rigged"):
+        out["rigged"] = True
+        out["animations"] = len(a.get("animations", []))
     if _section(a):
         out["section"] = _section(a)
     return out
@@ -112,13 +117,30 @@ def ue_overview():
         "group": {"type": "string"},
         "section": {"type": "string"},
         "style": {"type": "string", "enum": [k for k, _t in G.STYLES]},
+        "max_polycount": {"type": "integer", "description": "только модели легче (треугольников)"},
+        "rigged": {"type": "boolean", "description": "только со скелетом (персонажи, животные - для анимаций)"},
         "theme": {"type": "string", "description": "тема скачивания или раздел («Кровати»)"},
         "limit": {"type": "integer", "default": 20},
         "offset": {"type": "integer", "default": 0},
     },
 )
-def ue_search(query="", kind=None, group=None, section=None, style=None, theme=None, limit=20, offset=0):
+def ue_search(
+    query="",
+    kind=None,
+    group=None,
+    section=None,
+    style=None,
+    max_polycount=None,
+    rigged=None,
+    theme=None,
+    limit=20,
+    offset=0,
+):
     items = _items()
+    if max_polycount:
+        items = [a for a in items if a.get("kind") == "model" and 0 < (a.get("polycount") or 0) <= max_polycount]
+    if rigged is not None:
+        items = [a for a in items if bool(a.get("rigged")) == bool(rigged)]
     if kind:
         items = [a for a in items if a.get("kind") == kind]
     if group:
@@ -188,6 +210,8 @@ def ue_info(id):  # noqa: A002 - так параметр называется у
     )
     if a.get("dimensions_mm"):
         out["dimensions_cm"] = [round(x / 10, 1) for x in a["dimensions_mm"]]
+    if a.get("animations"):
+        out["animation_names"] = a["animations"]
     return out
 
 
