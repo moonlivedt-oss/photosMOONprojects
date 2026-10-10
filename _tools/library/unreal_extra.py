@@ -247,3 +247,40 @@ def apply_meta(items, cache=None):
         if m.get("animations"):
             a["animations"] = m["animations"]
     return items
+
+
+# ---------------------------------------------------------------- поворот модели лицом к камере
+YAW_STORE = os.path.join(os.path.dirname(CACHE), "_unreal_yaw.json")
+
+
+def load_yaw():
+    try:
+        with open(YAW_STORE, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def yaw_of(a, cache=None):
+    """На сколько градусов развернуть модель (стоит спиной к камере превью) - по id ассета."""
+    return float((load_yaw() if cache is None else cache).get(a.get("id") or "", 0))
+
+
+def turn(a, deg=180):
+    """Развернуть модель: запомнить поворот, старое превью - прочь (его перерисует окно). -> новый поворот."""
+    with _lock:
+        cache = load_yaw()
+        new = (cache.get(a["id"], 0) + deg) % 360
+        if new:
+            cache[a["id"]] = new
+        else:
+            cache.pop(a["id"], None)
+        K.write_atomic(YAW_STORE, json.dumps(cache), "utf-8")
+    for f in ("preview.webp", "preview.none"):
+        try:
+            os.remove(os.path.join(a["dir"], f))
+        except OSError:
+            pass
+    a["_pt"] = 0
+    a.pop("_np", None)
+    return new

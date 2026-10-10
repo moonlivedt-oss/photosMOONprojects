@@ -467,3 +467,18 @@ def ue_from_project(project, folder, theme=None):
         raise ApiError(str(e)) from e
     ui_bridge.ue_changed()
     return {"added": [_brief(a) for a in _items() if a["dir"] in made]}
+
+
+@tool(
+    "ue_from_megascans",
+    "Всё, что пользователь скачал через Quixel Bridge в Documents/Megascans Library (MetaHuman), - в библиотеку: "
+    "Unreal выгружает в FBX во временном проекте (долго: минуты на каждые шесть). Уже добавленные пропускаются.",
+    write=True,
+)
+def ue_from_megascans():
+    from library import unreal_from_project as P
+
+    res = P.import_megascans(log=lambda t: report(0, None, t))
+    if res["added"]:
+        ui_bridge.ue_changed()
+    return {"added": len(res["added"]), "skipped": res["skipped"], "errors": res["errors"]}

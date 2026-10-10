@@ -819,7 +819,15 @@ def main():
     crashes = safety.start_run()
     cfg = load_cfg()  # тема и акцент - до первой отрисовки
     if crashes >= 2:  # безопасный режим: самое хрупкое (живой 3D на видеокарте) - выключить
+        if cfg.get("ue_live", True):
+            cfg["ue_live_safe"] = True  # выключил безопасный режим, а не пользователь - вернуть после
         cfg["ue_live"] = False
+        try:
+            save_cfg(cfg)
+        except OSError:
+            pass
+    if crashes == 0 and cfg.pop("ue_live_safe", False):  # прошлый запуск закрылся нормально - 3D обратно
+        cfg["ue_live"] = True
         try:
             save_cfg(cfg)
         except OSError:

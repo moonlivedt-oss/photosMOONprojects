@@ -29,6 +29,7 @@ _tools/_unreal_clip.npz
 _tools/_unreal_colors.json
 _tools/_unreal_sigs.json
 _tools/_unreal_meta.json
+_tools/_unreal_yaw.json
 _tools/_unreal_sets.json
 
 # стрелки стилей: окно пишет их само цветом текущей темы
@@ -42,3 +43,4 @@ _tools/_ui_request.json
 _tools/_unreal_changed
 _tools/_ui_state.json
 _tools/_ui_status.json
+_tools/_ue_stage/

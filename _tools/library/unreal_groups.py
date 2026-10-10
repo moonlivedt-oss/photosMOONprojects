@@ -296,6 +296,8 @@ def section_of(a):
     rules = SECTIONS.get(g)
     if not rules:
         return OTHER
+    if g == "Персонажи и животные" and any("outfit" in str(t).lower() for t in a.get("tags") or []):
+        return "Комплекты одежды"  # Modular Character Outfits: одежда без головы - на Universal Base Characters
     if g == "Прототипы и уровни":  # тут важен набор, а не имя модели
         tags = " ".join(str(t).lower() for t in a.get("tags") or [])
         for sec, keys in rules:
@@ -317,6 +319,8 @@ def section_order(group):
     """Порядок разделов в дереве."""
     if group == "Дом":
         return list(U.HOME_ORDER)
+    if group == "Персонажи и животные":
+        return ["Персонажи", "Комплекты одежды", "Снаряжение и одежда", "Животные", OTHER]
     return [s for s, _k in SECTIONS.get(group, ())] + [OTHER]
 
 

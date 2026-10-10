@@ -47,6 +47,8 @@ def viewable(a):
     """Можно ли открыть ассет в 3D окна: модели с сотнями морфов (лицо MetaHuman) роняют Qt Quick 3D -
     у них флаг no_qt3d (в asset.json или из library/fbx_meta), вместо 3D - картинка превью."""
     return a.get("kind") in CAN_VIEW and not a.get("no_qt3d")
+
+
 SHORT = {"tex": "Текстура", "hdri": "HDRI", "model": "Модель"}
 
 
@@ -163,6 +165,9 @@ def load_scene(root, a, probe="", sky=False):
         root.setProperty("status", "Эту модель 3D окна не откроет - смотрите в Unreal или Blender")
         return
     root.setProperty("status", "")
+    from library.unreal_extra import yaw_of
+
+    root.setProperty("modelYaw", yaw_of(a) if kind == "model" else 0)
     root.setProperty("flat", QUrl())
     root.setProperty("sizeText", "")
     root.setProperty("mode", kind)

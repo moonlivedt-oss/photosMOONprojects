@@ -103,6 +103,7 @@ class UnrealTab(QWidget):
         add_menu = QMenu(arch)
         add_menu.addAction(lib_icon("zip-archive"), "Скачанные архивы (zip)...", self.add_archives)
         add_menu.addAction(lib_icon("export"), "Из проекта Unreal (Fab, Megascans, MetaHuman)...", self.from_project)
+        add_menu.addAction(lib_icon("export"), "Из библиотеки Megascans (скачанное в Bridge)", self.from_megascans)
         arch.setMenu(add_menu)
         self.arch_btn = arch
         folder = QPushButton(lib_icon("folder"), "", objectName="tool")
@@ -744,11 +745,7 @@ class UnrealTab(QWidget):
         self.note.setEnabled(len(cur) == 1)
         self.note.setText(self.cfg.get("ue_notes", {}).get(cur[0]["id"], "") if len(cur) == 1 else "")
         live = (
-            self.mini is not None
-            and self.live.isChecked()
-            and len(cur) == 1
-            and viewable(cur[0])
-            and self.isVisible()
+            self.mini is not None and self.live.isChecked() and len(cur) == 1 and viewable(cur[0]) and self.isVisible()
         )
         if self.mini is not None:
             self.mini.setVisible(live)
@@ -907,6 +904,9 @@ class UnrealTab(QWidget):
         if any(x.get("kind") == "model" for x in sel):
             m.addAction(lib_icon("house"), "Собрать комнату из выбранного", lambda: self.room(sel, "Выбранное"))
         m.addSeparator()
+        models = [a for a in sel if a.get("kind") == "model" and viewable(a)]
+        if models:
+            m.addAction(lib_icon("dice_3D"), "Развернуть лицом (на 180°)", lambda: self.turn_models(models))
         m.addAction(lib_icon("folder"), "Показать файлы", self.open_dir)
         m.addAction(lib_icon("clipboard"), "Копировать пути", self.copy_paths)
         m.addAction(lib_icon("globe"), "Страница ассета", self.open_page)
@@ -1008,6 +1008,18 @@ class UnrealTab(QWidget):
             self.describe()
 
         bg(lambda: unreal_pack.pack(assets, dst, name.strip(), zip_it), done)
+
+    def turn_models(self, models):
+        """Модель стоит спиной: развернуть в 3D и перерисовать превью (поворот запоминается)."""
+        from library import unreal_extra as X
+
+        for a in models:
+            X.turn(a)
+        if self.mini is not None:
+            self.mini.shown = None  # перезагрузить живой 3D с новым поворотом
+        self.describe()
+        self.draw_previews()
+        self.win.say(f"Развёрнуто: {len(models)} - превью перерисуется")
 
     def node_menu(self, key, label):
         """Правый щелчок по группе или разделу дерева: всё в нём разом (со стилем и фильтром полигонов)."""
@@ -1240,6 +1252,41 @@ class UnrealTab(QWidget):
             self.refresh()
 
         bg(lambda: P.add_to_library(project, folder, log=lambda t: in_main(self.info.setText, f"выгружено: {t}")), done)
+
+    def from_megascans(self):
+        """Всё, что Bridge скачал в Documents/Megascans Library (MetaHuman), - в библиотеку; уже взятое пропускается."""
+        from PyQt6.QtWidgets import QMessageBox
+
+        from library import unreal_from_project as P
+
+        items = [a for a in P.megascans_list() if a["type"] == "metahuman-preset"]
+        if not items:
+            QMessageBox.information(self, "Megascans", f"В {P.MEGASCANS} нет скачанных MetaHuman.")
+            return
+        ok = QMessageBox.question(
+            self,
+            "Megascans",
+            f"В библиотеке Megascans MetaHuman: {len(items)}. Unreal выгрузит новых в FBX во временном проекте "
+            "(по паре минут на шесть персонажей; проекты не меняются). Начать?",
+        )
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+        self.arch_btn.setEnabled(False)
+
+        def done(res):
+            self.arch_btn.setEnabled(True)
+            if isinstance(res, Exception):
+                QMessageBox.warning(self, "Megascans", f"Не получилось: {res}")
+                return
+            self.win.say(
+                f"MetaHuman добавлено: {len(res['added'])}, уже были: {len(res['skipped'])}"
+                + (f", не вышло: {len(res['errors'])}" if res["errors"] else "")
+            )
+            if res["errors"]:
+                log_error("Megascans:\n" + "\n".join(res["errors"]))
+            self.refresh()
+
+        bg(lambda: P.import_megascans(log=lambda t: in_main(self.info.setText, t)), done)
 
     def add_archives(self):
         """Скачанные вручную архивы -> модели по темам; превью дорисуются сами (refresh)."""

@@ -40,6 +40,7 @@ Item {
     property color accent: "#a897ff"
     property real height3d: 200
     property real camScale: 1.0            // дальше камера во столько раз (рендер превью: модель целиком)
+    property real modelYaw: 0              // модель стоит спиной - развернуть (градусы, из _unreal_yaw.json)
     property bool linearColors: false     // цвета материалов в файле линейные (Quaternius) - на экран через гамму
     property bool tryOn: false            // примерка: материал текстуры (texMat) на все части модели
     property var origMats: []             // [{model, mats}] - вернуть родные материалы
@@ -125,7 +126,7 @@ Item {
         fitted = true
         if (linearColors) brighten(loader)
         if (tryOn) applyTryOn()
-        turn.eulerRotation = Qt.vector3d(0, 0, 0)
+        turn.eulerRotation = Qt.vector3d(0, modelYaw, 0)
         loader.scale = Qt.vector3d(1, 1, 1)
         loader.position = Qt.vector3d(0, 0, 0)
         var box = sceneBox(loader, {ok: false})

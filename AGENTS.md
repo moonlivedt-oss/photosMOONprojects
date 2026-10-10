@@ -44,7 +44,7 @@
 | Найти и посмотреть | `ue_search` (по смыслу; `group`/`section` - «Природа»/«Деревья»; `style` - `real` или `low`, `Kenney`, `Quaternius`, `KayKit`; `max_polycount`; `rigged=true` - со скелетом), `ue_view` (превью листом), `ue_info` (размер в см, полигоны, имена анимаций) |
 | Показать пользователю | `ue_show` (ассеты отдельным списком во вкладке «Unreal» открытого окна) |
 | Скачанные архивы | `ue_add_archives` (zip с itch.io и т. п. из `_Unreal/_Архивы` - разбираются по группам) |
-| Скачанное в самом Unreal | `ue_from_project` (Fab, Megascans, MetaHuman: папка Content проекта -> FBX; редактор закрыт; лицензия не CC0) |
+| Скачанное в самом Unreal | `ue_from_project` (Fab, Megascans, MetaHuman: папка Content проекта -> FBX; редактор закрыт; лицензия не CC0), `ue_from_megascans` (всё из библиотеки Quixel Bridge) |
 | Комната по описанию | `ue_plan_room` («уютная спальня в скандинавском стиле» -> вещи, пол, стены, свет с заменами) |
 | Подборки | `ue_collection` (видны во вкладке слева) |
 | Проверка | `ue_check` (нет файлов, пустой FBX, повторы - одна модель, скачанная дважды) |
