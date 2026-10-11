@@ -20,6 +20,10 @@ jobs:
       run:
         working-directory: _tools
     steps:
+      # имена листов в _sources - списки кусков («mechanical-keyboard, coffee-mug-steam, ...»): длиннее 260 знаков
+      - name: Длинные пути
+        run: git config --system core.longpaths true
+        working-directory: .
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:

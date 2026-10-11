@@ -11,14 +11,15 @@
 4x3 sheet cutting with preview, filing by section and palette, semantic search in Russian and English<br>
 tag and folder suggestions, smart folders, neural background removal and x4 upscaling<br>
 AI assistants (Claude, Cursor) search, view and edit pictures - every change shows up in the window and can be undone<br>
-an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D viewer
+an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D viewer<br>
+project checks: model scale, scene budget, contrast on the site background, licenses before publishing
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
-![version](https://img.shields.io/badge/version-2.5.0-cba6f7)
+![version](https://img.shields.io/badge/version-2.6.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
 ![tests](https://img.shields.io/badge/tests-165%20ok-a6e3a1)
-![images](https://img.shields.io/badge/pictures-4163-89b4fa)
+![images](https://img.shields.io/badge/pictures-4284-89b4fa)
 ![unreal](https://img.shields.io/badge/Unreal-CC0%20assets-313244)
 ![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
 ![license](https://img.shields.io/badge/code-MIT-green)

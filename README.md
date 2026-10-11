@@ -11,14 +11,15 @@
 Нарезка листов 4x3 с предпросмотром, раскладка по разделам и палитрам, поиск по смыслу на русском<br>
 подсказка меток и раздела, умные папки, нейросети: любой фон прочь, чёткое увеличение x4<br>
 ИИ-помощники (Claude, Cursor) ищут, смотрят и правят картинки - всё видно в окне и отменяется<br>
-вкладка «Unreal»: текстуры, HDRI, модели и свет для Unreal Engine с просмотром в 3D
+вкладка «Unreal»: текстуры, HDRI, модели и свет для Unreal Engine с просмотром в 3D<br>
+проверки для своих проектов: масштаб моделей, бюджет сцены, контраст на фоне сайта, лицензии перед публикацией
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
-![version](https://img.shields.io/badge/version-2.5.0-cba6f7)
+![version](https://img.shields.io/badge/version-2.6.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-окно-41CD52?logo=qt&logoColor=white)
 ![tests](https://img.shields.io/badge/тесты-165%20ok-a6e3a1)
-![images](https://img.shields.io/badge/картинок-4163-89b4fa)
+![images](https://img.shields.io/badge/картинок-4284-89b4fa)
 ![unreal](https://img.shields.io/badge/Unreal-ассеты%20CC0-313244)
 ![mcp](https://img.shields.io/badge/MCP-ИИ--помощники-d97757)
 ![license](https://img.shields.io/badge/код-MIT-green)
