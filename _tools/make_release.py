@@ -6,15 +6,16 @@
 своя лицензия (LICENSES.md). Тот же скрипт запускает workflow release.yml на каждый тег v*."""
 
 import os
+import re
 import subprocess
 import sys
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-sys.path.insert(0, HERE)
-
-from library.common import VERSION  # noqa: E402
+# версия - прямо из текста library/common.py: импорт потянул бы numpy и Qt, а на CI для архива их не ставят
+with open(os.path.join(HERE, "library", "common.py"), encoding="utf-8") as _fh:
+    VERSION = re.search(r'^VERSION = "([^"]+)"', _fh.read(), re.M).group(1)
 
 ROOT_FILES = [
     "Library.cmd",
