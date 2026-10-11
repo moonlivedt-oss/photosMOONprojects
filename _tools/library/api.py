@@ -10,6 +10,7 @@
 import contextvars
 import io
 import os
+import re
 import shutil
 import time
 
@@ -1160,6 +1161,87 @@ def check(folder=None, limit=200):
         bad.append(dict(path=rel(p), problems=[names[c] for c in res]))
     bad.sort(key=lambda d: d["path"])
     return dict(checked=len(files), with_problems=len(bad), items=bad[:limit])
+
+
+@tool(
+    "odd_ones",
+    "Что выбивается из своего набора по манере: другие цвета или оттенок, нет светлой обводки, больше или "
+    "меньше деталей, плотнее или реже рисунок, другое поле прозрачности. Набор - папка с картинками (от 6 штук); "
+    "одна и та же картинка в нескольких палитрах набора - одной строкой. Смысл не учитывается (печенье рядом с "
+    "яблоком - норма). Перегенерировать или поправить - edit.",
+    {
+        "folder": {"type": "string", "description": "папка; пусто - вся библиотека"},
+        "imported": {"type": "boolean", "default": False, "description": "и чужие наборы (Kenney, Hero Patterns)"},
+        "limit": {"type": "integer", "default": 100},
+    },
+)
+def odd_ones(folder=None, imported=False, limit=100):
+    from library import style_check
+
+    found = style_check.odd_ones(
+        folder_path(folder) if folder else None, imported, step=lambda d, t: report(d, t, "сравниваю наборы")
+    )
+    return dict(
+        found=len(found),
+        items=[
+            dict(
+                path=rel(x["path"]),
+                set=x["set"].replace(os.sep, "/"),
+                why=[w for _n, _s, w in x["reasons"]],
+                strength=round(x["score"], 1),
+                **({"palettes": x["palettes"]} if len(x["palettes"]) > 1 else {}),
+            )
+            for x in found[:limit]
+        ],
+    )
+
+
+@tool(
+    "contrast",
+    "Видно ли иконку или наклейку на фоне (WCAG: для значков нужно 3:1). Смотрится край рисунка: доля края с "
+    "контрастом от 3:1 и типичный контраст. Фоны: основа палитры папки, белый, тёмная тема и свои (backgrounds). "
+    "Картинки без прозрачности (фоны, фото) пропускаются.",
+    {
+        "paths": {"type": "array", "items": {"type": "string"}},
+        "backgrounds": {"type": "array", "items": {"type": "string"}, "description": "свои фоны, #rrggbb"},
+    },
+    ["paths"],
+)
+def contrast(paths, backgrounds=None):
+    from library import style_check
+
+    extra = []
+    for c in backgrounds or []:
+        if not re.fullmatch(r"#?[0-9a-fA-F]{6}", str(c)):
+            raise ApiError(f"Фон «{c}» - нужен цвет вида #1e1e24.")
+        extra.append("#" + str(c).lstrip("#").lower())
+    res = style_check.contrast_of(images(paths, limit=100), extra)
+    out = []
+    for p, r in res.items():
+        if r is None:
+            out.append(dict(path=rel(p), skipped="нет прозрачного фона - проверять нечего"))
+        else:
+            out.append(dict(path=rel(p), backgrounds=r["bgs"], worst=r["worst"]["name"]))
+    return dict(items=out)
+
+
+@tool(
+    "credits",
+    "Авторы и лицензии проекта: всё, что из библиотеки ушло в папку проекта (выгруженные картинки, ассеты Unreal "
+    "из импорта и пакетов), - в CREDITS.md этой папки (чужой CREDITS.md не трогается - тогда CREDITS.library.md). "
+    "Отдельно - что требует указать автора (CC BY) и что не CC0.",
+    {"project": {"type": "string", "description": "папка проекта (полный путь)"}},
+    ["project"],
+    write=True,
+)
+def credits(project):
+    from library import credits as CR
+
+    if not os.path.isabs(project) or not os.path.isdir(project):
+        raise ApiError("Нужен полный путь к существующей папке проекта.")
+    if CR.inside(project, C.LIB):
+        raise ApiError("Это папка библиотеки, а не проекта.")
+    return CR.write(project, C.load_cfg())
 
 
 # ---------------------------------------------------------------- прочее

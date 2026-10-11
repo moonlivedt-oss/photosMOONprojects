@@ -1164,6 +1164,16 @@ class LibTab(QWidget):
         self.show_files()
         self.win.say("Возвращена прошлая версия - текущая сохранена в истории", undo=True)
 
+    def contrast(self, paths=None):
+        from ui.style_dialogs import ContrastDialog
+
+        paths = [p for p in (paths or self.paths()) if not p.lower().endswith(".svg")]
+        if not paths:
+            self.win.say("Выберите иконки или наклейки во вкладке «Библиотека»")
+            return
+        self.contrast_dlg = ContrastDialog(self.win, paths)
+        self.contrast_dlg.show()
+
     def compare(self, paths=None):
         from ui.tools_dialogs import CompareDialog
 
@@ -1590,6 +1600,7 @@ class LibTab(QWidget):
             lambda: self.palette_from(None, sel),
         )
         tools.addAction(lib_icon("drawing_pen"), "Векторизация в SVG (три варианта)...", lambda: self.vectorize(sel))
+        tools.addAction(lib_icon("color-palette"), "Контраст на фонах (видно ли)...", lambda: self.contrast(sel))
         m.addSeparator()
         m.addAction("Открыть\tEnter", self.open_file)
         m.addAction("Быстрый просмотр\tПробел", self.look)

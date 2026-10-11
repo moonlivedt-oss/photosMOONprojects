@@ -227,7 +227,7 @@ def build_meta(items, cache=None, progress=None, stop=None):
 
 
 def apply_meta(items, cache=None):
-    """Сведения из FBX - в ассеты (в памяти): polycount (если каталог его не дал), dims_cm, rigged, animations."""
+    """Сведения из FBX - в ассеты (в памяти): polycount (по самому FBX), dims_cm, rigged, animations."""
     cache = load_meta() if cache is None else cache
     for a in items:
         if a.get("kind") != "model":
@@ -235,7 +235,11 @@ def apply_meta(items, cache=None):
         m = cache.get(_meta_key(a) or "")
         if not m:
             continue
-        if not a.get("polycount") and m.get("triangles"):
+        if m.get("triangles"):
+            # главное - сколько треугольников придёт в Unreal: у Poly Haven каталог считает всю сцену Blender
+            # с разбросом (трава 1 млн), а в FBX - только сами кусты (7.8 тыс.)
+            if a.get("polycount") and a["polycount"] != m["triangles"]:
+                a["polycount_catalog"] = a["polycount"]
             a["polycount"] = m["triangles"]
         # у моделей со скелетом вершины лежат в исходной позе без костей - габариты врут (MetaHuman в метр ростом),
         # поэтому размер показывается только у обычных моделей

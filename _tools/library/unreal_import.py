@@ -48,8 +48,10 @@ def tryon_of(a, tryons=None):
 def plan(assets, dst, tryons=None):
     """Скопировать файлы ассетов в dst/<имя>/ и составить список работ для скрипта. Модель с примеркой из окна 3D
     везёт и свою текстуру - скрипт соберёт из неё материал с тем же повтором, поворотом, оттенком и глянцем."""
+    from library import budget
+
     jobs, used = [], set()
-    for a in assets:
+    for a in map(budget.for_import, assets):
         name = base = asset_name(a.get("name", "asset"))
         n = 2
         while name.lower() in used:  # одинаковые имена (Stool в двух наборах Quaternius) - не в одну папку

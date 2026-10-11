@@ -8,8 +8,8 @@ import time
 import traceback
 
 from PyQt6 import sip
-from PyQt6.QtCore import QFile, QFileSystemWatcher, QSize, Qt, QTimer
-from PyQt6.QtGui import QPainter
+from PyQt6.QtCore import QFile, QFileSystemWatcher, QSize, Qt, QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices, QPainter
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -125,6 +125,10 @@ class Window(QMainWindow):
         tm.addAction(lib_icon("color-palette"), "Палитра из картинки...", lambda: self.lib.palette_from())
         tm.addAction(lib_icon("magnifying-glass"), "Сравнить две картинки...", lambda: self.lib.compare())
         tm.addAction(lib_icon("drawing_pen"), "Векторизация в SVG...", lambda: self.lib.vectorize())
+        tm.addSeparator()
+        tm.addAction(lib_icon("checklist"), "Выбивается из набора...", self.odd_ones)
+        tm.addAction(lib_icon("color-palette"), "Контраст выбранных на фонах...", lambda: self.lib.contrast())
+        tm.addAction(lib_icon("Книга"), "Авторы и лицензии проекта...", self.credits)
         tm.addSeparator()
         tm.addAction(lib_icon("first-aid-kit"), "Проверка и восстановление...", self.safety)
         tools.setMenu(tm)
@@ -749,6 +753,36 @@ class Window(QMainWindow):
 
     def missing(self):
         MissingDialog(self).exec()
+
+    def odd_ones(self):
+        from ui.style_dialogs import OddDialog
+
+        OddDialog(self).exec()
+
+    def credits(self):
+        """CREDITS.md в папке проекта: всё, что туда ушло из библиотеки, с авторами и лицензиями."""
+        from library import credits
+
+        folder = QFileDialog.getExistingDirectory(self, "Папка проекта", self.cfg.get("credits_dir", ""))
+        if not folder:
+            return
+        if credits.inside(folder, LIB):
+            self.say("Это папка библиотеки - выберите папку проекта, куда выгружали картинки или ассеты")
+            return
+        self.cfg["credits_dir"] = folder
+        try:
+            res = credits.write(folder, self.cfg)
+        except Exception as e:
+            self.say(f"Не получилось: {e}")
+            return
+        text = f"{os.path.basename(res['path'])}: картинок {res['images']}, ассетов Unreal {res['assets']}"
+        if res["attribution"]:
+            text += ". Нужно указать автора: " + ", ".join(res["attribution"])
+        if res["not_cc0"]:
+            text += f". Не CC0: {len(res['not_cc0'])} - проверить условия"
+        self.say(text)
+        if res["images"] or res["assets"]:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(res["path"]))
 
     def show_weight(self):
         WeightDialog(self).exec()

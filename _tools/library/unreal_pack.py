@@ -67,6 +67,12 @@ def pack(assets, dst, title="Пакет", zip_it=False):
 
 def remember_use(cfg, assets, where):
     """«Использовано в»: какой ассет в какой проект ушёл (настройки, ue_used: {id: [папки]})."""
+    from library import db
+
+    try:
+        db.log_ue_use([a.get("id") or os.path.relpath(a["dir"], U.ROOT).replace(os.sep, "/") for a in assets], where)
+    except Exception:
+        pass
     used = cfg.setdefault("ue_used", {})
     for a in assets:
         lst = used.setdefault(a.get("id", ""), [])

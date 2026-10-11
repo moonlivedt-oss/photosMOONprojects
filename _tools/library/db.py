@@ -44,6 +44,7 @@ def _open():
                 CREATE TABLE IF NOT EXISTS clip(rel TEXT PRIMARY KEY, mt REAL, vec BLOB);
                 CREATE TABLE IF NOT EXISTS smart(name TEXT PRIMARY KEY, query TEXT, color TEXT, sem INT);
                 CREATE TABLE IF NOT EXISTS exports(rel TEXT, dest TEXT, t REAL, PRIMARY KEY(rel, dest));
+                CREATE TABLE IF NOT EXISTS ue_used(id TEXT, dest TEXT, t REAL, PRIMARY KEY(id, dest));
                 CREATE TABLE IF NOT EXISTS fav(rel TEXT PRIMARY KEY, t REAL);
                 CREATE TABLE IF NOT EXISTS journal(id INTEGER PRIMARY KEY AUTOINCREMENT, t REAL, who TEXT,
                                                    text TEXT, steps TEXT, undone INT DEFAULT 0);
@@ -246,6 +247,26 @@ def exports_of(rel):
     """[(папка, время)] - куда выгружалась картинка, свежие сначала."""
     with _lock:
         return conn().execute("SELECT dest, t FROM exports WHERE rel=? ORDER BY t DESC", (rel,)).fetchall()
+
+
+def all_exports():
+    """[(картинка, папка)] - все выгрузки (авторы и лицензии проекта)."""
+    with _lock:
+        return conn().execute("SELECT rel, dest FROM exports").fetchall()
+
+
+def log_ue_use(ids, dest):
+    """Ассеты Unreal ушли в проект (импорт, пакет) - и из окна, и от помощника."""
+    with _lock:
+        c = conn()
+        with c:
+            c.executemany("INSERT OR REPLACE INTO ue_used VALUES (?,?,?)", [(i, dest, time.time()) for i in ids if i])
+
+
+def ue_uses():
+    """[(id ассета, папка или проект)]."""
+    with _lock:
+        return conn().execute("SELECT id, dest FROM ue_used").fetchall()
 
 
 def favs():

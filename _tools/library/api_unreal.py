@@ -422,7 +422,7 @@ def ue_compare(ids):
         rows.append(
             f"| {i + 1} | {a.get('name', '')} | {G.style_of(a)} | {a.get('polycount') or '-'} | "
             f"{round(a.get('size', 0) / 2**20, 1)} МБ | {a.get('res') or '-'} | {' x '.join(map(str, dims)) or '-'} | "
-            f"{rig} | {'CC0' if U.is_cc0(a) else 'своя'} | {_section(a) or '-'} |"
+            f"{rig} | {'CC0' if U.is_cc0(a) else (a.get('license') or 'не CC0').split(' - ')[0][:40]} | {_section(a) or '-'} |"
         )
     ids_txt = "\n".join(f"{i + 1}. {_key(a)}" for i, a in enumerate(assets))
     return Picture(_sheet(assets), "\n".join(rows) + "\n\nid:\n" + ids_txt)
@@ -618,9 +618,12 @@ def ue_download(kind, theme, count=4, res="2k"):
     write=True,
 )
 def ue_pack(ids, dest, title="Пакет", zip=False):  # noqa: A002
-    from library import unreal_pack
+    from library import db, unreal_pack
 
-    return {"path": unreal_pack.pack(_by_ids(ids), dest, title, zip)}
+    assets = _by_ids(ids)
+    out = unreal_pack.pack(assets, dest, title, zip)
+    db.log_ue_use([_key(a) for a in assets], os.path.abspath(dest))  # для авторов и лицензий проекта
+    return {"path": out}
 
 
 @tool(
@@ -640,7 +643,12 @@ def ue_import(ids, project):
         raise ApiError("Редактор Unreal открыт - пусть импортирует он сам, или закройте его и повторите.")
     if not E.python_enabled(project):
         E.enable_python(project)
-    res = E.import_into(_by_ids(ids), project, log=lambda text: report(0, None, text))
+    from library import db
+
+    assets = _by_ids(ids)
+    res = E.import_into(assets, project, log=lambda text: report(0, None, text))
+    if res.get("ok"):
+        db.log_ue_use([_key(a) for a in assets], os.path.dirname(os.path.abspath(project)))
     return {k: res[k] for k in ("ok", "imported", "errors", "log")}
 
 
@@ -793,3 +801,58 @@ def ue_from_megascans():
         "skipped": res["skipped"],
         "errors": res["errors"],
     }
+
+
+@tool(
+    "ue_budget",
+    "Бюджет сцены в Unreal для подборки или списка ассетов: треугольники (по самим FBX), память видеокарты под "
+    "текстуры (примерно, со сжатием Unreal и мипами), что включить с Nanite, что упростить (ue_simplify), "
+    "общий вывод. Перед импортом большой сцены.",
+    {
+        "ids": {"type": "array", "items": {"type": "string"}},
+        "collection": {"type": "string", "description": "или имя подборки (ue_overview -> collections)"},
+    },
+)
+def ue_budget(ids=None, collection=None):
+    from library import budget, unreal_sets
+
+    if collection:
+        sets = unreal_sets.load()
+        if collection not in sets:
+            raise ApiError(f"Нет подборки «{collection}». Есть: {', '.join(sets) or 'ни одной'}.")
+        ids = list(sets[collection])
+    if not ids:
+        raise ApiError("Нужны ids или collection.")
+    return budget.scene(_by_ids(ids, 400))
+
+
+@tool(
+    "ue_simplify",
+    "Упростить тяжёлую модель в Blender (Decimate) до triangles треугольников: рядом с оригиналом появляется "
+    "<имя>_<N>k.fbx, и при импорте и в пакете берётся она (use=false - снова оригинал). Оригинал не меняется. "
+    "Модели со скелетом не упрощаются. Тяжёлая модель - минута-другая.",
+    {
+        "id": {"type": "string"},
+        "triangles": {"type": "integer", "default": 100000},
+        "use": {"type": "boolean", "default": True, "description": "false - не брать упрощённую копию при импорте"},
+    },
+    ["id"],
+    write=True,
+)
+def ue_simplify(id, triangles=100000, use=True):  # noqa: A002
+    from library import budget
+
+    a = _by_ids([id])[0]
+    if a.get("kind") != "model":
+        raise ApiError("Упрощать можно только модели.")
+    if not use:
+        budget.set_active(a, None)
+        return {"id": id, "use": "оригинал"}
+    if triangles < 500:
+        raise ApiError("Меньше 500 треугольников - от модели ничего не останется.")
+    report(0, None, f"упрощаю {a.get('name')} в Blender")
+    try:
+        item = budget.simplify(a, triangles)
+    except (ValueError, RuntimeError) as e:
+        raise ApiError(str(e)) from e
+    return {"id": id, **item}

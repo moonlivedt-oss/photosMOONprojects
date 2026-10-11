@@ -905,6 +905,7 @@ class UnrealTab(QWidget):
         )
         if any(x.get("kind") == "model" for x in sel):
             m.addAction(lib_icon("house"), "Собрать комнату из выбранного", lambda: self.room(sel, "Выбранное"))
+        m.addAction(lib_icon("checklist"), "Бюджет сцены (полигоны, память, Nanite)...", lambda: self.budget(sel))
         m.addSeparator()
         models = [a for a in sel if a.get("kind") == "model" and viewable(a)]
         if models:
@@ -1041,10 +1042,17 @@ class UnrealTab(QWidget):
         for name in sorted(self.nav.sets()):
             sets.addAction(name, lambda nm=name: self.add_to_set(nm, lst))
         sets.addAction(lib_icon("plus"), "Новая подборка...", lambda: self.add_to_set(None, lst))
+        m.addAction(lib_icon("checklist"), "Бюджет сцены...", lambda: self.budget(lst, title))
         models = [a for a in lst if a.get("kind") == "model"]
         if models and len(models) <= 60:  # больше - Blender будет собирать сцену слишком долго
             m.addAction(lib_icon("dice_3D"), "Открыть в Blender", lambda: self.open_blender(models, title))
         m.exec(QCursor.pos())
+
+    def budget(self, assets, title="Выбранное"):
+        from ui.budget_dialog import BudgetDialog
+
+        self.budget_dlg = BudgetDialog(self.win, assets, title)
+        self.budget_dlg.show()
 
     def import_ue(self):
         self.import_assets(self.current())
