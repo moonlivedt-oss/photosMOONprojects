@@ -292,6 +292,7 @@ goes to its model, like any file you show it.
 Code (`_tools/`, `Library.cmd`, `Prompts.html`) - MIT, see [LICENSE](LICENSE).
 Library pictures are not covered by MIT: Kenney sets - CC0, Hero Patterns - CC BY 4.0
 (see `_авторы и лицензия.txt` in their folders), the rest belong to the repository author.
+Details: [LICENSES.md](LICENSES.md).
 
 Changes: [CHANGELOG.md](CHANGELOG.md).
 

@@ -672,6 +672,7 @@ ambientCG, Kenney, KayKit (GitHub) и открытых папок Quaternius н�
 Код (`_tools/`, `Library.cmd`, `Prompts.html`) - MIT, см. [LICENSE](LICENSE).
 Картинки библиотеки под MIT не попадают: наборы Kenney - CC0, Hero Patterns - CC BY 4.0
 (файлы `_авторы и лицензия.txt` в их папках), остальные картинки - автора репозитория.
+Подробно - в [LICENSES.md](LICENSES.md).
 
 ---
 
