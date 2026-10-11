@@ -108,6 +108,31 @@ def parallel(job, items, stop=None):
             f.cancel()
 
 
+def parallel_own(job, items, stop=None):
+    """Как parallel, но в своих процессах - не в очереди за пакетной работой окна (при запуске общий пул занят
+    отпечатками и превью, а потоки в окне делят GIL с анимациями). Процессы закрываются в конце."""
+    n = max(1, min(8, (os.cpu_count() or 2) - 1, len(items)))
+    ex = ProcessPoolExecutor(n, mp_context=multiprocessing.get_context("spawn"))
+    futs = {ex.submit(job, p, o): p for p, o in items}
+    try:
+        for f in as_completed(futs):
+            if CLOSING.is_set() or (stop and stop[0]):
+                break
+            try:
+                res = f.result()
+            except Exception as e:
+                res = e
+            yield futs[f], res
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+
+
+def in_process(fn, *args):
+    """fn(*args) в отдельном процессе и дождаться (для фоновой задачи окна: не делит GIL с анимациями)."""
+    with ProcessPoolExecutor(1, mp_context=multiprocessing.get_context("spawn")) as ex:
+        return ex.submit(fn, *args).result()
+
+
 def stop_procs():
     """Процессы по ядрам - бросить (окно закрывается)."""
     if _procs is not None:

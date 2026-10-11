@@ -190,7 +190,7 @@ def _meta_key(a):
             t = os.path.getmtime(os.path.join(a["dir"], "asset.json"))
         except OSError:
             return None
-    return f"{os.path.relpath(a['dir'], ROOT)}|{m}|{t:.0f}"
+    return f"{_rel(a['dir'])}|{m}|{t:.0f}"
 
 
 def load_meta():
@@ -229,6 +229,7 @@ def build_meta(items, cache=None, progress=None, stop=None):
 def apply_meta(items, cache=None):
     """Сведения из FBX - в ассеты (в памяти): polycount (по самому FBX), dims_cm, rigged, animations."""
     cache = load_meta() if cache is None else cache
+    scales = load_scale()
     for a in items:
         if a.get("kind") != "model":
             continue
@@ -244,13 +245,62 @@ def apply_meta(items, cache=None):
         # у моделей со скелетом вершины лежат в исходной позе без костей - габариты врут (MetaHuman в метр ростом),
         # поэтому размер показывается только у обычных моделей
         if m.get("dims_cm") and not a.get("dimensions_mm") and not m.get("rigged"):
-            a["dims_cm"] = m["dims_cm"]
+            f = scales.get(asset_key(a), 1.0)
+            a["dims_cm"] = [round(x * f, 1) for x in m["dims_cm"]] if f != 1 else m["dims_cm"]
+            if f != 1:
+                a["scale"] = f
         a["rigged"] = bool(m.get("rigged"))
         if m.get("morphs", 0) > 100:  # сотни морфов (лицо MetaHuman) роняют 3D окна (Qt Quick 3D)
             a["no_qt3d"] = True
         if m.get("animations"):
             a["animations"] = m["animations"]
     return items
+
+
+# ---------------------------------------------------------------- масштаб (наборы не в сантиметрах)
+SCALE_STORE = os.path.join(os.path.dirname(CACHE), "_unreal_scale.json")
+
+
+def _rel(d):
+    """Папка ассета от корня _Unreal; на другом диске - полный путь (relpath там падает)."""
+    try:
+        return os.path.relpath(d, ROOT)
+    except ValueError:
+        return os.path.abspath(d)
+
+
+def asset_key(a):
+    return a.get("id") or _rel(a["dir"]).replace(os.sep, "/")
+
+
+def load_scale():
+    try:
+        with open(SCALE_STORE, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def scale_of(a, cache=None):
+    """Во сколько раз увеличить модель, чтобы она была в настоящих сантиметрах (library/scale_check)."""
+    return float((load_scale() if cache is None else cache).get(asset_key(a), 1.0))
+
+
+def set_scale(assets, factor):
+    """Запомнить множитель для моделей (1 или None - как в файле). Файлы не меняются: множитель берут размеры
+    в окне и импорт в Unreal (Import Uniform Scale). -> сколько моделей изменено."""
+    with _lock:
+        cache = load_scale()
+        n = 0
+        for a in assets:
+            k = asset_key(a)
+            if not factor or abs(factor - 1) < 1e-6:
+                n += cache.pop(k, None) is not None
+            elif cache.get(k) != factor:
+                cache[k] = factor
+                n += 1
+        K.write_atomic(SCALE_STORE, json.dumps(cache, ensure_ascii=False), "utf-8")
+    return n
 
 
 # ---------------------------------------------------------------- поворот модели лицом к камере

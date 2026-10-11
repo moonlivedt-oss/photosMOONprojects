@@ -856,3 +856,58 @@ def ue_simplify(id, triangles=100000, use=True):  # noqa: A002
     except (ValueError, RuntimeError) as e:
         raise ApiError(str(e)) from e
     return {"id": id, **item}
+
+
+@tool(
+    "ue_scale_check",
+    "Модели не в своём масштабе: размер из FBX против настоящего (стул 70-110 см высотой, дверь 180-290). "
+    "Low-poly наборы часто сделаны не в сантиметрах - стул Kenney Furniture Kit 4.7 м. packs - общий множитель "
+    "на весь набор (одна единица на кит), items - поштучно. Исправить - ue_set_scale.",
+    {"limit": {"type": "integer", "default": 60}},
+)
+def ue_scale_check(limit=60):
+    from library import scale_check
+
+    r = scale_check.check(_items())
+    return dict(
+        packs=[
+            {k: p[k] for k in ("pack", "source", "url", "factor", "checked", "wrong", "fixed", "examples")}
+            for p in r["packs"]
+        ],
+        items=[dict({k: v for k, v in x.items() if k != "asset"}, id=_key(x["asset"])) for x in r["items"][:limit]],
+        total_items=len(r["items"]),
+    )
+
+
+@tool(
+    "ue_set_scale",
+    "Поправить масштаб моделей: множитель для ids или для всего набора (pack из ue_scale_check). Файлы не "
+    "меняются - множитель берут размеры в окне и импорт в Unreal (Import Uniform Scale). factor=1 - как в файле.",
+    {
+        "factor": {"type": "number"},
+        "ids": {"type": "array", "items": {"type": "string"}},
+        "pack": {"type": "string"},
+    },
+    ["factor"],
+    write=True,
+)
+def ue_set_scale(factor, ids=None, pack=None):
+    from library import scale_check
+    from library import unreal_extra as X
+
+    try:
+        factor = float(factor)
+    except (TypeError, ValueError):
+        raise ApiError("factor - число, например 0.2 или 4.") from None
+    if not 0.001 <= factor <= 1000:
+        raise ApiError("factor - от 0.001 до 1000.")
+    if pack:
+        assets = scale_check.pack_members(_items(), pack)
+        if not assets:
+            raise ApiError(f"Нет набора «{pack}» - список: ue_scale_check.")
+    elif ids:
+        assets = [a for a in _by_ids(ids, 400) if a.get("kind") == "model"]
+    else:
+        raise ApiError("Нужны ids или pack.")
+    n = X.set_scale(assets, factor)
+    return {"changed": n, "models": len(assets), "factor": factor}

@@ -45,6 +45,7 @@ def _open():
                 CREATE TABLE IF NOT EXISTS smart(name TEXT PRIMARY KEY, query TEXT, color TEXT, sem INT);
                 CREATE TABLE IF NOT EXISTS exports(rel TEXT, dest TEXT, t REAL, PRIMARY KEY(rel, dest));
                 CREATE TABLE IF NOT EXISTS ue_used(id TEXT, dest TEXT, t REAL, PRIMARY KEY(id, dest));
+                CREATE TABLE IF NOT EXISTS projects(folder TEXT PRIMARY KEY, bg TEXT, colors TEXT, t REAL);
                 CREATE TABLE IF NOT EXISTS fav(rel TEXT PRIMARY KEY, t REAL);
                 CREATE TABLE IF NOT EXISTS journal(id INTEGER PRIMARY KEY AUTOINCREMENT, t REAL, who TEXT,
                                                    text TEXT, steps TEXT, undone INT DEFAULT 0);
@@ -267,6 +268,28 @@ def ue_uses():
     """[(id ассета, папка или проект)]."""
     with _lock:
         return conn().execute("SELECT id, dest FROM ue_used").fetchall()
+
+
+def save_project(folder, bg, colors):
+    """Палитра проекта (фон и цвета) - за его папкой: подбор наборов и проверка перед публикацией."""
+    with _lock:
+        c = conn()
+        with c:
+            c.execute("INSERT OR REPLACE INTO projects VALUES (?,?,?,?)", (folder, bg, ",".join(colors), time.time()))
+
+
+def project_palette(folder):
+    """-> (фон, [цвета]) или None"""
+    with _lock:
+        r = conn().execute("SELECT bg, colors FROM projects WHERE folder=?", (folder,)).fetchone()
+    return (r[0], [c for c in r[1].split(",") if c]) if r else None
+
+
+def projects():
+    """[(папка, фон, [цвета])] - свежие сначала."""
+    with _lock:
+        rows = conn().execute("SELECT folder, bg, colors FROM projects ORDER BY t DESC").fetchall()
+    return [(f, b, [c for c in cs.split(",") if c]) for f, b, cs in rows]
 
 
 def favs():

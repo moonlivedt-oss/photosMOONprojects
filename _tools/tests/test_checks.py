@@ -59,7 +59,9 @@ class Contrast(unittest.TestCase):
             float(contrast.ratio(contrast.luminance([255, 255, 255]), contrast.luminance([0, 0, 0]))), 21.0, 1
         )
 
-    def test_outline_saves_on_dark_not_on_white(self):
+    def test_outline_lost_on_white_but_drawing_visible(self):
+        """Белая обводка на белом сливается, но тёмный рисунок за ней виден - «хорошо» с пометкой;
+        бледная фигура без контура на белом - «плохо видно», средняя - «так себе»."""
         tmp = tempfile.mkdtemp()
         try:
             p = os.path.join(tmp, "s.png")
@@ -67,8 +69,17 @@ class Contrast(unittest.TestCase):
             r = contrast.check(p, [("Белый", "#ffffff"), ("Тёмный", "#1e1e24")])
             by = {b["name"]: b for b in r["bgs"]}
             self.assertEqual(by["Тёмный"]["verdict"], "хорошо")
-            self.assertEqual(by["Белый"]["verdict"], "плохо видно")
-            self.assertEqual(r["worst"]["name"], "Белый")
+            self.assertEqual(by["Белый"]["verdict"], "хорошо")
+            self.assertIn("обводка", by["Белый"]["note"])
+            for name, fill, want in (
+                ("pale", (220, 214, 255, 255), "плохо видно"),
+                ("mid", (170, 160, 240, 255), "так себе"),
+            ):
+                q = os.path.join(tmp, name + ".png")
+                im = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+                ImageDraw.Draw(im).ellipse((10, 10, 118, 118), fill=fill)
+                im.save(q)
+                self.assertEqual(contrast.check(q, [("Белый", "#ffffff")])["worst"]["verdict"], want)
             Image.new("RGB", (64, 64), (10, 10, 10)).save(os.path.join(tmp, "bg.png"))
             self.assertIsNone(contrast.check(os.path.join(tmp, "bg.png"), [("Белый", "#ffffff")]))
         finally:
@@ -193,6 +204,141 @@ class Budget(unittest.TestCase):
     def test_simplify_refuses_light_model(self):
         with self.assertRaises(ValueError):
             budget.simplify(dict(self.a, polycount=500), 1000, blender="нет")
+
+
+class Scale(unittest.TestCase):
+    def kit(self, names, dims, url="https://kenney.nl/assets/furniture-kit"):
+        return [
+            dict(id=f"k-{n}", name=n, kind="model", source="Kenney", url=url, dims_cm=d, dir=f"/x/{n}")
+            for n, d in zip(names, dims)
+        ]
+
+    def test_pack_factor_found(self):
+        from library import scale_check
+
+        items = self.kit(
+            ["Chair", "Table", "Bed single", "Sofa", "Lamp round floor", "Door"],
+            [[200, 200, 470], [841, 447, 380], [571, 1125, 375], [700, 400, 450], [152, 175, 860], [400, 40, 1100]],
+        )
+        r = scale_check.check(items)
+        self.assertEqual(len(r["packs"]), 1)
+        self.assertEqual(r["packs"][0]["factor"], 0.2)
+        self.assertEqual(r["items"], [])
+
+    def test_parts_and_false_friends_skipped(self):
+        from library import scale_check
+
+        for name in ("Wheel truck", "Warning orange", "Debris door", "Flower bed", "Platform center plate"):
+            self.assertIsNone(scale_check._rule(name), name)
+        self.assertEqual(scale_check._rule("Chair desk")[0], "h")
+
+    def test_single_item_and_real_sizes(self):
+        from library import scale_check
+
+        ok = self.kit(["Chair", "Table", "Door"], [[45, 45, 95], [120, 80, 75], [90, 10, 210]], url="u")
+        odd = self.kit(["Mug"], [[30, 30, 27]], url="u")
+        r = scale_check.check(ok + odd)
+        self.assertEqual([x["name"] for x in r["items"]], ["Mug"])
+        self.assertEqual(r["items"][0]["factor"], 0.5)
+        # у Poly Haven размеры настоящие - не проверяются
+        ph = dict(self.kit(["Chair"], [[200, 200, 470]])[0], dimensions_mm=[2000, 2000, 4700])
+        self.assertEqual(scale_check.check([ph])["items"], [])
+
+    def test_scale_store_applies_to_dims_and_import(self):
+        from library import unreal_extra as X
+        from library import unreal_import
+
+        tmp = tempfile.mkdtemp()
+        old = X.SCALE_STORE, X.META_STORE, X.ROOT
+        try:
+            X.ROOT = tmp
+            X.SCALE_STORE = os.path.join(tmp, "scale.json")
+            X.META_STORE = os.path.join(tmp, "meta.json")
+            d = os.path.join(tmp, "Chair")
+            os.makedirs(d)
+            with open(os.path.join(d, "chair.fbx"), "wb") as fh:
+                fh.write(b"x")
+            a = dict(id="k-chair", name="Chair", kind="model", dir=d, main=["chair.fbx"], _t=1.0)
+            with open(X.META_STORE, "w", encoding="utf-8") as fh:
+                json.dump({X._meta_key(a): {"triangles": 10, "dims_cm": [200, 200, 470]}}, fh)
+            self.assertEqual(X.set_scale([a], 0.2), 1)
+            got = X.apply_meta([dict(a)])[0]
+            self.assertEqual(got["dims_cm"], [40.0, 40.0, 94.0])
+            jobs = unreal_import.plan([a], os.path.join(tmp, "out"))
+            self.assertEqual(jobs[0]["scale"], 0.2)
+            X.set_scale([a], 1)
+            self.assertEqual(X.scale_of(a), 1.0)
+        finally:
+            X.SCALE_STORE, X.META_STORE, X.ROOT = old
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+class Project(unittest.TestCase):
+    def setUp(self):
+        self.proj = tempfile.mkdtemp()
+        css = os.path.join(self.proj, "css")
+        os.makedirs(css)
+        with open(os.path.join(css, "tokens.css"), "w", encoding="utf-8") as fh:
+            fh.write(
+                ":root { --paper: #edf1ec; --accent: #3ea2ff; }\n"
+                "@media (prefers-color-scheme: dark) { :root:not([data-theme=light]) { --paper: #0e1412; } }\n"
+                ":root[data-theme=dark] { --paper: #0e1412; }\n"
+            )
+        with open(os.path.join(css, "base.css"), "w", encoding="utf-8") as fh:
+            fh.write("body { background: var(--paper); color: #222; }\n.btn { background: var(--accent); }\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.proj, ignore_errors=True)
+
+    def test_css_backgrounds_both_themes(self):
+        from library import project_fit as P
+
+        self.assertEqual([c for _n, c in P.css_backgrounds(self.proj)], ["#edf1ec", "#0e1412"])
+        self.assertIn("#3ea2ff", P.css_accents(self.proj))
+
+    def test_from_css_file_and_norm(self):
+        from library import project_fit as P
+
+        _bg, cols = P.from_css(os.path.join(self.proj, "css", "tokens.css"))
+        self.assertIn("#3ea2ff", cols)
+        self.assertEqual(P.norm("#ABC"), "#aabbcc")
+        with self.assertRaises(ValueError):
+            P.norm("красный")
+
+    def test_score_takes_worst_background(self):
+        from library import project_fit as P
+
+        folder = os.path.join(self.proj, "set")
+        os.makedirs(folder)
+        files = []
+        for i in range(4):
+            f = os.path.join(folder, f"{i}.png")
+            im = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+            ImageDraw.Draw(im).ellipse((8, 8, 88, 88), fill=(10, 10, 10, 255))  # чёрное - на тёмной теме пропадает
+            im.save(f)
+            files.append(f)
+        st = P.set_stats(folder, files)
+        self.assertGreater(P.score(st, "#ffffff", ["#ffffff"])["contrast"], 0.9)
+        self.assertLess(P.score(st, ["#ffffff", "#0e1412"], ["#ffffff"])["contrast"], 0.3)
+
+
+class Publish(OnLibrary):
+    def test_publish_check_sections(self):
+        from library import publish_check as PC
+
+        dest = os.path.join(self.proj, "img")
+        os.makedirs(dest)
+        Image.new("RGB", (900, 900)).save(os.path.join(dest, "big.png"))
+        db.log_export([os.path.join("07 Паттерны и текстуры", "Чужие", "x.png")], dest)
+        r = PC.check(self.proj, {})
+        self.assertEqual(r["licenses"]["attribution"], ["Автор - https://example.com"])
+        self.assertEqual(r["licenses"]["level"], "bad")  # CC BY, а CREDITS.md нет
+        self.assertEqual(r["weight"]["images"], 1)
+        self.assertIn("Лицензии", PC.markdown(r))
+        credits.write(self.proj, {})
+        self.assertEqual(PC.check(self.proj, {})["licenses"]["level"], "warn")
+        res = api.call("publish_check", {"project": self.proj, "save": True})
+        self.assertTrue(os.path.exists(res["report"]))
 
 
 if __name__ == "__main__":

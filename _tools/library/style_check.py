@@ -14,7 +14,7 @@ def _imported(rel):
 
 
 def job(path, _o=None):
-    """Для процессов по ядрам (common.parallel)."""
+    """Для процессов (common.parallel_own)."""
     return style.features_of(path)
 
 
@@ -34,7 +34,8 @@ def odd_ones(folder=None, imported=False, stop=None, step=None):
         groups.setdefault(os.path.dirname(f), []).append(f)
     files = [f for g in groups.values() if len(g) >= style.MIN_SET for f in g]
     feats = {}
-    for i, (p, res) in enumerate(C.parallel(job, [(p, None) for p in files], stop)):
+    # свои процессы: общий пул окна при запуске занят, а потоки в окне делят GIL с анимациями
+    for i, (p, res) in enumerate(C.parallel_own(job, [(p, None) for p in files], stop)):
         feats[p] = res if isinstance(res, dict) else None  # исключение из процесса - как пустая
         if step and i % 100 == 0:
             step(i, len(files))

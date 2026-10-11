@@ -129,6 +129,8 @@ class Window(QMainWindow):
         tm.addAction(lib_icon("checklist"), "Выбивается из набора...", self.odd_ones)
         tm.addAction(lib_icon("color-palette"), "Контраст выбранных на фонах...", lambda: self.lib.contrast())
         tm.addAction(lib_icon("Книга"), "Авторы и лицензии проекта...", self.credits)
+        tm.addAction(lib_icon("color-palette"), "Палитра проекта: подходящие наборы...", lambda: self.project(0))
+        tm.addAction(lib_icon("checklist"), "Проверка проекта перед публикацией...", lambda: self.project(1))
         tm.addSeparator()
         tm.addAction(lib_icon("first-aid-kit"), "Проверка и восстановление...", self.safety)
         tools.setMenu(tm)
@@ -753,6 +755,12 @@ class Window(QMainWindow):
 
     def missing(self):
         MissingDialog(self).exec()
+
+    def project(self, tab=0):
+        from ui.project_dialog import ProjectDialog
+
+        self.project_dlg = ProjectDialog(self, tab)
+        self.project_dlg.show()
 
     def odd_ones(self):
         from ui.style_dialogs import OddDialog

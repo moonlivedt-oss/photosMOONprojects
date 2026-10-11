@@ -49,6 +49,7 @@ def plan(assets, dst, tryons=None):
     """Скопировать файлы ассетов в dst/<имя>/ и составить список работ для скрипта. Модель с примеркой из окна 3D
     везёт и свою текстуру - скрипт соберёт из неё материал с тем же повтором, поворотом, оттенком и глянцем."""
     from library import budget
+    from library.unreal_extra import scale_of
 
     jobs, used = [], set()
     for a in map(budget.for_import, assets):
@@ -80,6 +81,7 @@ def plan(assets, dst, tryons=None):
         job = {
             "kind": a.get("kind") or "",
             "rigged": bool(a.get("rigged")),
+            "scale": scale_of(a) if a.get("kind") == "model" else 1.0,  # набор не в сантиметрах (scale_check)
             "name": name,
             "files": files,
             "dest": f"{GAME_ROOT}/{SUB.get(a.get('kind'), 'Misc')}/{name}",
@@ -150,7 +152,7 @@ def role_of(fn):
     return ""
 
 
-def task(path, dest, skeletal=False):
+def task(path, dest, skeletal=False, scale=1.0):
     t = unreal.AssetImportTask()
     t.filename = path
     t.destination_path = dest
@@ -165,6 +167,9 @@ def task(path, dest, skeletal=False):
         ui.import_animations = skeletal
         if skeletal:
             ui.mesh_type_to_import = unreal.FBXImportType.FBXIT_SKELETAL_MESH
+        if abs(scale - 1.0) > 1e-6:  # набор сделан не в сантиметрах - поправка из библиотеки
+            data = ui.skeletal_mesh_import_data if skeletal else ui.static_mesh_import_data
+            data.set_editor_property("import_uniform_scale", scale)
         t.options = ui
     return t
 
@@ -291,7 +296,7 @@ def wear(job, tasks):
 
 done = 0
 for job in JOBS:
-    tasks = [task(p, job["dest"], job.get("rigged", False)) for p in job["files"]]
+    tasks = [task(p, job["dest"], job.get("rigged", False), job.get("scale", 1.0)) for p in job["files"]]
     tools.import_asset_tasks(tasks)
     if job["kind"] == "tex":
         maps = texture_maps(tasks, job["files"])

@@ -33,6 +33,18 @@ def commands(win):
         ("Выбивается из набора", "стиль манера цвет обводка набор не такая", "checklist", win.odd_ones),
         ("Контраст выбранных на фонах", "wcag видно читаемость фон контраст", "color-palette", lambda: lib.contrast()),
         ("Авторы и лицензии проекта", "credits лицензия cc by автор титры", "Книга", win.credits),
+        (
+            "Палитра проекта: подходящие наборы",
+            "сайт игра цвета css подобрать набор",
+            "color-palette",
+            lambda: win.project(0),
+        ),
+        (
+            "Проверка перед публикацией",
+            "публикация релиз вес лицензии контраст бюджет",
+            "checklist",
+            lambda: win.project(1),
+        ),
         ("Вес разделов", "размер место диск", "zip-archive", win.show_weight),
         ("Папка генератора", "слежка генератор", "eye", win.pick_gen),
         ("Вставить из буфера", "ctrl+v paste", "clipboard", win.paste),
@@ -50,6 +62,12 @@ def commands(win):
             lambda: (tab(2), ue.scene()),
         ),
         ("Каталог Poly Haven", "каталог ассеты", "globe", lambda: (tab(2), ue.catalog())),
+        (
+            "Масштаб моделей Unreal",
+            "размер сантиметры метры великан scale",
+            "resize_a_cross_diagonal",
+            lambda: (tab(2), ue.scale_check()),
+        ),
     ]
 
 

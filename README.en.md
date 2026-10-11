@@ -17,7 +17,7 @@ an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D 
 ![version](https://img.shields.io/badge/version-2.5.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/tests-153%20ok-a6e3a1)
+![tests](https://img.shields.io/badge/tests-165%20ok-a6e3a1)
 ![images](https://img.shields.io/badge/pictures-4163-89b4fa)
 ![unreal](https://img.shields.io/badge/Unreal-CC0%20assets-313244)
 ![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
@@ -42,7 +42,7 @@ Then run **`Library.cmd`** - a window opens with three tabs: "Входящие" 
 The interface is in Russian.
 
 ```bash
-_tools\run-tests.cmd                            # all tests (153 checks, no window)
+_tools\run-tests.cmd                            # all tests (165 checks, no window)
 py -3.14 _tools/cli.py done                     # rebuild done.js - Prompts.html hides finished cards
 py -3.14 _tools/cli.py cut sheet.png --grid 4x3  # cut a sheet without the window
 ```
@@ -174,6 +174,13 @@ three variants side by side and a **light or dark theme** with five accents.
   WCAG edge contrast (icons need 3:1) and a verdict.
 - **Project credits** - writes `CREDITS.md` into a project folder: every picture exported there and every
   Unreal asset imported or packed for it, with licenses; CC BY (attribution required) and non-CC0 listed apart.
+- **Project palette** - site or game colors (typed, from a screenshot or from the project CSS, light and dark
+  theme backgrounds resolved through `var(--bg)`) -> which library sets fit: visible on every project
+  background and close in color; recolor a set into the project colors.
+- **Pre-publish check** - one button for a project folder: licenses and CREDITS.md, image weight (and webp
+  savings), whether exported icons are visible on the project backgrounds, Unreal scene budget -> `PUBLISH-CHECK.md`.
+- **Model scale** (Unreal tab) - FBX size against real-world size (a Kenney Furniture Kit chair is 4.7 m tall):
+  one factor per kit, applied to sizes in the window and to Unreal import (Import Uniform Scale).
 - **Scene budget** (Unreal tab, right click): triangles counted from the FBX itself, estimated GPU memory for
   textures, what to build with Nanite and what to simplify; **Simplify in Blender** writes a decimated
   `<name>_<N>k.fbx` next to the original, and import and packs use it.
@@ -209,6 +216,7 @@ file is kept as `.bak`); a ready command for Claude Code and Codex CLI, a config
 | Look | `view` - a picture or a numbered contact sheet comes back as an image; `info` |
 | Label | `suggest_tags`, `tag`, `note`, `favorite`, `smart_folder` |
 | Check manner | `odd_ones`, `contrast`; project credits - `credits` |
+| Project | `project_palette`, `fit_sets`, `publish_check` |
 | File | `rename`, `move`, `trash`, `import_images`, `cut_sheet` |
 | Edit | `edit` (editor recipe, preview first), `remove_background`, `upscale`, `convert` |
 | Deliver | `export` (formats, @2x/@3x, atlas, svg sprite) |

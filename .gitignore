@@ -29,6 +29,7 @@ _tools/_unreal_colors.json
 _tools/_unreal_sigs.json
 _tools/_unreal_meta.json
 _tools/_unreal_yaw.json
+_tools/_unreal_scale.json
 _tools/_unreal_sets.json
 
 # стрелки стилей: окно пишет их само цветом текущей темы

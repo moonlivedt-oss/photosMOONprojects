@@ -1226,6 +1226,96 @@ def contrast(paths, backgrounds=None):
 
 
 @tool(
+    "project_palette",
+    "Палитра проекта (сайта, игры): задать цвета (colors, фон - background), взять из скриншота (image) или из "
+    "CSS / SCSS / HTML (css). Запоминается за папкой проекта (project) - её берут fit_sets и publish_check. "
+    "Только project - показать сохранённую.",
+    {
+        "project": {"type": "string", "description": "папка проекта (полный путь)"},
+        "colors": {"type": "array", "items": {"type": "string"}, "description": "#rrggbb"},
+        "background": {"type": "string", "description": "фон проекта, #rrggbb (по умолчанию - первый цвет)"},
+        "image": {"type": "string", "description": "скриншот сайта или игры (полный путь)"},
+        "css": {"type": "string", "description": "файл стилей проекта (полный путь)"},
+    },
+    write=True,
+    # только показать или подобрать без project - разрешено и в «Только чтение»
+    preview=lambda a: not a.get("project") or not (a.get("colors") or a.get("image") or a.get("css")),
+)
+def project_palette(project=None, colors=None, background=None, image=None, css=None):
+    from library import project_fit as P
+
+    try:
+        if image:
+            bg, cols = P.from_image(image)
+        elif css:
+            bg, cols = P.from_css(css)
+        elif colors:
+            cols = [P.norm(c) for c in colors]
+            bg = cols[0]
+        elif project:
+            got = P.load(project)
+            if not got:
+                raise ApiError("Для этой папки палитра ещё не задана - передайте colors, image или css.")
+            return dict(project=project, background=got[0], colors=got[1], saved=True)
+        else:
+            raise ApiError("Нужны colors, image, css или project.")
+        if background:
+            bg = P.norm(background)
+    except (OSError, ValueError) as e:
+        raise ApiError(str(e)) from e
+    if project:
+        if not os.path.isdir(project):
+            raise ApiError(f"Нет папки {project}.")
+        P.save(project, bg, cols)
+    return dict(project=project, background=bg, colors=cols, saved=bool(project))
+
+
+@tool(
+    "fit_sets",
+    "Какие наборы библиотеки подходят проекту: видно ли их на фоне проекта (контраст края по WCAG) и близки ли "
+    "их цвета к цветам проекта. Цвета - colors/background или сохранённые за project (project_palette). "
+    "only: art - иконки и наклейки, bg - фоны и узоры. Плюс ближайшая палитра Prompts.html - для перекраски "
+    "(edit, op recolor с цветами проекта).",
+    {
+        "project": {"type": "string"},
+        "colors": {"type": "array", "items": {"type": "string"}},
+        "background": {"type": "string"},
+        "only": {"type": "string", "enum": ["all", "art", "bg"], "default": "all"},
+        "limit": {"type": "integer", "default": 30},
+    },
+)
+def fit_sets(project=None, colors=None, background=None, only="all", limit=30):
+    from library import project_fit as P
+
+    bgs = None
+    if not colors and project:
+        got = P.load(project)
+        if got:
+            background, colors = background or got[0], got[1]
+        elif os.path.isdir(project):  # не сохранена - фоны страницы и частые цвета из CSS проекта
+            css = [c for _n, c in P.css_backgrounds(project)]
+            if css:
+                bgs, colors = css, css + P.css_accents(project)
+    if not colors:
+        raise ApiError("Нужны colors (и background) или project с сохранённой палитрой (project_palette).")
+    try:
+        res = P.fit(
+            bgs or background or colors[0],
+            colors,
+            step=lambda d, t: report(d, t, "оцениваю наборы"),
+            limit=limit,
+            only=only,
+        )
+    except ValueError as e:
+        raise ApiError(str(e)) from e
+    for x in res["sets"]:
+        x.pop("folder")
+        x["set"] = x["set"].replace(os.sep, "/")
+        x["sample"] = [rel(p) for p in x["sample"]]
+    return res
+
+
+@tool(
     "credits",
     "Авторы и лицензии проекта: всё, что из библиотеки ушло в папку проекта (выгруженные картинки, ассеты Unreal "
     "из импорта и пакетов), - в CREDITS.md этой папки (чужой CREDITS.md не трогается - тогда CREDITS.library.md). "
@@ -1242,6 +1332,33 @@ def credits(project):
     if CR.inside(project, C.LIB):
         raise ApiError("Это папка библиотеки, а не проекта.")
     return CR.write(project, C.load_cfg())
+
+
+@tool(
+    "publish_check",
+    "Проверка проекта перед публикацией: лицензии (что из библиотеки, нужно ли указать автора, есть ли "
+    "CREDITS.md), вес картинок (тяжёлые и сколько даст webp), видно ли выгруженные иконки на фоне проекта "
+    "(палитра project_palette или фон из CSS проекта, светлая и тёмная тема), бюджет сцены Unreal. "
+    "save=true - ещё и отчёт PUBLISH-CHECK.md в папку проекта.",
+    {
+        "project": {"type": "string", "description": "папка проекта (полный путь)"},
+        "save": {"type": "boolean", "default": False},
+    },
+    ["project"],
+    write=True,
+    preview=lambda a: not a.get("save"),
+)
+def publish_check(project, save=False):
+    from library import credits as CR
+    from library import publish_check as PC
+
+    if not os.path.isabs(project) or not os.path.isdir(project):
+        raise ApiError("Нужен полный путь к существующей папке проекта.")
+    if CR.inside(project, C.LIB):
+        raise ApiError("Это папка библиотеки, а не проекта.")
+    r = PC.write(project, C.load_cfg()) if save else PC.check(project, C.load_cfg())
+    r["text"] = PC.markdown(r)
+    return r
 
 
 # ---------------------------------------------------------------- прочее

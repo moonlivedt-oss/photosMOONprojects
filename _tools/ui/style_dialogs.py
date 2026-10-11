@@ -190,8 +190,8 @@ class ContrastDialog(QDialog):
         self.head = QLabel("Считаю...", objectName="title")
         sub = QLabel(
             "Смотрится край рисунка - по силуэту глаз и находит значок. Для значков WCAG требует контраст от 3:1: "
-            "«хорошо» - так у 80% края и больше, «так себе» - у половины, «плохо видно» - меньше. "
-            "Фон палитры - основа палитры папки.",
+            "«хорошо» - так у большей части края, «так себе» - только от 2:1 (видно, но бледно), «плохо видно» - "
+            "меньше. Если белая обводка сливается с фоном, смотрится рисунок под ней. Фон палитры - основа палитры папки.",
             objectName="dim",
             wordWrap=True,
         )
@@ -274,7 +274,10 @@ class ContrastDialog(QDialog):
                 pic = QLabel()
                 pic.setPixmap(to_pix(pics[p][b["color"]]))
                 pic.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                pic.setToolTip(f"{b['color']}: край с контрастом от 3:1 - {round(b['share'] * 100)}%")
+                pic.setToolTip(
+                    f"{b['color']}: край с контрастом от 3:1 - {round(b['share'] * 100)}%"
+                    + ("\n" + b["note"] if b.get("note") else "")
+                )
                 txt = QLabel(f"{b['ratio']}:1  {b['verdict']}", alignment=Qt.AlignmentFlag.AlignCenter)
                 txt.setStyleSheet(f"color:{VERDICT[b['verdict']]};font-size:9pt")
                 cv.addWidget(pic)

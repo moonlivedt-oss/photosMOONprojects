@@ -153,6 +153,9 @@ class UnrealTab(QWidget):
         doc = QPushButton(lib_icon("first-aid-kit"), "", objectName="tool")
         doc.setToolTip("Проверить ассеты: битые FBX, пропавшие файлы, недокачанные папки")
         doc.clicked.connect(self.check_assets)
+        scale = QPushButton(lib_icon("resize_a_cross_diagonal"), "", objectName="tool")
+        scale.setToolTip("Масштаб моделей: какие наборы сделаны не в сантиметрах (стул 4.7 м) - и поправка")
+        scale.clicked.connect(self.scale_check)
         self.like, self.problems = None, None  # особые списки: «похожие на», «проблемные»
         self.ai_title = None  # список показал ИИ-помощник (ue_show): заголовок над плитками
         self.title = QLabel(objectName="big")
@@ -184,6 +187,7 @@ class UnrealTab(QWidget):
         bar.addWidget(self.sem_btn)
         bar.addWidget(self.slider)
         bar.addWidget(doc)
+        bar.addWidget(scale)
         bar.addWidget(scene)
         bar.addWidget(cat)
         bar.addWidget(arch)
@@ -585,6 +589,12 @@ class UnrealTab(QWidget):
         self.like, self.problems = a, None
         self.back_btn.show()
         self.show_assets()
+
+    def scale_check(self):
+        from ui.scale_dialog import ScaleDialog
+
+        self.scale_dlg = ScaleDialog(self.win, self.items, on_done=self.describe)
+        self.scale_dlg.show()
 
     def check_assets(self):
         from library import unreal_extra as X

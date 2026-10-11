@@ -65,7 +65,8 @@ class Swatch(QPushButton):
 class PaletteDialog(QDialog):
     """Палитра из любой картинки -> перекраска выбранных картинок библиотеки в неё (копиями)."""
 
-    def __init__(self, win, targets, source=None):
+    def __init__(self, win, targets, source=None, colors=None, title=None):
+        """colors - готовая палитра (цвета проекта) вместо картинки-образца."""
         super().__init__(win, Qt.WindowType.Window)
         self.win, self.targets = win, [p for p in targets if p != source]
         self.colors, self.src, self.small = [], None, {}
@@ -122,6 +123,10 @@ class PaletteDialog(QDialog):
         lay.addLayout(right, 1)
         if source:
             self.load(source)
+        elif colors:
+            if title:
+                self.setWindowTitle(title)
+            self.show_colors(list(colors))
         self.update_info()
 
     def choose(self):
@@ -146,7 +151,10 @@ class PaletteDialog(QDialog):
     def extract(self):
         if self.src is None:
             return
-        self.colors = extract_palette(self.src, self.n.value())
+        self.show_colors(extract_palette(self.src, self.n.value()))
+
+    def show_colors(self, colors):
+        self.colors = colors
         while self.sw.count():
             w = self.sw.takeAt(0).widget()
             if w:
