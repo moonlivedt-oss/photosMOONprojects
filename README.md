@@ -17,7 +17,7 @@
 ![version](https://img.shields.io/badge/version-2.5.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-окно-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/тесты-99%20ok-a6e3a1)
+![tests](https://img.shields.io/badge/тесты-141%20ok-a6e3a1)
 ![images](https://img.shields.io/badge/картинок-4163-89b4fa)
 ![unreal](https://img.shields.io/badge/Unreal-ассеты%20CC0-313244)
 ![mcp](https://img.shields.io/badge/MCP-ИИ--помощники-d97757)
@@ -43,7 +43,7 @@ py -3.14 _tools/get_models.py      # модели нейросетей, ~460 М�
 Отдельно:
 
 ```bash
-_tools\run-tests.cmd                            # все тесты (99 проверок, окно не открывается)
+_tools\run-tests.cmd                            # все тесты (141 проверка, окно не открывается)
 py -3.14 _tools/cli.py done                     # пересобрать done.js - Prompts.html прячет готовые карточки
 py -3.14 _tools/cli.py cut лист.png --grid 4x3  # нарезать лист без окна
 ```
@@ -503,7 +503,7 @@ py -3.14 _tools/cli.py repair restore latest  # вернуть последню�
 
 ```
 00 Входящие/            неразобранное (в поиск не попадает)
-01 Фоны/ ... 10 .../    разделы; наборы - <раздел>/<набор>/<палитра>/
+01 Фоны/ ... 13 .../    разделы; наборы - <раздел>/<набор>/<палитра>/
 _sources/               исходные листы (<год-месяц>), оригиналы до сжатия и правки, _undone для Ctrl+Y
 _Unreal/                ассеты для Unreal Engine: <вид>/<тема>/<имя>/ (не в git)
 _docs/screenshots/      картинки этого README (обновить: py -3.14 _tools/docs_screenshots.py)
@@ -516,6 +516,7 @@ _tools/
   mcp_server.py         сервер MCP для ИИ-помощников (stdin/stdout, без сторонних пакетов)
   cli.py                командная строка: cut, convert, dupes, done, nobg, upscale, unreal, api
   get_models.py         скачать модели поиска по смыслу
+  docs_screenshots.py   снимки окна для этого README
   imaging/              ядро без Qt (Pillow + numpy)
     files.py            пути, чтение с поворотом по EXIF, атомарная запись
     cutting.py          удаление фона, обводка, поиск рисунков, нарезка сеткой
@@ -540,7 +541,13 @@ _tools/
     sorting.py          заготовки нарезки, метки в имени, запись в разделы
     prompts.py          данные Prompts.html (через node)
     unreal.py           ассеты Unreal: темы, Poly Haven, ambientCG, Kenney, Quaternius, загрузка на место
-    unreal_sem.py       поиск по смыслу по ассетам; unreal_extra.py - цвета превью и проверка ассетов
+    unreal_sem.py       поиск по смыслу по ассетам; unreal_extra.py - цвета превью, проверка, повторы, полигоны
+    unreal_groups.py    группы, разделы и стили дерева Unreal (общие для окна и помощника)
+    unreal_local.py     разбор скачанных архивов (itch.io и др.); unreal_links.py - страница ссылок на них
+    unreal_from_project.py  выгрузка Fab, Megascans и MetaHuman из проекта Unreal в FBX
+    mh_view.py          MetaHuman для 3D-просмотра (_view.glb через Blender, с текстурами)
+    blender_preview.py  превью моделей, которые Qt Quick 3D не тянет (MetaHuman), рендером Blender
+    fbx_meta.py         треугольники, размер в см, скелет и анимации прямо из FBX
     unreal_import.py    копия файлов и import_to_unreal.py (настройки текстур, материал M_<имя>)
     fbx_colors.py       цвета материалов Quaternius из .mtl прямо в FBX
     scene_plan.py       подборка комнаты по описанию; room_layout.py - расстановка мебели (без Qt)
@@ -549,22 +556,27 @@ _tools/
     unreal_pack.py      пакет для проекта; unreal_sets.py - подборки (общий файл окна и помощников)
     api_unreal.py       операции ue_* для помощников; versions.py - прошлые версии картинки
     safety.py           резервные копии, проверка и восстановление базы и настроек
+    cleanup.py          чистка _sources: что можно убрать в корзину и сколько места вернётся
+    ui_bridge.py        связь помощника с открытым окном (показать, что выбрано, ход работы) через файлы
   ui/                   окно (PyQt6)
     main_window.py      главное окно, отмена/возврат, приём файлов, main()
     inbox_tab.py        вкладка «Входящие»
     library_tab.py      вкладка «Библиотека», быстрый просмотр, умные папки, поиск по картинке
     semantic.py, signatures.py - то же, что в library, но досчёт в фоне
     unreal_tab.py       вкладка «Unreal»; unreal_nav.py, unreal_tiles.py, unreal_catalog.py - панель, карточки, каталог
+    unreal_panel.py     карточка ассета справа и в «Сведениях» 3D-окна
+    compare3d.py + .qml сравнение 2-4 моделей или текстур в 3D
     viewer3d.py + .qml  просмотр в 3D на Qt Quick 3D; room3d.py + .qml - комната; render_previews.py - превью моделей
     tools_dialogs.py    палитра из картинки, сравнение двух картинок, векторизация, оформление
     scene_dialog.py     подборка по описанию; unreal_import_dialog.py - импорт в Unreal
     command_palette.py  «Найти везде» (Ctrl+P); safety_dialog.py - проверка и восстановление
-    agents.py           окно «ИИ-помощники»; help.py - справка
+    agents.py           окно «ИИ-помощники»; ai_drawer.py - лента их действий; help.py - справка
+    settings_dialog.py  «Настройки» (Ctrl+,)
     editor.py, compress.py, export.py, dupes.py, weight.py, doctor.py, missing.py - окна действий
     widgets.py, thumbnails.py, animations.py, theme.py, common.py - общее для окна
-  tests/                unittest: эталонные листы, нарезка, правка, база, метки, CLIP;
+  tests/                unittest (run-tests.cmd): эталонные листы, нарезка, правка, база, метки, CLIP;
                         test_api.py - операции для помощников и протокол MCP на временной библиотеке;
-                        test_unreal.py, test_fbx_colors.py - ассеты Unreal без сети
+                        test_unreal*.py, test_fbx_*.py, test_mh_view.py, test_scene_plan.py - Unreal без сети
   cli/                  .cmd для перетаскивания файлов
 ```
 
@@ -595,7 +607,8 @@ _tools/
 Картинки библиотеки **не уходят в сеть**: метки, поиск по смыслу, правка - всё считается на этом компьютере.
 Сеть нужна в двух случаях, и оба - только скачивание: `get_models.py` один раз качает модели с Hugging Face
 и GitHub, а вкладка «Unreal» по кнопкам «Скачать ещё...», «Каталог...» и «Перекачать» берёт ассеты с Poly Haven,
-ambientCG, Kenney и открытых папок Quaternius на Google Drive. Ничего из библиотеки не отправляется.
+ambientCG, Kenney, KayKit (GitHub) и открытых папок Quaternius на Google Drive. Архивы с itch.io вы качаете сами;
+выгрузка из Unreal и Quixel Bridge идёт с этого компьютера. Ничего из библиотеки не отправляется.
 
 Сервер для помощников тоже работает локально и сам ничего не отправляет. Но то, что помощник
 смотрит (`view`, предпросмотр правки) или читает (имена, метки), уходит его модели - как любой

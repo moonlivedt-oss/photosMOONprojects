@@ -17,7 +17,7 @@ an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D 
 ![version](https://img.shields.io/badge/version-2.5.0-cba6f7)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/tests-99%20ok-a6e3a1)
+![tests](https://img.shields.io/badge/tests-141%20ok-a6e3a1)
 ![images](https://img.shields.io/badge/pictures-4163-89b4fa)
 ![unreal](https://img.shields.io/badge/Unreal-CC0%20assets-313244)
 ![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
@@ -42,7 +42,7 @@ Then run **`Library.cmd`** - a window opens with three tabs: "Входящие" 
 The interface is in Russian.
 
 ```bash
-_tools\run-tests.cmd                            # all tests (99 checks, no window)
+_tools\run-tests.cmd                            # all tests (141 checks, no window)
 py -3.14 _tools/cli.py done                     # rebuild done.js - Prompts.html hides finished cards
 py -3.14 _tools/cli.py cut sheet.png --grid 4x3  # cut a sheet without the window
 ```
@@ -261,8 +261,9 @@ action journal, search, tools for assistants); `_tools/mcp_server.py` - the MCP 
 
 Library pictures **never leave the computer**: tags, semantic search and edits are all computed locally.
 The network is used only for downloads: `get_models.py` fetches the models once (Hugging Face, GitHub), and the
-"Unreal" tab fetches assets from Poly Haven, ambientCG, Kenney and Quaternius' public Google Drive folders when you
-press its download buttons.
+"Unreal" tab fetches assets from Poly Haven, ambientCG, Kenney, KayKit (GitHub) and Quaternius' public Google Drive
+folders when you press its download buttons. itch.io archives you download yourself; Unreal and Quixel Bridge exports
+happen on this computer.
 The assistant server is local too and sends nothing by itself, but whatever an assistant views or reads
 goes to its model, like any file you show it.
 

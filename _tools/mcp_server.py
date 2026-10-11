@@ -129,6 +129,9 @@ def main():
             send(dict(jsonrpc="2.0", id=None, error=dict(code=-32700, message="parse error")))
             continue
         for m in msg if isinstance(msg, list) else [msg]:
+            if not isinstance(m, dict):  # не объект - ответить ошибкой, а не уронить сервер
+                send(dict(jsonrpc="2.0", id=None, error=dict(code=-32600, message="invalid request")))
+                continue
             mid = m.get("id")
             try:
                 res = handle(api, m)

@@ -553,6 +553,9 @@ class Window(QMainWindow):
     def paste(self):
         cb = QApplication.clipboard()
         md = cb.mimeData()
+        if md is None:  # буфер занят другой программой
+            self.say("Буфер обмена сейчас недоступен - попробуйте ещё раз")
+            return
         if md.hasUrls() and self.take([u.toLocalFile() for u in md.urls() if u.isLocalFile()]):
             return
         if md.hasImage():

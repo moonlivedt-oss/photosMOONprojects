@@ -82,6 +82,27 @@ def report(done, total=None, message=""):
         ui_bridge.status(message or "работаю", done, total, AGENT["who"])
 
 
+def check_arg(name, value, spec):
+    """Неверное значение - понятная ошибка, а не молча пустой ответ (by="color", limit=-5, color="#ff0000").
+    -> значение (целые из 2.0 и "2" приводятся к int)."""
+    if value is None:
+        return value
+    if spec.get("type") == "integer":
+        try:
+            num = float(value)
+        except (TypeError, ValueError):
+            num = None
+        if isinstance(value, bool) or num is None or not num.is_integer():
+            raise ApiError(f"{name}: нужно целое число, а не {value!r}.")
+        value = int(num)
+        if value < 0:
+            raise ApiError(f"{name}: не может быть меньше нуля ({value}).")
+    enum = spec.get("enum")
+    if enum and value not in enum and str(value).lower() not in [str(e).lower() for e in enum]:
+        raise ApiError(f"{name}: нет значения {value!r}. Можно: {', '.join(map(str, enum))}.")
+    return value
+
+
 def write_allowed():
     return C.load_cfg().get("ai_write", True)
 
@@ -100,6 +121,8 @@ def call(name, args=None, progress=None):
     missing = [k for k in t["schema"]["required"] if k not in args]
     if missing:
         raise ApiError(f"Не хватает параметров: {', '.join(missing)}.")
+    for k, v in args.items():
+        args[k] = check_arg(k, v, known[k])
     writing = bool(t["write"]) and not (t["preview"] and t["preview"](args))
     if writing and not write_allowed():
         raise ApiError(
@@ -149,7 +172,7 @@ def absolute(path, must_exist=True, inside=True):
         near = [rel(f) for f in K.images_in(C.LIB) if len(base) > 2 and base in os.path.basename(f).lower()][:5]
         if near:
             hint = " Похожие по имени: " + "; ".join(near)
-        raise ApiError(f"Нет файла «{path}».{hint}")
+        raise ApiError(f"Нет файла или папки «{path}».{hint}")
     return p
 
 
@@ -336,7 +359,11 @@ def list_folder(folder="", limit=100, offset=0):
     {
         "query": {"type": "string", "default": ""},
         "semantic": {"type": "string", "enum": ["auto", "true", "false"], "default": "auto"},
-        "color": {"type": "string", "description": "код цвета: r o y g c b v p w k (см. overview.colors)"},
+        "color": {
+            "type": "string",
+            "enum": [c for c, _n, _h in K.COLORS],
+            "description": "код цвета (см. overview.colors)",
+        },
         "tag": {"type": "string"},
         "folder": {"type": "string", "description": "искать только в этой папке"},
         "favorites": {"type": "boolean", "default": False},
@@ -1142,7 +1169,7 @@ def check(folder=None, limit=200):
     {
         "name": {"type": "string"},
         "query": {"type": "string", "default": ""},
-        "color": {"type": "string", "default": ""},
+        "color": {"type": "string", "enum": ["", *(c for c, _n, _h in K.COLORS)], "default": ""},
         "semantic": {"type": "boolean", "default": False},
         "delete": {"type": "boolean", "default": False},
     },

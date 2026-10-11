@@ -93,6 +93,18 @@ class Api(unittest.TestCase):
             api.call("info", {"path": "../outside.png"})
         with self.assertRaises(api.ApiError):
             api.call("search", {"qery": "x"})
+
+    def test_bad_values_are_explained(self):
+        for name, args in (
+            ("search", {"limit": -5}),
+            ("search", {"color": "#ff0000"}),
+            ("search", {"limit": "много"}),
+            ("similar", {"path": f"{SEC}/blue-moon.png", "by": "color"}),
+        ):
+            with self.subTest(args=args), self.assertRaises(api.ApiError):
+                api.call(name, args)
+        r = api.call("search", {"limit": "1", "semantic": False})  # числа строкой и булевы - как от клиентов MCP
+        self.assertEqual(len(r["items"]), 1)
         with self.assertRaises(api.ApiError):
             api.call("move", {"paths": [f"{SEC}/red-planet.png"], "folder": "_sources"})
 

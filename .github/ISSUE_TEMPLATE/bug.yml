@@ -41,6 +41,8 @@ body:
         - Поиск по смыслу или подсказка меток
         - Редактор, сжатие или выгрузка
         - Командная строка или .cmd
+        - Вкладка Unreal или 3D-просмотр
+        - ИИ-помощники (MCP, cli.py api)
         - Prompts.html
     validations:
       required: true
@@ -48,7 +50,7 @@ body:
     id: python
     attributes:
       label: Версия Python и Windows
-      placeholder: "Python 3.14.0 · Windows 11 24H2"
+      placeholder: "Python 3.14.0, Windows 11 24H2"
     validations:
       required: true
   - type: textarea

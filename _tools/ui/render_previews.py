@@ -14,6 +14,8 @@ from ui.common import log_error
 from ui.viewer3d import QML, load_scene
 
 SIDE = 512
+# пустой кадр - плоская стена или дверь видна с изнанки или ребром: снять с других сторон, потом сдаться
+TURNS = ((-16, 212, 0), (-16, 122, 0), (-16, -58, 0), (-70, 32, 0))
 
 
 def needs_preview(a):
@@ -35,6 +37,10 @@ def give_up(a):
         open(os.path.join(a["dir"], NONE), "w").close()
     except OSError:
         pass
+
+
+def empty(img: QImage):
+    return not to_pil(img).getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
 
 
 def touches_edge(img: QImage, pad=3):
@@ -107,7 +113,7 @@ class PreviewRenderer(QObject):
             self.done.emit(self.ok)
             return
         self.cur = self.queue.pop(0)
-        self.wait, self.tries, self.frozen = 0, 0, False
+        self.wait, self.tries, self.frozen, self.turns = 0, 0, False, 0
         self.root.setProperty("camScale", 1.35)
         load_scene(self.root, self.cur, self.probe)
         # взгляд чуть сверху и сбоку - как на карточках Kenney
@@ -147,6 +153,13 @@ class PreviewRenderer(QObject):
             else:
                 self.root.setProperty("camScale", 1.35 * 1.5**self.tries)
                 self.root.resetView()
+            self.wait = 0
+            return
+        if self.turns < len(TURNS) and empty(img):
+            from PyQt6.QtGui import QVector3D
+
+            self.root.findChild(QObject, "orbit").setProperty("eulerRotation", QVector3D(*TURNS[self.turns]))
+            self.turns += 1
             self.wait = 0
             return
         self.timer.stop()
