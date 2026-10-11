@@ -29,7 +29,14 @@ ROOT_FILES = [
     "CLAUDE.md",
     ".mcp.json",
 ]
-SKIP = ("_tools/tests/", "_tools/docs_", "_tools/make_release.py", "_tools/badges.py")
+SKIP = (
+    "_tools/tests/",
+    "_tools/docs_",
+    "_tools/make_release.py",
+    "_tools/badges.py",
+    "_tools/run-tests.cmd",
+    "_tools/ruff.toml",
+)
 SECTIONS = [
     "00 Входящие",
     "01 Фоны",
