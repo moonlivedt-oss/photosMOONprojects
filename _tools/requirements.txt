@@ -1,0 +1,6 @@
+# окно и ядро: py -3.14 -m pip install -r _tools/requirements.txt
+PyQt6>=6.9
+pillow>=11
+numpy>=2.2
+onnxruntime>=1.22   # поиск по смыслу, удаление фона, увеличение (модели - get_models.py)
+vtracer>=0.6        # векторизация в SVG (необязательно: нужен только для svg)

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Бейджи README (число тестов и картинок) - свежие в каждом коммите. Включить: git config core.hooksPath .githooks
+py -3.14 _tools/badges.py --stage >/dev/null 2>&1 || true

@@ -1,0 +1,47 @@
+name: Release
+
+# Тег v* -> архив Library-<версия>.zip (программа без картинок автора) прикладывается к релизу.
+# Релиза с этим тегом нет - создаётся с заметками из CHANGELOG.md.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Тег релиза, например v2.6.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Длинные пути
+        run: git config --system core.longpaths true
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Архив
+        run: python _tools/make_release.py --out dist
+      - name: Заметки из CHANGELOG
+        shell: python
+        run: |
+          import os, re
+          v = os.environ["TAG"].lstrip("v")
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          m = re.search(r"^## \[" + re.escape(v) + r"\][^\n]*\n(.*?)(?=^## \[|\Z)", text, re.S | re.M)
+          open("notes.md", "w", encoding="utf-8").write(m.group(1).strip() if m else f"Версия {v}")
+      - name: Релиз
+        shell: bash
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "${TAG#v}" --notes-file notes.md
+          gh release upload "$TAG" dist/*.zip --clobber

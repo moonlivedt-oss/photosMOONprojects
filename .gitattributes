@@ -1,3 +1,4 @@
 * text=auto
 *.cmd text eol=crlf
 *.bat text eol=crlf
+.githooks/* text eol=lf

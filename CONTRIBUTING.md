@@ -7,7 +7,8 @@
 ```bash
 git clone https://github.com/moonlivedt-oss/photosMOONprojects.git
 cd photosMOONprojects
-py -3.14 -m pip install PyQt6 pillow numpy onnxruntime ruff
+py -3.14 -m pip install -r _tools/requirements.txt ruff
+git config core.hooksPath .githooks   # бейджи README (тесты, картинки) обновляются при коммите
 py -3.14 _tools/get_models.py        # по желанию: модели поиска по смыслу
 Library.cmd                           # окно
 cd _tools && py -3.14 -m ruff check . && py -3.14 -m unittest discover -s tests    # всё, что гоняет CI

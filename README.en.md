@@ -2,9 +2,9 @@
 
 [Русский](README.md) | **English**
 
-<img src="_docs/screenshots/logo.png" alt="Picture Library logo: an image file with mountains and a sun" width="120">
+<img src="_docs/screenshots/logo.png" alt="Image Library logo: a picture file with mountains and the sun" width="120">
 
-# Picture Library
+# Image Library
 
 ### A personal library of icons, stickers and backgrounds with a sorting window: cuts generated sheets, files them, searches by meaning
 
@@ -15,291 +15,114 @@ an "Unreal" tab: textures, HDRIs, models and lights for Unreal Engine with a 3D 
 project checks: model scale, scene budget, contrast on the site background, licenses before publishing
 
 [![CI](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml/badge.svg)](https://github.com/moonlivedt-oss/photosMOONprojects/actions/workflows/ci.yml)
-![version](https://img.shields.io/badge/version-2.6.0-cba6f7)
+[![release](https://img.shields.io/github/v/release/moonlivedt-oss/photosMOONprojects?label=version&color=cba6f7)](https://github.com/moonlivedt-oss/photosMOONprojects/releases/latest)
 ![python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![qt](https://img.shields.io/badge/PyQt6-window-41CD52?logo=qt&logoColor=white)
-![tests](https://img.shields.io/badge/tests-165%20ok-a6e3a1)
-![images](https://img.shields.io/badge/pictures-4284-89b4fa)
+![tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmoonlivedt-oss%2FphotosMOONprojects%2Fmain%2F_docs%2Fbadges%2Ftests.json)
+![images](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmoonlivedt-oss%2FphotosMOONprojects%2Fmain%2F_docs%2Fbadges%2Fimages.json)
 ![unreal](https://img.shields.io/badge/Unreal-CC0%20assets-313244)
 ![mcp](https://img.shields.io/badge/MCP-AI%20assistants-d97757)
 ![license](https://img.shields.io/badge/code-MIT-green)
 
-<img src="_docs/screenshots/hero.webp" alt="Library window: quick access cards with live counts and a section tree with numbers and share bars on the left, fairy-tale sticker tiles in the middle, a large baby dragon with its colors and a tag suggestion on the right" width="880">
+<img src="_docs/screenshots/demo.webp" alt="Animation: a sheet of 12 icons in the inbox is cut into a grid and repeats are marked as already in the library, then semantic search for a night city finds pictures without these words in their names, and in the Unreal tab a chair rotates in 3D" width="880">
 
-<sub>One folder, PyQt6 window, Pillow and numpy core, semantic search on onnxruntime</sub>
+<sub>One folder, a PyQt6 window, a Pillow and numpy core, semantic search through onnxruntime. The interface is in Russian.</sub>
 
 </div>
 
 ---
 
-## Quick start
+## Download
+
+**[Latest release](https://github.com/moonlivedt-oss/photosMOONprojects/releases/latest)** - `Library-<version>.zip`:
+the program without the author's pictures, empty sections and `Установить.cmd` (install). It needs
+[Python 3.14](https://www.python.org/downloads/) (keep the "py launcher" box checked). Unzip, run `Установить.cmd`
+(installs the packages and offers to download the neural network models), then `Library.cmd`.
+
+## Quick start from the repository
 
 ```bash
-py -3.14 -m pip install PyQt6 pillow numpy onnxruntime
-py -3.14 _tools/get_models.py      # neural models, ~460 MB, once (or by part: clip, bg, upscale)
+py -3.14 -m pip install -r _tools/requirements.txt
+py -3.14 _tools/get_models.py      # neural network models, ~460 MB, once (or in parts: clip, bg, upscale)
 ```
 
-Then run **`Library.cmd`** - a window opens with three tabs: "Входящие" (Inbox), "Библиотека" (Library) and "Unreal".
-The interface is in Russian.
+Then run **`Library.cmd`** - a window with three tabs opens: "Входящие" (inbox), "Библиотека" (library) and "Unreal".
+To connect an AI assistant (Claude Code, Claude Desktop, Cursor) use the **"ИИ-помощники"** button
+([details](_docs/en/ai.md)); Claude Code opened in this folder finds the library by itself.
 
-```bash
-_tools\run-tests.cmd                            # all tests (165 checks, no window)
-py -3.14 _tools/cli.py done                     # rebuild done.js - Prompts.html hides finished cards
-py -3.14 _tools/cli.py cut sheet.png --grid 4x3  # cut a sheet without the window
-```
-
-To connect an AI assistant (Claude Code, Claude Desktop, Cursor) use the **"ИИ-помощники"** (AI assistants)
-button in the window or see [AI assistants](#ai-assistants) below. Claude Code opened in this folder finds the
-library by itself.
-
-> Without the models the window works as before; only semantic search and tag suggestions are hidden.
-> The prompts page (`Prompts.html`) and the "what is missing" table need node.
+> Without the models the window works, only the neural network buttons are hidden. `Prompts.html` and "what is missing" need node.
 
 ## What it is
 
-Pictures for projects (icons, stickers, mascots, backgrounds) are generated as sheets of 12 and
-tend to scatter across project folders. **Picture Library** keeps them in one place **by type**,
-not by project, and takes over the routine: a sheet dropped into the inbox is cut by grid, its
-pieces are named from the prompt list, pieces already in the library are marked, tags are
-suggested, and everything is filed into the right section and palette.
+Pictures for projects (icons, stickers, mascots, backgrounds) are generated in sheets of 12 and get scattered
+across project folders: the same picture lives in three places, finding "that owl in the purple palette" means
+browsing everything, and every sheet still has to be cut by hand.
 
-| | Plain folder | Asset managers (Eagle etc.) | Picture Library |
+**Image Library** keeps everything in one place **by type** rather than by project and does the routine: a sheet
+lands in the inbox - the window cuts it into a grid, names the pieces from the prompt list, marks what is already
+there, suggests tags and files the pieces into the right section and palette.
+
+| | Plain folder | Image managers (Eagle etc.) | Image Library |
 |---|---|---|---|
-| Cutting a sheet into pieces | by hand | no | **yes - grid or auto search, preview, manual boxes** |
-| Filing into sections | by hand | by hand | **yes - automatically from a tag in the file name** |
-| "Already have it" | no | no | **yes - fingerprints, repeats are not saved** |
-| Search by meaning | no | paid AI features | **yes - local, Russian and English** |
-| Search by image | no | partly | **yes - drop a file onto the search field** |
-| Tag suggestions | no | no | **yes - from piece meaning, one click** |
-| Smart folders | no | yes | **yes - saved search: words, color, meaning** |
-| Perceptual compression | no | no | **yes - SSIM-based quality, lightest format** |
-| Export to a project | by hand | partly | **yes - format, size, @2x/@3x, atlas, svg sprite** |
-| AI assistants | no | no | **yes - MCP server: search, view, edit, file; everything is undoable** |
-| Undo | recycle bin | partly | **yes - any action, even after restarting the window** |
-| Where data lives | on disk | own database | **on disk, plain files and folders** |
+| Cutting a sheet into pieces | by hand | no | **yes - grid or auto-detection, preview, frames by hand** |
+| Filing by section | by hand | by hand | **yes - by a tag in the file name** |
+| "Already have it" | no | no | **yes - fingerprints, a repeat is not saved** |
+| Semantic search | no | paid AI features | **yes - local, in Russian and English ("cozy night street")** |
+| Tag suggestions | no | no | **yes - by the meaning of the pieces, one click** |
+| Background from any picture, x4 upscaling | no | no | **yes - BiRefNet and Real-ESRGAN, local** |
+| AI assistants | no | no | **yes - an MCP server: search, view, edit, file; everything can be undone** |
+| Undo | recycle bin | partly | **yes - any action, even after a restart** |
+| Export to a project | by hand | partly | **yes - format, size, @2x/@3x, atlas, svg sprite; "where used"** |
+| Project checks | no | no | **yes - licenses, weight, contrast on the site background, before publishing** |
+| Where the data is | on disk | own database | **on disk, plain files and folders** |
 
----
+## Features in short
 
-## Features
+- **Inbox** - a 4x3 sheet is cut by grid or auto-detection, pieces are named from the prompt, repeats are marked
+  "already there", the window suggests tags and a section; a tag in the name (`Космос [ic tokyo]`) files it by itself.
+- **Library** - search by words, tags, color and meaning ("cat in space"), by picture, smart folders, sets by
+  palette, editor, "visually lossless" compression, export to a project, doctor and duplicates, undo for everything.
+- **Checks** - what stands out from its set by manner, icon contrast on backgrounds, project palette and fitting
+  sets, authors and licenses, a pre-publish check.
+- **Unreal** - textures, HDRIs, models and IES profiles (Poly Haven, ambientCG, Kenney, Quaternius, KayKit - CC0),
+  a 3D viewer, a room from a description, Blender, one-click import into a project, scene budget, model scale.
+- **AI assistants** - 61 operations over MCP: find, view, tag, edit, cut, gather a kit for Unreal; every action
+  shows up in the window and can be undone.
 
-| Feature | Details |
+Documentation:
+
+| Page | About |
 |---|---|
-| **Inbox** | sheets from `00 Входящие`, drag and drop or Ctrl+V; watching the generator folder; a background or illustration is kept whole, a single drawing is cut out |
-| **"Looks like: folder"** | from the meaning of the pieces the window suggests the folder where similar pictures already live |
-| **AI assistants** | Claude, Cursor etc. over MCP or the command line: search, view, tag, move, edit, remove background, upscale, cut sheets, export; their actions pop up in the window with an "Undo" button; read-only mode |
-| **Cutting** | 4x3 grid (neighbours touching by outline are split), auto search, whole picture; background removal, white outline, padding, size, format; hand-editable boxes |
-| **Tag in the name** | a file `Космос [ic tokyo]` picks the cutting, section and palette itself and takes the 12 piece names from `Prompts.html` |
-| **Semantic search** | crystal-ball button (Ctrl+M): "cat in space", "sad mascot" - no words in file names needed |
-| **Unreal** (Ctrl+3) | PBR textures, HDRI skies, 3D models and IES light profiles by theme; 3D viewer (model, texture on a sphere, 360 panorama); "Download more..." fetches CC0 assets from Poly Haven and ambientCG; drag a tile straight into the Content Browser |
-| **Search by image** | drop a file or a tile onto the search field; "Similar" and "Similar by meaning" in the tile menu |
-| **Tags** | suggestions in the inbox and for the selected picture, optional auto-tagging for batch filing; tags and notes are searchable |
-| **Neural editing** | remove any background (BiRefNet-lite), sharp x2/x4 upscaling (Real-ESRGAN, separate models for art and photos); CLI `nobg`, `upscale`, `cut --bg ai` |
-| **Bulk tags, usage log** | apply suggested tags to a whole section; export (Ctrl+E) remembers which project folder a picture went to |
-| **Smart folders** | save a search (words, color, meaning) - the folder in the tree fills itself |
-| **Color search, sets** | 10 colors by dominant colors; sets with palette subfolders shown as one cover |
-| **Editor** (Ctrl+R) | crop, rotate, color, recolor to palette, remove background and fringe, brush, outline, shadow, glow, rounding, resize; recipes; batch edit |
-| **Compression** (Ctrl+K) | "no visible difference" quality (SSIM + color drift), lightest format, KB budget, before/after slider, all CPU cores |
-| **Export** (Ctrl+E) | format, size, @1x/@2x/@3x, budget, svg (vtracer), png+json+css atlas, svg sprite |
-| **Doctor and duplicates** | empty, cut off, leftover background, fringe, neighbour piece; duplicates go to `_duplicates` |
-| **Undo** | Ctrl+Z / Ctrl+Y, a history menu and an "Undo" button in notifications - for saving, moving, renaming, deleting, compression, edits and assistant actions; history survives restarts; originals wait in `_sources` |
-| **Help** (F1) | sections with search; "What's new" after an update, "Getting started" on the first run |
+| [Features and how to use](_docs/en/usage.md) | every window feature, tools, hotkeys, neural networks |
+| [Assets for Unreal Engine](_docs/en/unreal.md) | the "Unreal" tab, 3D, rooms, Blender, import, budget and scale |
+| [AI assistants](_docs/en/ai.md) | connecting, all operations, safety |
+| [Command line](_docs/en/cli.md) | `cli.py`: cutting, compression, neural networks, Unreal, assistant operations |
+| [FAQ and troubleshooting](_docs/en/faq.md) | what to do if the window does not start or tags are gone |
+| [How it is built](_docs/en/architecture.md) | files and modules, privacy, limitations |
 
 <div align="center">
-<img src="_docs/screenshots/inbox.webp" alt="Inbox tab: a 4x3 sheet with piece boxes, pieces marked as already present, cutting settings and tag suggestions on the right" width="820">
-<br><sub>Inbox: the sheet is cut by grid, repeats are marked, suggested tags on the right</sub>
+<img src="_docs/screenshots/inbox.webp" alt="Inbox tab: a 4x3 sheet of fairy creatures with piece frames, ten pieces marked as already there, two new ones checked, cutting settings and tag suggestions on the right" width="49%">
+<img src="_docs/screenshots/semantic.webp" alt="Semantic search for a cozy night street with lanterns: Unreal assets on top, 17 night scenes below, a rainy neon street on the right with tag suggestions" width="49%">
+<img src="_docs/screenshots/unreal.webp" alt="Unreal tab: kind cards, the Home tree with sections, brass vases and bronze statues, a bronze whale on the right with sizes next to a 180 cm person" width="49%">
+<img src="_docs/screenshots/viewer-model.webp" alt="3D viewer: a leather lounge chair under studio light, texture try-on, light, polygons and sizes on the right" width="49%">
+<br><sub>Inbox and semantic search; the Unreal tab and the 3D viewer</sub>
 </div>
-
-<div align="center">
-<img src="_docs/screenshots/semantic.webp" alt="Semantic search for a cozy night street with lanterns: a strip of five matching Unreal assets on top, 17 night scenes below" width="820">
-<br><sub>Semantic search: none of the query words are in the file names; matching Unreal assets on top</sub>
-</div>
-
-## Unreal Engine assets
-
-<div align="center">
-<img src="_docs/screenshots/unreal.webp" alt="Unreal tab: kind cards, a style switch set to PBR and the Home tree on the left, brass vases, goblets and bronze statues from the Decor section in the middle, the bronze whale with polycount and size next to a 180 cm person on the right" width="820">
-<br><sub>The "Unreal" tab: home models by purpose, live 3D on the right, drag a tile into the Content Browser</sub>
-</div>
-
-The **Unreal** tab (Ctrl+3) keeps 3D assets apart from the pictures, in `_Unreal/<kind>/<theme>/<name>/` (not in git):
-PBR textures (DirectX normal, packed ARM), HDRI skies, FBX models and 12 generated IES light profiles. Assets are
-CC0 from [Poly Haven](https://polyhaven.com), [ambientCG](https://ambientcg.com), [Kenney](https://kenney.nl) and
-[Quaternius](https://quaternius.com). The tab has semantic search, a Poly Haven catalog, collections, filters by
-polycount and color, re-download in 1K/2K/4K and a one-click import script for Unreal (`import_to_unreal.py`:
-texture settings and an `M_<name>` material).
-
-<div align="center">
-<img src="_docs/screenshots/viewer-texture.webp" alt="3D viewer: a mossy rock texture on a sphere under studio light, each map viewable separately" width="49%">
-<img src="_docs/screenshots/viewer-model.webp" alt="3D viewer: a mid-century leather lounge chair under studio light, with polycount and real size" width="49%">
-<br><sub>3D viewer on Qt Quick 3D: texture on a sphere with every map separately; a model on a floor with a shadow</sub>
-</div>
-
-<div align="center">
-<img src="_docs/screenshots/room.webp" alt="Room draft: wooden floor, concrete walls, a sofa, armchairs, a rocking chair, tables, a cabinet, a mirror and plants at real scale, a chandelier under the ceiling" width="760">
-<br><sub>Room draft from a collection: real-scale furniture, floor and walls from downloaded textures, HDRI light</sub>
-</div>
-
-## Find anywhere (Ctrl+P)
-
-One line for the whole window: commands, folders, pictures (by name, or by meaning when no name matches) and
-Unreal assets.
-
-<div align="center">
-<img src="_docs/screenshots/find.webp" alt="Find anywhere: the Russian word for whale finds whale.webp first" width="620">
-</div>
-
-### Room from a description, Blender and Unreal in one click
-
-"Подборка по описанию" (room from a description): type "a cozy Scandinavian bedroom" and the AI picks items per
-section, floor, walls and light from the downloaded assets (realistic and low-poly are not mixed; "another
-option" on every row). The result opens **in Blender** (models at real scale, PBR materials with the DirectX
-normal flipped, chandeliers on the ceiling, pictures on the wall, saved as .blend) or is **imported straight
-into an Unreal project** without opening the editor (pythonscript commandlet; tested on UE 5.8). A **project
-pack** bundles the files, the import script, CREDITS.md and manifest.json. AI assistants get the same through
-`ue_plan_room`, `ue_blender` (returns a render), `ue_import`, `ue_pack` and more.
-
-<div align="center">
-<img src="_docs/screenshots/scene.webp" alt="Room from a description: a cozy vintage living room, items by section with previews and an alternative for each" width="49%">
-<img src="_docs/screenshots/blender.webp" alt="Blender render of the same room" width="49%">
-</div>
-
-## Tools and themes
-
-The "Инструменты" (Tools) menu: duplicates, doctor, missing sets, folder weights, **palette from a picture** (and
-recoloring other pictures into it), **comparing two versions** (slider, difference, SSIM), **SVG tracing** with
-three variants side by side and a **light or dark theme** with five accents.
-
-- **Odd one out** - pictures that differ from their set in manner, not meaning: other colors or hue, no light
-  outline, more or less detail, sparser drawing. The reason is shown in words under the tile.
-- **Contrast on backgrounds** - selected icons on their palette background, white, dark and a custom color:
-  WCAG edge contrast (icons need 3:1) and a verdict.
-- **Project credits** - writes `CREDITS.md` into a project folder: every picture exported there and every
-  Unreal asset imported or packed for it, with licenses; CC BY (attribution required) and non-CC0 listed apart.
-- **Project palette** - site or game colors (typed, from a screenshot or from the project CSS, light and dark
-  theme backgrounds resolved through `var(--bg)`) -> which library sets fit: visible on every project
-  background and close in color; recolor a set into the project colors.
-- **Pre-publish check** - one button for a project folder: licenses and CREDITS.md, image weight (and webp
-  savings), whether exported icons are visible on the project backgrounds, Unreal scene budget -> `PUBLISH-CHECK.md`.
-- **Model scale** (Unreal tab) - FBX size against real-world size (a Kenney Furniture Kit chair is 4.7 m tall):
-  one factor per kit, applied to sizes in the window and to Unreal import (Import Uniform Scale).
-- **Scene budget** (Unreal tab, right click): triangles counted from the FBX itself, estimated GPU memory for
-  textures, what to build with Nanite and what to simplify; **Simplify in Blender** writes a decimated
-  `<name>_<N>k.fbx` next to the original, and import and packs use it.
-
-<div align="center">
-<img src="_docs/screenshots/palette.webp" alt="Palette from a picture: a night lantern market sample and its six colors, twelve forest animals recolored into them" width="49%">
-<img src="_docs/screenshots/light.webp" alt="Light theme: the library with sea creature stickers on a light background" width="49%">
-<br><sub>Palette from a picture; the light theme</sub>
-</div>
-
----
-
-## AI assistants
-
-<div align="center">
-<img src="_docs/screenshots/ai.webp" alt="Library window with space icons; a notification at the bottom says the assistant tagged 12 pictures, with an Undo button" width="820">
-<br><sub>The assistant tagged pictures - the window shows it at once and offers to undo</sub>
-</div>
-
-Claude, Cursor and other assistants use the library as a tool: "find stickers with cats and tag them",
-"remove the background from these three and put copies into 02 Наклейки/Котики", "cut the sheet in the inbox",
-"export the space icons to D:/site/assets as 128 px webp".
-
-**Connect** with the "ИИ-помощники" button at the top of the window: Claude Desktop, Cursor, VS Code (Copilot),
-Windsurf, Cline, Roo Code, LM Studio and Gemini CLI in one click (the server is added to their config, the old
-file is kept as `.bak`); a ready command for Claude Code and Codex CLI, a config block for the rest. In this folder Claude Code finds the server via
-`.mcp.json`. Without MCP the same operations are available from the shell: `py -3.14 _tools/cli.py api`.
-
-| What | Tools |
-|---|---|
-| Orientation | `overview`, `list_folder`, `inbox`, `palettes`, `history` |
-| Find | `search` (words, tags, color, meaning), `similar`, `duplicates`, `check` (doctor) |
-| Look | `view` - a picture or a numbered contact sheet comes back as an image; `info` |
-| Label | `suggest_tags`, `tag`, `note`, `favorite`, `smart_folder` |
-| Check manner | `odd_ones`, `contrast`; project credits - `credits` |
-| Project | `project_palette`, `fit_sets`, `publish_check` |
-| File | `rename`, `move`, `trash`, `import_images`, `cut_sheet` |
-| Edit | `edit` (editor recipe, preview first), `remove_background`, `upscale`, `convert` |
-| Deliver | `export` (formats, @2x/@3x, atlas, svg sprite) |
-| Revert | `undo` |
-
-**Safe by design.** Every assistant action goes to a shared journal: the window shows it with an "Undo"
-button and puts it into History (Ctrl+Z). Deleted pictures are not erased but kept in `_sources/_deleted`;
-replaced originals go to `_sources/edit <date>`. Assistants can be limited to search and viewing.
-Guidance for assistants: [AGENTS.md](AGENTS.md).
-
-<div align="center">
-<img src="_docs/screenshots/agents.webp" alt="AI assistants window: permissions, eight assistants with a Connect button in two columns, commands for Claude Code and Codex CLI, list of assistant actions" width="640">
-</div>
-
----
-
-## Semantic search
-
-Runs entirely on this computer with `onnxruntime` (no torch):
-
-- **images** - CLIP ViT-B/32, quantized ONNX
-  [`Xenova/clip-vit-base-patch32`](https://huggingface.co/Xenova/clip-vit-base-patch32);
-- **text** - multilingual encoder
-  [`sentence-transformers/clip-ViT-B-32-multilingual-v1`](https://huggingface.co/sentence-transformers/clip-ViT-B-32-multilingual-v1)
-  (50+ languages in the same space as the images).
-
-The models (~225 MB) are not in the repository - GitHub rejects files over 100 MB - and are
-downloaded once with `py -3.14 _tools/get_models.py`. Image vectors are computed in the background
-and stored in the database. Similarity to the average library picture (or to generic words, for
-text) is subtracted, so small flat UI parts do not float to the top of every query.
-
-## Command line
-
-```bash
-py -3.14 _tools/cli.py cut sheet.png --grid 4x3 --names a,b,c --outline 8 --bg auto
-py -3.14 _tools/cli.py convert folder --to webp --max 1920 [--replace]
-py -3.14 _tools/cli.py dupes [folder]
-py -3.14 _tools/cli.py done
-py -3.14 _tools/cli.py unreal get tex "Город" --count 6 --res 2k   # Unreal assets: tex | hdri | model | ies
-py -3.14 _tools/cli.py api                                  # assistant tools, JSON output
-py -3.14 _tools/cli.py api search '{"query": "cozy night street"}'
-```
-
-## If something breaks
-
-"Инструменты" -> "Проверка и восстановление" (Tools -> Check and restore, also via Ctrl+P) shows the state of the
-settings, the database, backups, models and disk space, fixes problems in one click and restores backups.
-The database (tags, notes, favorites, smart folders, undo journal) and the settings are backed up daily into
-`_tools/_backups` (last 10). A damaged file is never deleted: it is moved aside as `*.broken-<time>` and the last
-good backup is used. If the window does not start at all, run `_tools/repair.cmd` or
-`py -3.14 _tools/cli.py repair fix`.
-
-## Project layout
-
-`_tools/imaging/` - Qt-free core (cutting, encoding, editing, similarity, CLIP, doctor, sprites);
-`_tools/library/` - Qt-free library model shared by the window, the CLI and the MCP server (database,
-action journal, search, tools for assistants); `_tools/mcp_server.py` - the MCP server; `_tools/ui/` - the PyQt6 window; `_tools/tests/` - unittest; `_sources/` - original sheets;
-`_docs/` - README images. Full tree with comments: [README.md](README.md#структура-проекта).
 
 ## Privacy
 
-Library pictures **never leave the computer**: tags, semantic search and edits are all computed locally.
-The network is used only for downloads: `get_models.py` fetches the models once (Hugging Face, GitHub), and the
-"Unreal" tab fetches assets from Poly Haven, ambientCG, Kenney, KayKit (GitHub) and Quaternius' public Google Drive
-folders when you press its download buttons. itch.io archives you download yourself; Unreal and Quixel Bridge exports
-happen on this computer.
-The assistant server is local too and sends nothing by itself, but whatever an assistant views or reads
-goes to its model, like any file you show it.
+Pictures **never leave the computer**: tags, semantic search and edits are computed locally. The network is used only
+to download the neural network models and Unreal assets. Whatever an assistant views goes to its model - like any
+file you show it. Details: [How it is built](_docs/en/architecture.md#privacy).
 
-## License
+## Changes and license
 
-Code (`_tools/`, `Library.cmd`, `Prompts.html`) - MIT, see [LICENSE](LICENSE).
-Library pictures are not covered by MIT: Kenney sets - CC0, Hero Patterns - CC BY 4.0
-(see `_авторы и лицензия.txt` in their folders), the rest belong to the repository author.
-Details: [LICENSES.md](LICENSES.md).
-
-Changes: [CHANGELOG.md](CHANGELOG.md).
+All changes are in [CHANGELOG.md](CHANGELOG.md) (in Russian). Code (`_tools/`, `Library.cmd`, `Prompts.html`) - MIT,
+see [LICENSE](LICENSE); library pictures are not covered by MIT - what is under which license: [LICENSES.md](LICENSES.md).
 
 ---
 
 <div align="center">
-  <sub><b>Picture Library</b> - generate a sheet, drop it into the inbox, find it by meaning.</sub>
+  <sub><b>Image Library</b> - generate a sheet, drop it into the inbox, find it by meaning.</sub>
   <br>
   <sub>Found a bug or have an idea? - <a href="https://github.com/moonlivedt-oss/photosMOONprojects/issues">Issues</a></sub>
 </div>

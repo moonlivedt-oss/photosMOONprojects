@@ -44,3 +44,6 @@ _tools/_unreal_changed
 _tools/_ui_state.json
 _tools/_ui_status.json
 _tools/_ue_stage/
+
+# архив релиза (_tools/make_release.py)
+dist/

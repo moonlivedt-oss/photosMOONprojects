@@ -12,7 +12,7 @@ from concurrent.futures.process import BrokenProcessPool
 
 import imaging as K
 
-VERSION = "2.6.0"  # вместе с ней - CHANGELOG и бейдж в README
+VERSION = "2.6.1"  # вместе с ней - CHANGELOG и тег v<версия> (релиз и бейдж версии - по тегу)
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # папка _tools
 
 LIB = K.LIB

@@ -103,11 +103,11 @@ py -3.14 _tools/cli.py api undo
 
 ## Если нужно менять код
 
-- Устройство - в [README.md](README.md) («Структура проекта»). Слои: `imaging/` - обработка картинок
+- Устройство - в [_docs/architecture.md](_docs/architecture.md) (файлы и модули). Слои: `imaging/` - обработка картинок
   (Pillow, numpy), `library/` - база, журнал, поиск, операции (без Qt), `ui/` - окно на PyQt6.
   В `imaging/` и `library/` не импортировать Qt.
 - Запуск только `py -3.14`. Проверка: `py -3.14 -m ruff check .` и `py -3.14 -m unittest discover -s tests`
   в `_tools` (окно не открывается; тесты операций идут на временной библиотеке).
 - `.cmd` - с окончаниями строк CRLF (иначе ломаются после `chcp 65001`).
 - Никаких эмодзи - ни в коде, ни в текстах; значки окна - картинки из `04 Иконки` (`lib_icon(имя)`).
-- Новая версия: `VERSION` в `library/common.py`, `CHANGELOG.md`, бейдж в `README.md`.
+- Новая версия: `VERSION` в `library/common.py`, `CHANGELOG.md`, тег `v<версия>` - релиз с архивом соберёт `release.yml`.
