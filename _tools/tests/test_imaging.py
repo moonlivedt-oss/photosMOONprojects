@@ -233,13 +233,11 @@ class Sorting(unittest.TestCase):
 
         r = route(os.path.join(K.LIB, "00 Входящие", "Космос [ic tokyo].png"))
         self.assertIsNotNone(r)
-        r2 = route(
-            os.path.join(
-                K.LIB,
-                "00 Входящие",
-                "Тёмные 1 - Лофи-комната, Подводные руины, Космос, Киберпанк-переулок [ds default].png",
-            )
-        )
+        # любой ещё не сгенерированный лист фонов: готовые карточки из Prompts.html удаляются
+        from library.sorting import prompt_data
+
+        ds = next(k[1] for k in prompt_data()[1] if isinstance(k, tuple) and k[0] == "ds")
+        r2 = route(os.path.join(K.LIB, "00 Входящие", ds + " [ds default].png"))
         self.assertEqual((r2["o"]["mode"], len(r2["names"])), ("cells", 4))
         self.assertTrue(r["dest"].startswith(os.path.join(K.LIB, "04 Иконки", "Космос")))
 

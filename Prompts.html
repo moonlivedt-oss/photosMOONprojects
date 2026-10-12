@@ -249,15 +249,10 @@ var N = {
 // Разделы «Про запас: ...» свёрнуты: для игр и экспериментов, проектам пока не нужны.
 var S = [
  ["Листы наклеек 4x3", "st", "default", [
-  ["Интерфейс: основное", sheet(["folder", "gear", "magnifying glass", "trash bin", "cloud", "padlock", "key", "bell", "calendar", "wifi signal", "rocket", "beetle seen from above"]), "3:2"],
-  ["Интерфейс: действия", sheet(["download arrow", "upload arrow", "circular sync arrows", "eye", "camera", "clipboard", "terminal window", "puzzle piece", "paint brush", "color palette", "wrench", "battery"]), "3:2"],
-  ["Интерфейс: знаки", sheet(["house", "user silhouette", "plus in circle", "check mark in circle", "cross in circle", "question mark bubble", "speech bubble", "heart", "star", "bookmark", "pin", "lightning bolt"]), "3:2"],
-  ["Файлы", sheet(["document", "image file", "music file", "video file", "zip archive", "code file with brackets", "spreadsheet", "pdf file", "folder with star", "folder with lock", "notebook", "sticky note"]), "3:2"],
   ["Сеть (NetworkDoctor)", sheet(["globe", "wifi router with antennas", "ethernet cable", "broken chain link", "shield with check mark", "satellite dish", "server rack", "signal bars", "plug and socket", "magnet", "tunnel entrance", "first aid kit"]), "3:2", "nord"],
   ["Время и конкурсы (ContestReminder)", sheet(["alarm clock", "hourglass", "stopwatch", "countdown timer display", "megaphone", "trophy cup", "podium with three places", "finish flag", "laurel wreath", "checklist", "target with arrow", "envelope"]), "3:2", "sunset"],
   ["Язык (AutoTranslator)", sheet(["two speech bubbles", "open dictionary", "globe with arrows", "keyboard", "microphone", "sound wave sign", "magnifier over text lines", "scissors", "stack of flash cards", "alphabet blocks", "loudspeaker", "quill pen"]), "3:2", "tokyo"],
   ["Код и VS Code", sheet(["curly braces block", "puzzle-shaped extension piece", "git branch fork", "bug under a magnifier", "command palette window", "split editor panes", "gear with a code symbol", "package box with a version tag", "terminal prompt arrow", "breakpoint red dot on a line", "merge arrows", "search and replace arrows"], "Clean, modern developer-tool feel"), "3:2", "onedark"],
-  ["Реакции", sheet(["thumbs up", "clapping hands", "party popper", "fire", "sparkles", "zzz sleep symbol", "sweat drop", "exclamation mark", "question mark", "broken heart", "crown", "rainbow"]), "3:2"],
   ["Погода", sheet(["sun", "fog bank", "rain cloud", "thunderstorm", "snowflake", "sun behind cloud", "moon with stars", "wind swirl", "umbrella", "thermometer", "tornado", "sunrise"]), "3:2", "mint"],
   ["Еда и уют", sheet(["coffee cup", "tea mug", "donut", "cookie", "cake slice", "pizza slice", "onigiri", "ramen bowl", "milk box", "apple", "candy", "ice cream"]), "3:2", "latte"],
   ["Космос", sheet(["asteroid with a little flag", "ringed planet", "flying saucer", "satellite with solar panels", "space helmet with a mirrored visor", "telescope", "comet", "cratered moon", "space station module", "meteor", "star map", "moon rover"]), "3:2", "tokyo"],
@@ -270,56 +265,6 @@ var S = [
   ["Лесные звери (с лицами)", zoo(["fox", "owl", "hedgehog", "squirrel", "fawn", "raccoon", "rabbit", "bear cub", "frog", "badger", "mouse", "bat"]), "3:2", "forest", "liv"],
   ["Морские жители (с лицами)", zoo(["octopus", "crab", "whale", "jellyfish", "seahorse", "sea turtle", "pufferfish", "baby shark", "otter", "seal", "clownfish", "axolotl"]), "3:2", "ocean", "liv"],
   ["Сказочные существа (с лицами)", zoo(["baby dragon", "little ghost", "slime", "tiny golem", "forest spirit", "phoenix chick", "unicorn foal", "kitsune", "mushroom sprite", "griffin cub", "sea serpent", "moth fairy"]), "3:2", "rosepine", "liv"]
- ]],
- ["Наклейки с надписью", "txt", "default", [
-  ["Учёба: штампы", captions([["stamping a big green rubber stamp with a check mark onto a card, happy and proud", "Изучено!"], ["holding up a glowing light bulb, eyes bright", "Подсказка"], ["reading an open book with small round glasses", "Читаю"], ["shuffling a fan of flash cards", "Повторить"], ["holding a small warm flame in both palms", "Серия!"], ["presenting a shining star badge", "Новое"], ["hand on chin, small question marks floating", "Хм..."], ["lifting a solved glowing puzzle piece", "Решено!"], ["stretching with a sweatband, ready to start", "Разминка"], ["climbing a small staircase of blocks", "Шаг за шагом"], ["rolling a big dice", "Наугад"], ["napping on a closed book with a tiny pillow", "Перерыв"]],
-    ["learn-done", "learn-hint", "learn-reading", "learn-repeat", "learn-streak", "learn-new", "learn-thinking", "learn-solved", "learn-warmup", "learn-steps", "learn-random", "learn-break"]), "3:2"],
-  ["Реакции с надписью", captions([["waving hello with a big smile", "Привет!"], ["holding a small heart with both arms", "Спасибо!"], ["giving a thumbs up next to a check mark", "Готово!"], ["jumping with joy, confetti falling", "Ура!"], ["sheepish, sweat drop, hand behind the head", "Упс..."], ["sad with a single tear, a small crack sign nearby", "Ошибка"], ["holding a tiny spinning hourglass", "Загрузка..."], ["hugging a floppy disk with a sparkle", "Сохранено"], ["clapping, stars around", "Отлично!"], ["tapping a foot, holding a tiny alarm clock", "Жду"], ["waving goodbye with closed happy eyes", "Пока!"], ["pointing forward with determination, a tiny flag", "Вперёд!"]],
-    ["say-hello", "say-thanks", "say-done", "say-hooray", "say-oops", "say-error", "say-loading", "say-saved", "say-great", "say-waiting", "say-bye", "say-go"]), "3:2"],
-  ["Ярлыки для README", labels([["sparkle", "Новое"], ["wrench", "Исправлено"], ["arrow up", "Улучшено"], ["trash bin", "Удалено"], ["flask", "Бета"], ["hourglass", "Скоро"], ["light bulb", "Совет"], ["exclamation mark", "Важно"], ["warning triangle", "Внимание"], ["check mark", "Готово"], ["circular sync arrows", "Обновление"], ["rocket", "Быстрый старт"]],
-    ["tag-new", "tag-fixed", "tag-improved", "tag-removed", "tag-beta", "tag-soon", "tag-tip", "tag-important", "tag-warning", "tag-done", "tag-update", "tag-quick-start"]), "3:2", "default", "lab"]
- ]],
- ["Маскот", "ch", "default", [
-  ["Грусть (ошибка)", mascot("sad face with a single big tear, drooping tuft"), "1:1"],
-  ["Удивление", mascot("surprised with wide eyes and round open mouth, tuft standing up"), "1:1"],
-  ["Ждёт (загрузка)", mascot("waiting patiently, holding a tiny alarm clock, tapping one foot"), "1:1"],
-  ["Чинит", mascot("holding a big wrench, fixing something, small sparks around"), "1:1"],
-  ["Празднует", mascot("jumping with joy, arms raised, confetti falling"), "1:1"],
-  ["Читает", mascot("reading an open book, small round glasses on the nose"), "1:1"],
-  ["Пьёт чай", mascot("drinking tea from a big mug, relaxed, steam curls"), "1:1"],
-  ["Машет на прощание", mascot("waving goodbye with one arm, happy closed eyes"), "1:1"],
-  ["Показывает влево", mascot("pointing to the left with the whole arm, looking at the viewer"), "1:1"],
-  ["Показывает вправо", mascot("pointing to the right with the whole arm, looking at the viewer"), "1:1"],
-  ["Сидит на краю", mascot("sitting on an edge with legs dangling down"), "1:1"],
-  ["Держит табличку", mascot("holding a large blank sign board with both arms; the board is completely empty so any text can be added later"), "1:1"],
-  ["В наушниках", mascot("wearing big headphones, eyes closed, music notes floating"), "1:1"],
-  ["С глобусом (сеть)", mascot("hugging a small globe with glowing network lines"), "1:1"],
-  ["С календарём", mascot("hugging a calendar page with a red circle"), "1:1"],
-  ["Сонный в пледе", mascot("wrapped in a blanket, sleepy, zzz above head"), "1:1"],
-  ["Выглядывает", mascot("peeking out from behind a wall, only half of the body visible"), "1:1"],
-  ["Лист 12 поз: дела и праздники", poses(["thinking hard with a glowing light bulb popping up above the head", "hiding inside a cardboard box, only the eyes and tuft peeking over the edge", "flying with a small jetpack and puffs of soft smoke", "floating cross-legged in calm meditation with a soft glowing aura", "proudly lifting a shiny trophy cup above the head", "taking a photo with a small vintage camera, one eye closed", "wearing a santa hat and holding a small gift box", "wearing a small witch hat and holding a glowing pumpkin lantern", "holding a bouquet of spring flowers", "floating on a swim ring with sunglasses", "jumping into a pile of autumn leaves", "blowing out the candles on a small birthday cake"],
-    ["pose-thinking-bulb", "pose-hiding-box", "pose-jetpack", "pose-meditating", "pose-trophy", "pose-camera", "pose-santa-gift", "pose-witch-pumpkin", "pose-spring-flowers", "pose-swim-ring", "pose-autumn-leaves", "pose-birthday-cake"]), "3:2"],
-  ["Лист 12 поз", poses(["sad with a tear", "surprised", "waiting with a clock", "fixing with a wrench", "celebrating", "reading a book", "drinking tea", "waving", "pointing left", "pointing right", "holding a blank sign", "sleeping in a blanket"],
-    ["pose-sad-tear", "pose-surprised", "pose-waiting-clock", "pose-fixing-wrench", "pose-celebrating", "pose-reading-book", "pose-drinking-tea", "pose-waving", "pose-pointing-left", "pose-pointing-right", "pose-holding-sign", "pose-sleeping-blanket"]), "3:2"],
-  ["Лист 12 поз: хобби", poses(["riding a skateboard", "painting on a tiny easel", "watering a sprout with a little can", "playing with a game controller", "eating ramen with chopsticks", "casting sparkles in a wizard hat", "sleeping on a crescent moon", "carrying a stack of boxes", "typing on a tiny laptop", "holding a heart balloon", "sailing in a paper boat", "strumming a tiny guitar"],
-    ["pose-skateboard", "pose-painting", "pose-watering", "pose-gaming", "pose-ramen", "pose-wizard", "pose-moon-nap", "pose-boxes", "pose-typing", "pose-balloon", "pose-paper-boat", "pose-guitar"]), "3:2"]
- ]],
- ["Экраны ошибок и пустоты", "st", "default", [
-  ["Экраны: пусто и нет связи", empties(["an empty inbox tray with a tiny cobweb in the corner", "an unplugged power cable lying next to a wall socket with a small grey rain cloud above", "broken wifi signal bars with a bandage", "a magnifying glass over an empty dotted rectangle with a small question mark", "a closed door with a big padlock and a small key lying far away", "a torn paper map with a dotted path that runs off the edge and a small flag on a tiny planet", "an open cardboard box with bubble wrap and nothing inside", "an empty calendar page with a zzz sleep symbol above it", "an empty shopping basket with a single crumb", "an empty bookshelf with one fallen bookmark", "an empty mailbox with its little flag down", "an empty picture frame hanging on a nail"],
-    ["empty-inbox", "empty-offline", "empty-bad-signal", "empty-not-found", "empty-no-access", "empty-404", "empty-no-files", "empty-no-plans", "empty-cart", "empty-shelf", "empty-mailbox", "empty-gallery"]), "3:2"],
-  ["Экраны: состояния", empties(["two gears turning with small sparks and motion lines", "a big check mark with confetti bursting", "a warning triangle with a loose bolt and small sparks", "a tiny rocket on a launchpad with countdown lights", "a crescent moon resting on a small cloud with a nightcap and a zzz symbol", "a cloud with an upward arrow inside a progress ring", "a padlock clicking shut next to a small shield", "an hourglass with the sand almost run out", "a nearly empty battery with a small red warning glow", "a trash bin with a crumpled paper falling in", "a floppy disk with a small sparkle", "a coffee cup with steam curling into a pause symbol"],
-    ["state-loading", "state-success", "state-error", "state-update", "state-night-mode", "state-uploading", "state-locked", "state-timeout", "state-low-battery", "state-deleted", "state-saved", "state-paused"]), "3:2"]
- ]],
- ["Обложки README", "cov", "default", [
-  ["NetworkDoctor", cover("a friendly robot doctor listening to a glowing wifi router with a stethoscope", "NetworkDoctor", "Чинит интернет после прокси и туннелей"), "2:1", "nord"],
-  ["AutoTranslator", cover("two floating speech bubbles exchanging glowing letters over an open book", "AutoTranslator", "Перевод и распознавание текста с экрана"), "2:1", "tokyo"],
-  ["ContestReminder", cover("a big calendar with a trophy on top and paper notes flying around", "ContestReminder", "Не пропустить ни одного конкурса"), "2:1", "sunset"],
-  ["Moon Bundle", cover("an open gift box under a crescent moon with small packages floating out", "Moon Bundle", "Установщики для друзей в один щелчок"), "2:1", "default"],
-  ["GraphicsGeneration", cover("a magic paint brush painting a colorful landscape on a floating canvas", "GraphicsGeneration", "Картинки нейросетью на своём компьютере"), "2:1", "mocha"],
-  ["Moon Core", cover("a crescent moon with a glowing gear inside, small code brackets and sliders orbiting around it", "Moon Core", "VS Code - под себя"), "2:1", "dracula"],
-  ["VSCodeLauncher", cover("a stack of colorful extension blocks with a lightning bolt, only a few blocks lit up and the rest resting asleep", "VSCodeLauncher", "VS Code только с нужными расширениями"), "2:1", "onedark"],
-  ["Документация C++", cover("the mascot reading a glowing book with curly braces on the cover, small floating cards with code symbols", "Документация C++", "Справочник и карточки прямо в VS Code"), "2:1", "tokyo"],
-  ["Библиотека картинок", cover("a cozy shelf of sticker sheets, icons and small framed backgrounds, a magnifying glass with sparkles", "Библиотека картинок", "Иконки, наклейки и фоны - в одном месте"), "2:1", "default"]
  ]],
  ["Логотипы проектов", "logo", "default", [
   ["Логотипы: 6 проектов", logos(["NetworkDoctor - a stethoscope wrapped around a glowing wifi signal", "AutoTranslator - two overlapping speech bubbles, one with the letter A and one with the letter Я", "ContestReminder - a calendar page with a small trophy and a ringing bell", "Moon Bundle - a gift box with a crescent moon on the lid and a ribbon", "Moon Core - a crescent moon with a glowing gear inside it", "GraphicsGeneration - a paint brush drawing a sparkle on a small canvas"], ["logo-networkdoctor", "logo-autotranslator", "logo-contestreminder", "logo-moon-bundle", "logo-moon-core", "logo-graphicsgeneration"]), "3:2"],
@@ -337,18 +282,10 @@ var S = [
     "A large empty space in the center for a logo, gentle light rays", "Flat vector style, smooth gradients, minimal and elegant, high resolution", COL), "sp"), "16:9"]
  ]],
  ["Фоны тёмные: по 4 за раз", "bgs", "default", [
-  ["Тёмные 1: Лофи-комната, Подводные руины, Космос, Киберпанк-переулок", backs(["cozy lofi study room at night, wooden desk with a glowing monitor and desk lamp, rain streaks on a large window, potted plants, a sleeping cat on the windowsill, blurred city lights outside", "sunken ancient ruins under water, god rays from the surface, glowing jellyfish, schools of tiny fish, coral and seaweed silhouettes", "deep space with a colorful nebula, a small ringed planet in the lower right, distant galaxies, thin bands of star dust, tiny spaceship silhouette", "rainy cyberpunk back alley, wet asphalt with neon reflections, hanging signs with abstract symbols, steam from vents, cables overhead, vending machine glow"], ["bg-cozy-lofi-study", "bg-sunken-ancient-ruins", "bg-deep-space-colorful", "bg-rainy-cyberpunk-back"], "ds", DARK), "3:2"],
-  ["Тёмные 2: Горный храм, Волшебная библиотека, Ночная станция, Светящееся дерево", backs(["japanese mountain shrine at night, red torii gates, glowing stone lanterns, gentle snowfall, pine trees, stairs going up into fog", "endless magical library, tall bookshelves disappearing into darkness, floating candles, spiral staircase, open books with glowing pages", "empty old train station at night, single platform, warm street lamps, light fog, rails vanishing into the distance, a lone bench", "giant ancient tree with glowing blue leaves in a dark valley, swirling fireflies, a small river reflecting the light"], ["bg-japanese-mountain-shrine", "bg-endless-magical-library", "bg-empty-old-train", "bg-giant-ancient-tree"], "ds", DARK), "3:2"],
-  ["Тёмные 3: Хижина и сияние, Маяк, Летающие острова, Сад на крыше", backs(["cozy wooden cabin in a snowy forest at night, warm window light, smoke from the chimney, aurora in the sky", "lighthouse on a cliff at night, rotating light beam cutting through sea mist, waves crashing below, starry sky", "floating islands above clouds at twilight, waterfalls falling into the void, small glowing houses", "quiet rooftop garden above a night city, string lights, a telescope, potted plants, skyline bokeh"], ["bg-cozy-wooden-cabin", "bg-lighthouse-cliff-night", "bg-floating-islands-above", "bg-quiet-rooftop-garden"], "ds", DARK), "3:2"],
-  ["Тёмные 4: Боковая панель (вертикаль), Поезд среди звёзд, Оранжерея на орбите, Рынок фонарей", backs(["tall vertical composition, main subject at the bottom, empty dark sky in the upper two thirds, a small glowing lantern on a hill with a lone tree", "an old steam train crossing a bridge of light between clouds in a starry sky, glowing windows, long trail of sparkling steam", "glass greenhouse dome on a space station, lush plants and hanging vines inside, a blue planet glowing through the glass, soft grow lights", "night lantern market along a canal, hundreds of paper lanterns, empty wooden boats, reflections on still water, stalls with glowing jars"], ["bg-tall-vertical-composition", "bg-old-steam-train", "bg-glass-greenhouse-dome", "bg-night-lantern-market"], "ds", DARK), "3:2"],
-  ["Тёмные 5: Затопленное метро, Город на спине кита, Обсерватория, Грибной лес", backs(["abandoned flooded subway station, clear shallow water over the rails, glowing moss and mushrooms on the walls, a shaft of moonlight from a broken ceiling", "tiny lantern-lit town built on the back of a giant whale swimming through a sea of clouds at night, far away and small in the frame", "old observatory on a mountain peak, open dome with a brass telescope, milky way overhead, warm light from the doorway", "giant bioluminescent mushroom forest, glowing spores drifting, narrow wooden walkway, small round doors in the stems"], ["bg-abandoned-flooded-subway", "bg-tiny-lantern-lit", "bg-old-observatory-mountain", "bg-giant-bioluminescent-mushroom"], "ds", DARK), "3:2"],
   ["Тёмные 6: Мастерская часовщика, Нижняя панель (панорама), Ночной сад камней, Пустынный караван", backs(["clockmaker workshop at night, hundreds of clocks and brass gears on the walls, desk lamp glow, moonlight through a round window", "ultra wide panorama, horizon line in the middle, low detail on the left side, distant mountain range under a starry sky with a thin moon", "moonlit zen courtyard with a koi pond, stepping stones and a small wooden bridge, fireflies over the water, maple branches in the foreground", "desert dunes under a huge full moon, a distant caravan of lanterns, an ancient half-buried statue, shooting stars"], ["bg-clockmaker-workshop-night", "bg-ultra-wide-panorama", "bg-moonlit-zen-courtyard", "bg-desert-dunes-huge"], "ds", DARK), "3:2"],
   ["Тёмные 7: Ледяная пещера, Купе ночного поезда, Книжная улица в снегу, Стеклянный тоннель под водой", backs(["vast ice cave with glowing blue crystals, a frozen waterfall, a small warm campfire deep inside, reflections on the icy floor", "cozy train compartment at night, rain on the window, a reading lamp, a steaming tea glass, city lights streaking past", "narrow old street of tiny bookshops in the snow at night, warm shop windows, stacked books in the windows, a lone street lamp", "glass tunnel on the sea floor at night, a giant whale gliding above, glowing plankton, soft blue light on the walkway"], ["bg-vast-ice-cave", "bg-cozy-train-compartment", "bg-narrow-old-street", "bg-glass-tunnel-sea"], "ds", DARK), "3:2"]
  ]],
  ["Фоны светлые: по 4 за раз", "bgs", "default", [
-  ["Светлые 1: Холмы, Город у моря, Берёзовый лес, Светлое кафе", backs(["soft rolling green hills with a few round trees and small white clouds", "white seaside town with blue domes stacked on a hillside, calm sea", "misty birch forest at early morning, thin white trunks, light fog", "bright cozy cafe interior, huge window, hanging plants, wooden tables, sunlight patches"], ["bg-soft-rolling-green", "bg-white-seaside-town", "bg-misty-birch-forest", "bg-bright-cozy-cafe"], "ls", LIGHT), "3:2"],
-  ["Светлые 2: Бумажные горы, Лавандовое поле, Утреннее озеро, Сад камней", backs(["paper cut layered mountains with a pastel sky and a pale sun", "lavender fields with a small windmill, soft haze", "wide calm lake with reeds and floating lily pads, morning mist", "japanese zen garden with raked sand patterns and one maple tree"], ["bg-paper-cut-layered", "bg-lavender-fields-small", "bg-wide-calm-lake", "bg-japanese-zen-garden"], "ls", LIGHT), "3:2"],
-  ["Светлые 3: Над облаками, Воздушные шары, Стеклянная оранжерея, Ветряки на побережье", backs(["cloudscape from above, soft pastel cumulus clouds, a tiny paper plane", "a few hot air balloons drifting over a pale valley with a winding river", "bright glass conservatory with tall palms, white iron arches, sunlight through the roof", "white wind turbines on a grassy coast, long soft shadows, calm pale sea"], ["bg-cloudscape-above-soft", "bg-few-hot-air", "bg-bright-glass-conservatory", "bg-white-wind-turbines"], "ls", LIGHT), "3:2"],
   ["Светлые 4: Рисовые террасы, Солнечная библиотека, Мост в тумане, Солнечный чердак", backs(["terraced rice fields on gentle slopes, small farmhouse, morning mist in the valley", "sunlit library reading room, tall arched windows, wooden ladders, dust motes in the light", "long white footbridge over a misty river, willow trees, ducks far away on the water", "sunny attic workshop under a slanted roof, potted plants, a drafting table, light through a round window"], ["bg-terraced-rice-fields", "bg-sunlit-library-reading", "bg-long-white-footbridge", "bg-sunny-attic-workshop"], "ls", LIGHT), "3:2"]
  ]],
  ["Схемы для справочника C++", "dia", "tokyo", [
@@ -395,8 +332,6 @@ var S = [
   ["Ноты", fx("musical notes"), "1:1", "synthwave"]
  ]],
  ["Про запас: рамки и орнаменты", "st", "default", [
-  ["Фэнтези-рамка", frame("ornate rectangular frame border with fantasy gold filigree, completely empty center"), "1:1", "gruvbox"],
-  ["Разделитель с луной", frame("horizontal decorative divider line with a small crescent moon in the middle"), "5:2"],
   ["Угловой орнамент", frame("corner ornament with art nouveau vines, top left corner"), "1:1", "forest"],
   ["Панель (9-slice)", frame("rounded ui panel with a thin glowing edge, empty center, 9-slice friendly, even border width"), "1:1", "tokyo"],
   ["Лента под заголовок", frame("ribbon banner for a title, empty, folded ends"), "5:2", "sunset"],
@@ -405,8 +340,6 @@ var S = [
   ["Полоса прогресса", frame("progress bar frame, empty, rounded"), "5:2", "mint"]
  ]],
  ["Про запас: паттерны и текстуры", "pat", "default", [
-  ["Звёзды и луны", pat("tiny stars, dots and small crescent moons scattered"), "1:1"],
-  ["Зерно", pat("fine film grain noise, uniform"), "1:1", "mono"],
   ["Акварельная бумага", pat("watercolor paper texture with soft fibers and faint pigment blooms"), "1:1", "paper"],
   ["Изометрическая сетка", pat("thin isometric grid lines, blueprint style, tiny dimension marks"), "1:1", "nord"],
   ["Символы кода", pat("faint code symbols: curly braces, brackets, semicolons, slashes"), "1:1", "onedark"],
@@ -435,26 +368,6 @@ var S = [
   ["День рождения: лист", sheet(["balloons", "cake with candle", "gift box", "party hat", "confetti", "cupcake", "pinata", "paper streamers", "ribbon bow", "greeting card", "goodie bag", "sparkler"]), "3:2", "latte"]
  ]],
  ["Про запас: фоны тёмные по одному", "bg", "tokyo", [
-  ["Лофи-комната", dark("cozy lofi study room at night, wooden desk with a glowing monitor and desk lamp, rain streaks on a large window, potted plants, a sleeping cat on the windowsill, blurred city lights outside"), "3:2", "mocha"],
-  ["Подводные руины", dark("sunken ancient ruins under water, god rays from the surface, glowing jellyfish, schools of tiny fish, coral and seaweed silhouettes"), "3:2", "ocean"],
-  ["Космос", dark("deep space with a colorful nebula, a small ringed planet in the lower right, distant galaxies, thin bands of star dust, tiny spaceship silhouette"), "3:2", "dracula"],
-  ["Киберпанк-переулок", dark("rainy cyberpunk back alley, wet asphalt with neon reflections, hanging signs with abstract symbols, steam from vents, cables overhead, vending machine glow"), "3:2", "synthwave"],
-  ["Горный храм", dark("japanese mountain shrine at night, red torii gates, glowing stone lanterns, gentle snowfall, pine trees, stairs going up into fog"), "3:2", "rosepine"],
-  ["Волшебная библиотека", dark("endless magical library, tall bookshelves disappearing into darkness, floating candles, spiral staircase, open books with glowing pages"), "3:2", "gruvbox"],
-  ["Ночная станция", dark("empty old train station at night, single platform, warm street lamps, light fog, rails vanishing into the distance, a lone bench"), "3:2", "onedark"],
-  ["Светящееся дерево", dark("giant ancient tree with glowing blue leaves in a dark valley, swirling fireflies, a small river reflecting the light"), "3:2", "forest"],
-  ["Хижина и сияние", dark("cozy wooden cabin in a snowy forest at night, warm window light, smoke from the chimney, aurora in the sky"), "3:2", "nord"],
-  ["Маяк", dark("lighthouse on a cliff at night, rotating light beam cutting through sea mist, waves crashing below, starry sky"), "3:2", "ocean"],
-  ["Летающие острова", dark("floating islands above clouds at twilight, waterfalls falling into the void, small glowing houses"), "3:2", "sunset"],
-  ["Сад на крыше", dark("quiet rooftop garden above a night city, string lights, a telescope, potted plants, skyline bokeh"), "3:2", "tokyo"],
-  ["Боковая панель (вертикаль)", dark("tall vertical composition, main subject at the bottom, empty dark sky in the upper two thirds, a small glowing lantern on a hill with a lone tree"), "2:5"],
-  ["Поезд среди звёзд", dark("an old steam train crossing a bridge of light between clouds in a starry sky, glowing windows, long trail of sparkling steam"), "3:2", "dracula"],
-  ["Оранжерея на орбите", dark("glass greenhouse dome on a space station, lush plants and hanging vines inside, a blue planet glowing through the glass, soft grow lights"), "3:2", "forest"],
-  ["Рынок фонарей", dark("night lantern market along a canal, hundreds of paper lanterns, empty wooden boats, reflections on still water, stalls with glowing jars"), "3:2", "sunset"],
-  ["Затопленное метро", dark("abandoned flooded subway station, clear shallow water over the rails, glowing moss and mushrooms on the walls, a shaft of moonlight from a broken ceiling"), "3:2", "ocean"],
-  ["Город на спине кита", dark("tiny lantern-lit town built on the back of a giant whale swimming through a sea of clouds at night, far away and small in the frame"), "3:2", "tokyo"],
-  ["Обсерватория", dark("old observatory on a mountain peak, open dome with a brass telescope, milky way overhead, warm light from the doorway"), "3:2", "nord"],
-  ["Грибной лес", dark("giant bioluminescent mushroom forest, glowing spores drifting, narrow wooden walkway, small round doors in the stems"), "3:2", "rosepine"],
   ["Мастерская часовщика", dark("clockmaker workshop at night, hundreds of clocks and brass gears on the walls, desk lamp glow, moonlight through a round window"), "3:2", "gruvbox"],
   ["Нижняя панель (панорама)", dark("ultra wide panorama, horizon line in the middle, low detail on the left side, distant mountain range under a starry sky with a thin moon"), "5:2"],
   ["Ночной сад камней", dark("moonlit zen courtyard with a koi pond, stepping stones and a small wooden bridge, fireflies over the water, maple branches in the foreground"), "3:2", "rosepine"],
@@ -462,18 +375,6 @@ var S = [
   ["Ледяная пещера", dark("vast ice cave with glowing blue crystals, a frozen waterfall, a small warm campfire deep inside, reflections on the icy floor"), "3:2", "nord"]
  ]],
  ["Про запас: фоны светлые по одному", "bg", "latte", [
-  ["Холмы", light("soft rolling green hills with a few round trees and small white clouds"), "3:2", "mint"],
-  ["Город у моря", light("white seaside town with blue domes stacked on a hillside, calm sea"), "3:2", "solar"],
-  ["Берёзовый лес", light("misty birch forest at early morning, thin white trunks, light fog"), "3:2", "paper"],
-  ["Светлое кафе", light("bright cozy cafe interior, huge window, hanging plants, wooden tables, sunlight patches"), "3:2", "latte"],
-  ["Бумажные горы", light("paper cut layered mountains with a pastel sky and a pale sun"), "3:2", "sakura"],
-  ["Лавандовое поле", light("lavender fields with a small windmill, soft haze"), "3:2", "latte"],
-  ["Утреннее озеро", light("wide calm lake with reeds and floating lily pads, morning mist"), "3:2", "mint"],
-  ["Сад камней", light("japanese zen garden with raked sand patterns and one maple tree"), "3:2", "paper"],
-  ["Над облаками", light("cloudscape from above, soft pastel cumulus clouds, a tiny paper plane"), "3:2", "sakura"],
-  ["Воздушные шары", light("a few hot air balloons drifting over a pale valley with a winding river"), "3:2", "solar"],
-  ["Стеклянная оранжерея", light("bright glass conservatory with tall palms, white iron arches, sunlight through the roof"), "3:2", "mint"],
-  ["Ветряки на побережье", light("white wind turbines on a grassy coast, long soft shadows, calm pale sea"), "3:2", "latte"],
   ["Рисовые террасы", light("terraced rice fields on gentle slopes, small farmhouse, morning mist in the valley"), "3:2", "mint"],
   ["Солнечная библиотека", light("sunlit library reading room, tall arched windows, wooden ladders, dust motes in the light"), "3:2", "paper"],
   ["Мост в тумане", light("long white footbridge over a misty river, willow trees, ducks far away on the water"), "3:2", "sakura"]
