@@ -50,6 +50,8 @@ _tools/
     sorting.py          cutting presets, tags in names, writing into sections
     prompts.py          Prompts.html data (through node)
     unreal.py           Unreal assets: themes, Poly Haven, ambientCG, Kenney, Quaternius, downloading in place
+    unreal_more.py      all Poly Haven and ambientCG textures without repeats; Google, Smithsonian, Khronos, NASA scans
+    blender_convert.py  glb / gltf / obj -> FBX via Blender (textures next to it, glb for the 3D window)
     unreal_sem.py       semantic search over assets; unreal_extra.py - preview colors, checks, repeats, polygons, scale
     unreal_groups.py    groups, sections and styles of the Unreal tree (shared by the window and the assistant)
     unreal_local.py     unpacking downloaded archives (itch.io etc.); unreal_links.py - a page with their links
@@ -120,7 +122,8 @@ are written; tags, notes, smart folders and CLIP vectors (float16, ~1 KB per pic
 Library pictures **never leave the computer**: tags, semantic search and edits are all computed locally. The
 network is used only for downloads: `get_models.py` fetches the models once (Hugging Face, GitHub), and the
 "Unreal" tab fetches assets from Poly Haven, ambientCG, Kenney, KayKit (GitHub) and Quaternius' public Google Drive
-folders when you press its download buttons. itch.io archives you download yourself; Unreal and Quixel Bridge
+folders when you press its download buttons (`unreal more` - also Google Scanned Objects, Smithsonian 3D, Khronos
+and NASA on GitHub). itch.io archives you download yourself; Unreal and Quixel Bridge
 exports happen on this computer. Nothing from the library is sent anywhere.
 
 The assistant server is local too and sends nothing by itself, but whatever an assistant views (`view`, edit

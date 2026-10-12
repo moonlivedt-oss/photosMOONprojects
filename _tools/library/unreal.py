@@ -273,6 +273,13 @@ THEMES = {
         "quaternius": ["ultimateanimatedanimals", "farmanimal"],
         "categories": ["animals", "rigged"],
     },
+    # реалистичные сканы и PBR-модели не из Poly Haven (library/unreal_more.py; переводятся в FBX Blender'ом)
+    "Дом - сканы Google": {"more": "gso"},
+    "Дом - витрина Khronos": {"more": "khronos"},
+    "Музей - Smithsonian": {"more": "si"},
+    "Космос - NASA": {"more": "nasa"},
+    # текстуры, которые не подошли ни к одной теме: дерево, пластик, бумага, износ и декали
+    "Материалы": {"tex": {"wood", "plastic", "paper", "cardboard", "rubber", "decal"}, "acg": ["Wood", "Plastic"]},
 }
 
 # куда в Unreal и как - подсказка в окне и в asset.json
@@ -415,6 +422,10 @@ def candidates(kind, theme, have=()):
     if kind == "model" and THEMES[theme].get("kaykit"):
         cats = THEMES[theme].get("categories") or ["furniture"]
         return [c for repo in THEMES[theme]["kaykit"] for c in kaykit_candidates(repo, cats) if c["id"] not in have]
+    if kind == "model" and THEMES[theme].get("more"):
+        from library import unreal_more
+
+        return unreal_more.candidates(THEMES[theme]["more"], have)
     if kind == "model" and THEMES[theme].get("kenney"):
         cats = THEMES[theme].get("categories") or ["furniture"]
         return [c for pack in THEMES[theme]["kenney"] for c in kenney_candidates(pack, cats) if c["id"] not in have]
@@ -1122,7 +1133,7 @@ def has_kind(theme, kind):
     spec = THEMES.get(theme, {})
     if kind == "ies":
         return True
-    if kind == "model" and (spec.get("kenney") or spec.get("quaternius") or spec.get("kaykit")):
+    if kind == "model" and (spec.get("kenney") or spec.get("quaternius") or spec.get("kaykit") or spec.get("more")):
         return True
     return bool(spec.get(kind) or (kind == "tex" and spec.get("acg")))
 
@@ -1236,6 +1247,10 @@ def fetch(cand, kind, theme, res="2k", progress=None, stop=None, dst=None, repla
             meta = fetch_quaternius(cand, tmp, progress, stop)
         elif cand["src"] == "kaykit":
             meta = fetch_kaykit(cand, tmp)
+        elif cand["src"] in ("gso", "si", "khronos", "nasa"):  # сканы и PBR-модели (library/unreal_more.py)
+            from library import unreal_more
+
+            meta = unreal_more.fetch(cand, tmp, progress, stop)
         elif cand["src"] == "local":  # из скачанного вручную архива (library/unreal_local.py)
             from library import unreal_local
 
@@ -1249,12 +1264,12 @@ def fetch(cand, kind, theme, res="2k", progress=None, stop=None, dst=None, repla
                 "kind": kind,
                 "theme": theme,
                 "res": res,
-                "license": LICENSE,
+                "license": meta.get("license") or LICENSE,
                 "added": time.strftime("%Y-%m-%d"),
-                "howto": HOWTO[kind],
+                "howto": meta.get("howto") or HOWTO[kind],
             }
         )
-        if cand["src"] in ("kenney", "quaternius", "kaykit", "local"):
+        if cand["src"] in ("kenney", "quaternius", "kaykit", "local", "gso", "si", "khronos", "nasa"):
             meta["res"] = ""  # у Kenney нет текстур - разрешения тоже
         lost = [m for m in meta.get("main", []) if not os.path.exists(os.path.join(tmp, *m.split("/")))]
         if lost:  # ассет без своих файлов не сохраняем - пусть лучше будет ошибка и повтор

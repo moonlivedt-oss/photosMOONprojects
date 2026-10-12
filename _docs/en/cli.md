@@ -10,6 +10,7 @@ py -3.14 _tools/cli.py done                             # done.js for Prompts.ht
 py -3.14 _tools/cli.py nobg picture.jpg                 # -> "picture без фона.png" (without background)
 py -3.14 _tools/cli.py upscale icon.png --x 4 --kind art   # -> "icon x4.png"
 py -3.14 _tools/cli.py unreal get hdri все --count 3    # Unreal Engine assets (CC0); "все" - all themes
+py -3.14 _tools/cli.py unreal more all                  # more: all textures without repeats, scans and PBR models
 py -3.14 _tools/cli.py repair                           # check and fix the database and settings without the window
 py -3.14 _tools/cli.py api                              # operations for assistants and scripts, the answer is JSON
 py -3.14 _tools/cli.py api search '{"query": "cozy night street"}'

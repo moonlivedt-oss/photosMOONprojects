@@ -13,6 +13,8 @@
 
 Ассеты Unreal (`_Unreal`) в репозиторий не входят: окно скачивает их само, и у каждого своя лицензия.
 Она записана в `asset.json` ассета, а для проекта её собирает «Инструменты» -> «Авторы и лицензии проекта».
+Почти всё - CC0; исключения: сканы Google Scanned Objects - CC BY 4.0 (указать автора: Google), часть моделей
+Khronos - CC BY, модели NASA - общественное достояние без права на логотипы NASA, MetaHuman и Fab - лицензия Epic.
 
 ---
 
@@ -29,3 +31,5 @@ The MIT license covers only the code. It does not cover the pictures of the libr
 
 Unreal assets (`_Unreal`) are not part of the repository: the window downloads them, and each one has its own
 license, recorded in its `asset.json`.
+Almost all of them are CC0; exceptions: Google Scanned Objects scans - CC BY 4.0 (credit Google), some Khronos
+models - CC BY, NASA models - public domain without rights to NASA insignia, MetaHuman and Fab - Epic license.

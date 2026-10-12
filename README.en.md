@@ -84,7 +84,8 @@ there, suggests tags and files the pieces into the right section and palette.
   palette, editor, "visually lossless" compression, export to a project, doctor and duplicates, undo for everything.
 - **Checks** - what stands out from its set by manner, icon contrast on backgrounds, project palette and fitting
   sets, authors and licenses, a pre-publish check.
-- **Unreal** - textures, HDRIs, models and IES profiles (Poly Haven, ambientCG, Kenney, Quaternius, KayKit - CC0),
+- **Unreal** - textures, HDRIs, models and IES profiles (Poly Haven, ambientCG, Kenney, Quaternius, KayKit, Google
+  scans, Smithsonian, Khronos, NASA),
   a 3D viewer, a room from a description, Blender, one-click import into a project, scene budget, model scale.
 - **AI assistants** - 61 operations over MCP: find, view, tag, edit, cut, gather a kit for Unreal; every action
   shows up in the window and can be undone.

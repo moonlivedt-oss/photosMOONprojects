@@ -50,6 +50,8 @@ _tools/
     unreal.py           ассеты Unreal: темы, Poly Haven, ambientCG, Kenney, Quaternius, загрузка на место
     unreal_sem.py       поиск по смыслу по ассетам; unreal_extra.py - цвета превью, проверка, повторы, полигоны
     unreal_groups.py    группы, разделы и стили дерева Unreal (общие для окна и помощника)
+    unreal_more.py      все текстуры Poly Haven и ambientCG без повторов; сканы Google, Smithsonian, Khronos, NASA
+    blender_convert.py  glb / gltf / obj -> FBX через Blender (текстуры рядом, glb для 3D-окна)
     unreal_local.py     разбор скачанных архивов (itch.io и др.); unreal_links.py - страница ссылок на них
     unreal_from_project.py  выгрузка Fab, Megascans и MetaHuman из проекта Unreal в FBX
     mh_view.py          MetaHuman для 3D-просмотра (_view.glb через Blender, с текстурами)
@@ -121,7 +123,8 @@ _tools/
 Картинки библиотеки **не уходят в сеть**: метки, поиск по смыслу, правка - всё считается на этом компьютере.
 Сеть нужна в двух случаях, и оба - только скачивание: `get_models.py` один раз качает модели с Hugging Face
 и GitHub, а вкладка «Unreal» по кнопкам «Скачать ещё...», «Каталог...» и «Перекачать» берёт ассеты с Poly Haven,
-ambientCG, Kenney, KayKit (GitHub) и открытых папок Quaternius на Google Drive. Архивы с itch.io вы качаете сами;
+ambientCG, Kenney, KayKit (GitHub), открытых папок Quaternius на Google Drive, а `unreal more` - ещё с Google
+Scanned Objects (Gazebo Fuel), Smithsonian 3D, GitHub Khronos и NASA. Архивы с itch.io вы качаете сами;
 выгрузка из Unreal и Quixel Bridge идёт с этого компьютера. Ничего из библиотеки не отправляется.
 
 Сервер для помощников тоже работает локально и сам ничего не отправляет. Но то, что помощник

@@ -753,7 +753,8 @@ class AssetCard(QWidget):
             self.spec(figs, [QLabel(f"Всего на диске: {human(size)}", objectName="dim")])
         self.text(
             "Ассеты для Unreal Engine: PBR-текстуры, небо HDRI, модели, профили света. "
-            "Источники - Poly Haven, ambientCG, Kenney, Quaternius, KayKit, Megascans.<br><br>"
+            "Источники - Poly Haven, ambientCG, Kenney, Quaternius, KayKit, Megascans, "
+            "сканы Google, Smithsonian, Khronos, NASA.<br><br>"
             "Щелчок по плитке - сведения здесь, двойной - 3D-просмотр, перетаскивание - прямо в Content Browser.",
             "dim",
         )

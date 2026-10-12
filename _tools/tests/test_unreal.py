@@ -72,7 +72,7 @@ class TestThemes(unittest.TestCase):
 
     def test_themes_cover_kinds(self):
         for th, spec in U.THEMES.items():
-            self.assertTrue(any(spec.get(k) for k in ("tex", "hdri", "model", "kenney", "quaternius", "kaykit")), th)
+            self.assertTrue(any(spec.get(k) for k in ("tex", "hdri", "model", "kenney", "quaternius", "kaykit", "more")), th)
 
 
 class TestHomeSections(unittest.TestCase):

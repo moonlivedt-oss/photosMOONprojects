@@ -5,7 +5,7 @@
 5000+ моделей удобнее не по источникам («Город - Kenney», «Город - KayKit»...), а так:
   группа  - что это за мир: Дом, Природа, Город, Средневековье, Космос, Персонажи, Прототипы, Еда;
   раздел  - что за вещь внутри группы: деревья, камни, здания, дороги, транспорт, оружие...;
-  стиль   - реалистичные (Poly Haven, ambientCG) или low-poly (Kenney, Quaternius, KayKit) - фильтр сверху.
+  стиль   - реалистичные (Poly Haven, ambientCG, сканы) или low-poly (Kenney, Quaternius, KayKit) - фильтр сверху.
 """
 
 import re
@@ -24,6 +24,8 @@ GROUPS = (
     ("Персонажи и животные", ("Персонажи", "Животные")),
     ("Прототипы и уровни", ("Прототипы и уровни",)),
     ("Еда", ("Еда",)),
+    ("Музей и история", ("Музей",)),
+    ("Материалы", ("Материалы",)),
     ("Студия и свет", ("Студия", "Свои профили")),
 )
 GROUP_ICON = {
@@ -35,6 +37,8 @@ GROUP_ICON = {
     "Персонажи и животные": "pawn",
     "Прототипы и уровни": "hand_cube",
     "Еда": "coffee-mug-steam",
+    "Музей и история": "carved-rune-stone",
+    "Материалы": "paint-roller",
     "Студия и свет": "camera",
     "Разное": "folder",
 }
@@ -236,6 +240,19 @@ SECTIONS = {
         ("Арена", W("arena")),
         ("Блоки-заготовки", W("prototype bits")),
     ),
+    "Музей и история": (
+        ("Скульптура и искусство", W("bust statue sculpture figure buddha bodhisattvas portrait cast slave relief painting")),
+        ("Сосуды и утварь", W("vase pot jar bowl ewer container burner kylix cup bottle tin garniture beaker")),
+        ("Одежда и обувь", W("dress suit costume shirtwaist skirt apron uniform helmet hat sneakers slippers shoes")),
+        ("Мебель", W("chair desk stool table cabinet seat armchair panel")),
+        (
+            "Техника и транспорт",
+            W("flyer engine module orbiter shuttle hatch plow telegraph coil monitor stereoscope saxophone bell x-1"),
+        ),
+        ("Черепа и кости", W("skull cranium mandible tusk skeleton bone")),
+        ("Ракушки и кораллы", W("shell murex coral porites acropora madrepora pocillopora balanus crab lobster")),
+        ("Растения и животные", W("bloom orchid fish bird deer bison goat camel")),
+    ),
 }
 
 
@@ -301,6 +318,10 @@ def section_of(a):
                 if words & keys:
                     return sec
         return base_of(th)
+    if kind == "tex":  # текстуры - по материалу: кирпич, бетон, металл... (тема - только папка)
+        from library import unreal_more
+
+        return unreal_more.tex_section(a)
     if kind != "model":
         return base_of(a.get("theme", "")) or OTHER
     rules = SECTIONS.get(g)
@@ -343,7 +364,10 @@ def section_order(group):
         return list(U.HOME_ORDER)
     if group == "Персонажи и животные":
         return ["Персонажи", "Комплекты одежды", "Снаряжение и одежда", "Животные", OTHER]
-    return [s for s, _k in SECTIONS.get(group, ())] + [OTHER]
+    from library import unreal_more
+
+    tex = [s for s, _k in unreal_more.TEX_SECTIONS] + [unreal_more.TEX_OTHER]
+    return [s for s, _k in SECTIONS.get(group, ())] + [OTHER] + [s for s in tex if s not in dict(SECTIONS.get(group, ()))]
 
 
 def annotate(items):

@@ -575,7 +575,8 @@ def ue_collection(name, add=None, remove=None):
 
 @tool(
     "ue_download",
-    "Скачать новые бесплатные ассеты (CC0: Poly Haven, ambientCG, Kenney, Quaternius, KayKit) по теме "
+    "Скачать новые бесплатные ассеты (Poly Haven, ambientCG, Kenney, Quaternius, KayKit - CC0; сканы Google - CC BY; "
+    "Smithsonian, Khronos, NASA) по теме "
     "(themes_available из ue_overview). Долго: сеть; ход работы - уведомлениями progress. Окно увидит сразу.",
     {
         "kind": {"type": "string", "enum": ["tex", "hdri", "model", "ies"]},

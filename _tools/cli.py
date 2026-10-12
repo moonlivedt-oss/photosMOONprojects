@@ -11,6 +11,7 @@ py -3.14 cli.py repair [fix|backup|list|restore latest]   # проверка и 
 py -3.14 cli.py unreal get tex "Город" --count 6 --res 2k     # tex | hdri | model | ies
 py -3.14 cli.py unreal archives [--path X.zip]  # скачанные вручную архивы (_Unreal/_Архивы) -> модели
 py -3.14 cli.py unreal index                 # досчитать всё заранее: поиск по смыслу, цвета, полигоны, повторы
+py -3.14 cli.py unreal more tex [--dry]      # ещё: все текстуры без повторов | gso | si | khronos | nasa | all
 py -3.14 cli.py api                          # операции для ИИ-помощников и скриптов (JSON)
 py -3.14 cli.py api search '{"query": "ночной город"}'
 py -3.14 cli.py api view '{"paths": ["04 Иконки/x.webp"]}' --out preview.png
@@ -253,7 +254,7 @@ def cmd_unreal(a):
             if th not in U.THEMES and a.kind != "ies":
                 sys.exit("темы: " + ", ".join(U.THEMES))
             print(U.KINDS[a.kind][1] + ("" if a.kind == "ies" else f" / {th}") + ":")
-            out = U.get_many(a.kind, th, a.count, a.res)
+            out = U.get_many(a.kind, th, a.count or 4, a.res)
             print(f"  скачано: {len(out)}")
             if a.kind == "ies":
                 break
@@ -262,6 +263,24 @@ def cmd_unreal(a):
         return
     if a.action == "previews":
         unreal_previews()
+        return
+    if a.action == "more":
+        from library import unreal_more as M
+
+        what = ["tex", *M.SOURCES] if a.kind == "all" else [a.kind]
+        for w in what:
+            if w != "tex" and w not in M.SOURCES:
+                sys.exit("что: tex | " + " | ".join(M.SOURCES) + " | all")
+            print(f"== {'текстуры' if w == 'tex' else M.NAMES[w]}", flush=True)
+            if a.dry:
+                todo, dropped = M.plan(w)
+                print(f"  скачать: {len(todo)}, повторов: {len(dropped)}")
+                continue
+            ok, errors = M.run(w, workers=a.workers, res=a.res, limit=a.count,
+                               log=lambda s: print(s, flush=True))
+            print(f"  скачано: {len(ok)}, ошибок: {len(errors)}", flush=True)
+        if not a.dry and what != ["tex"]:
+            unreal_previews()
         return
     if a.action == "index":
         unreal_index()
@@ -364,12 +383,14 @@ def main():
     ap.add_argument("--who", default="ИИ (командная строка)", help="кто действует - так подписано в журнале")
     ap.add_argument("--help-tool", action="store_true", help="описание и схема параметров операции")
     ue = sub.add_parser("unreal", help="ассеты для Unreal Engine (CC0): текстуры, HDRI, модели, IES")
-    ue.add_argument("action", nargs="?", default="list", choices=["list", "get", "previews", "archives", "index"])
+    ue.add_argument("action", nargs="?", default="list", choices=["list", "get", "previews", "archives", "index", "more"])
     ue.add_argument("kind", nargs="?", default="tex", help="tex | hdri | model | ies")
     ue.add_argument("theme", nargs="?", help="тема или «все»")
-    ue.add_argument("--count", type=int, default=4)
+    ue.add_argument("--count", type=int, help="сколько скачать (get - 4 на тему; more - всё)")
     ue.add_argument("--res", default="2k", choices=["1k", "2k", "4k"])
     ue.add_argument("--path", action="append", help="для archives: zip-архив или папка (можно несколько раз)")
+    ue.add_argument("--workers", type=int, default=4, help="для more: сколько ассетов качать сразу")
+    ue.add_argument("--dry", action="store_true", help="для more: только посчитать, что скачается")
     rp = sub.add_parser("repair", help="проверка и восстановление: база, настройки, резервные копии")
     rp.add_argument("action", nargs="?", default="check", choices=["check", "fix", "backup", "list", "restore"])
     rp.add_argument("name", nargs="?", help="для restore: часть имени копии или latest")

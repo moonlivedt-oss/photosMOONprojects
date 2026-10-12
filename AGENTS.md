@@ -56,7 +56,7 @@
 | Проверка | `ue_check` (нет файлов, пустой FBX, повторы - одна модель, скачанная дважды) |
 | Масштаб | `ue_scale_check` (наборы не в сантиметрах: стул 4.7 м), `ue_set_scale` (множитель на набор или модели - для размеров и импорта) |
 | Бюджет сцены | `ue_budget` (треугольники, видеопамять, что с Nanite, что упростить), `ue_simplify` (Decimate в Blender; импорт и пакет берут упрощённую копию) |
-| Скачать ещё | `ue_download` (CC0: Poly Haven, ambientCG, Kenney, Quaternius, KayKit; долго - ход работы приходит уведомлениями `progress`, если клиент их просит) |
+| Скачать ещё | `ue_download` (Poly Haven, ambientCG, Kenney, Quaternius, KayKit - CC0; темы «Дом - сканы Google» (CC BY), «Музей - Smithsonian», «Дом - витрина Khronos», «Космос - NASA»; долго - ход работы приходит уведомлениями `progress`, если клиент их просит) |
 | В проект | `ue_pack` (папка или zip с авторами и скриптом), `ue_import` (прямо в .uproject, редактор закрыт) |
 | Blender | `ue_blender` (сцена или комната в .blend; `render=true` - картинка сцены в ответ) |
 

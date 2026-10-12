@@ -166,6 +166,34 @@ stopped. Sources - [Poly Haven](https://polyhaven.com) and [ambientCG](https://a
 also [Kenney](https://kenney.nl), license **CC0**: free, for any project, no attribution needed. The library
 draws the IES profiles itself (`imaging/ies.py`).
 
+### More realistic textures and models
+
+One command fetches the whole photo-scan catalog and four sources of realistic models:
+
+| What | Where from | License |
+|---|---|---|
+| ~2600 PBR textures | all of [Poly Haven](https://polyhaven.com/textures) and [ambientCG](https://ambientcg.com) | CC0 |
+| ~1000 scans of household things (shoes, dishes, toys, boxes) - theme "Дом - сканы Google" | [Google Scanned Objects](https://app.gazebosim.org/GoogleResearch/fuel/collections/Scanned%20Objects%20by%20Google%20Research) | **CC BY 4.0** - credit Google |
+| ~500 museum objects: sculpture, vessels, machines, skulls, shells - group "Музей и история" | [Smithsonian 3D](https://3d.si.edu) | CC0 |
+| 21 reference PBR models (helmet, chair, watch, chess) - "Дом - витрина Khronos" | [glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) | per model, mostly CC0 |
+| ~220 spacecraft, satellites and telescopes - "Космос - NASA" | [NASA 3D Resources](https://github.com/nasa/NASA-3D-Resources) | public domain, no NASA insignia |
+
+Repeats are not downloaded: variants of one ambientCG shoot (A, B, C) are filtered by preview beforehand, and
+after the download the color maps are compared - one shoot under two names (also across the two sites) stays
+once. Textures are sorted by material: brick, concrete and asphalt go to "City", metal to "Industry", fabrics,
+floors and tiles to "Home", the rest (wood, plastic, paper, wear and decals) to the "Материалы" group; in the
+tree texture sections are by material too.
+
+Models come as glb / gltf / obj and are converted to FBX by Blender (it must be installed), textures go next to
+it in `textures/`. The 3D window keeps the source glb (rebuilt if it is Draco-compressed): full PBR there. Scans
+are dense (up to 150k triangles) - turn on Nanite in a scene or simplify with "Budget". Some museum scans have
+no color at all - they are white as scanned. CC BY of the Google scans goes into the project CREDITS.md by itself.
+
+```bash
+py -3.14 _tools/cli.py unreal more tex --dry      # count what would be downloaded and how many repeats
+py -3.14 _tools/cli.py unreal more all            # tex | gso | si | khronos | nasa | all; --workers 4 --count N
+```
+
 ```bash
 py -3.14 _tools/cli.py unreal                                   # what is downloaded, by kind and theme
 py -3.14 _tools/cli.py unreal get tex "Город" --count 6 --res 2k  # tex | hdri | model | ies; a theme or "все" (all)
